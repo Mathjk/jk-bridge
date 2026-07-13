@@ -28,7 +28,7 @@ scripts/verify-windows.ps1     Windows environment and runtime verification
 scripts/check-public-release.sh privacy/credential gate
 scripts/publish-win-x64.sh     tested release packaging
 tests/                         .NET and Linux tests
-docs/                          product, architecture, security, protocol, ADRs
+docs/                          install, troubleshooting, development, architecture, security, protocol, ADRs
 ```
 
 `JKBridge.Core` has no Avalonia dependency. External processes are invoked through argument lists, never shell interpolation. UI and platform adapters own only presentation and OS integration.
@@ -165,4 +165,4 @@ The key cannot run commands or obtain a shell. Only exact IPv4 loopback targets 
 
 ## Publishing
 
-The release script runs privacy checks, Python tests, .NET Release tests, and self-contained Windows publish before producing a staging directory. It packages the EXE, Linux helper, bilingual documents, recovery scripts, security notes, and checksums. A detached SHA-256 file covers the ZIP.
+The release script runs privacy checks, Python tests, .NET Release tests, and self-contained Windows publish before producing a staging directory. One payload array is the source of truth for both `SHA256SUMS` and ZIP creation. The package contains the EXE, Linux helper, bilingual installation and troubleshooting documents, recovery scripts, security notes, images, and checksums. A detached SHA-256 file covers the ZIP.

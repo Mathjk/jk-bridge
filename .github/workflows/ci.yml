@@ -19,6 +19,8 @@ jobs:
           global-json-file: global.json
       - name: Public-release privacy scan
         run: ./scripts/check-public-release.sh
+      - name: Documentation link check
+        run: ./scripts/check-doc-links.sh
       - name: Linux helper tests
         run: python3 -m unittest discover -s tests/linux -p 'test_*.py'
       - name: .NET tests

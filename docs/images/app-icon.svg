@@ -1,0 +1,28 @@
+<svg width="256" height="256" viewBox="0 0 256 256" fill="none"
+     xmlns="http://www.w3.org/2000/svg" role="img" aria-labelledby="title desc">
+  <title id="title">JK Bridge application icon</title>
+  <desc id="desc">A dark rounded tile with two service nodes joined by an iris-to-teal bridge.</desc>
+  <defs>
+    <linearGradient id="tile" x1="28" y1="20" x2="228" y2="236" gradientUnits="userSpaceOnUse">
+      <stop stop-color="#18222B"/>
+      <stop offset="1" stop-color="#0C1116"/>
+    </linearGradient>
+    <linearGradient id="bridge" x1="63" y1="154" x2="193" y2="154" gradientUnits="userSpaceOnUse">
+      <stop stop-color="#8B87FF"/>
+      <stop offset="1" stop-color="#39B8AE"/>
+    </linearGradient>
+    <filter id="glow" x="38" y="60" width="180" height="150" filterUnits="userSpaceOnUse">
+      <feGaussianBlur stdDeviation="9"/>
+    </filter>
+  </defs>
+  <rect x="12" y="12" width="232" height="232" rx="54" fill="url(#tile)"/>
+  <rect x="13" y="13" width="230" height="230" rx="53" stroke="#32434E" stroke-width="2"/>
+  <path d="M67 159C87 98 169 98 189 159" stroke="url(#bridge)" stroke-width="17" stroke-linecap="round" opacity="0.20" filter="url(#glow)"/>
+  <path d="M67 159C87 98 169 98 189 159" stroke="url(#bridge)" stroke-width="12" stroke-linecap="round"/>
+  <path d="M82 169H174" stroke="url(#bridge)" stroke-width="5" stroke-linecap="round" opacity="0.52"/>
+  <rect x="39" y="130" width="58" height="58" rx="17" fill="#18232B" stroke="#8B87FF" stroke-width="7"/>
+  <rect x="159" y="130" width="58" height="58" rx="17" fill="#18232B" stroke="#39B8AE" stroke-width="7"/>
+  <rect x="59" y="150" width="18" height="18" rx="5" fill="#B7B4FF"/>
+  <rect x="179" y="150" width="18" height="18" rx="5" fill="#75DDD5"/>
+  <circle cx="128" cy="106" r="10" fill="#121A21" stroke="url(#bridge)" stroke-width="6"/>
+</svg>

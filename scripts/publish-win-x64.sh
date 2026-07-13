@@ -45,9 +45,11 @@ trap cleanup EXIT
 rm -rf -- "$OUT" "$DELIVERY"
 rm -f -- "$ARCHIVE" "$ARCHIVE_SHA256"
 mkdir -p -- "$PUBLISH_ROOT" "$STAGE" "$DELIVERY" "$DELIVERY/docs"
+mkdir -p -- "$DELIVERY/docs/images"
 
 printf 'Using .NET SDK %s\n' "$("$DOTNET_BIN" --version)"
 "$ROOT/scripts/check-public-release.sh"
+"$ROOT/scripts/check-doc-links.sh"
 python3 -m unittest discover -s "$ROOT/tests/linux" -p 'test_*.py'
 "$DOTNET_BIN" test "$ROOT/JKBridge.slnx" -c Release
 "$DOTNET_BIN" publish "$ROOT/src/JKBridge.App/JKBridge.App.csproj" \
@@ -73,39 +75,45 @@ install -m 0644 "$ROOT/scripts/setup-windows.ps1" "$DELIVERY/Setup-JKBridge.ps1"
 install -m 0644 "$ROOT/scripts/verify-windows.ps1" "$DELIVERY/Verify-JKBridge.ps1"
 install -m 0644 "$ROOT/README.md" "$DELIVERY/README.md"
 install -m 0644 "$ROOT/README.zh-CN.md" "$DELIVERY/README.zh-CN.md"
-install -m 0644 "$ROOT/USER_GUIDE.md" "$DELIVERY/USER_GUIDE.md"
-install -m 0644 "$ROOT/docs/SECURITY.md" "$DELIVERY/SECURITY.md"
+install -m 0644 "$ROOT/CONTRIBUTING.md" "$DELIVERY/CONTRIBUTING.md"
+install -m 0644 "$ROOT/SECURITY.md" "$DELIVERY/SECURITY.md"
 install -m 0644 "$ROOT/LICENSE" "$DELIVERY/LICENSE"
 install -m 0644 "$ROOT/CHANGELOG.md" "$DELIVERY/CHANGELOG.md"
+install -m 0644 "$ROOT/docs/INSTALLATION.md" "$DELIVERY/docs/INSTALLATION.md"
+install -m 0644 "$ROOT/docs/INSTALLATION.zh-CN.md" "$DELIVERY/docs/INSTALLATION.zh-CN.md"
+install -m 0644 "$ROOT/docs/TROUBLESHOOTING.md" "$DELIVERY/docs/TROUBLESHOOTING.md"
+install -m 0644 "$ROOT/docs/TROUBLESHOOTING.zh-CN.md" "$DELIVERY/docs/TROUBLESHOOTING.zh-CN.md"
+install -m 0644 "$ROOT/docs/DEVELOPMENT.md" "$DELIVERY/docs/DEVELOPMENT.md"
 install -m 0644 "$ROOT/docs/ARCHITECTURE.md" "$DELIVERY/docs/ARCHITECTURE.md"
 install -m 0644 "$ROOT/docs/PAIRING_PROTOCOL.md" "$DELIVERY/docs/PAIRING_PROTOCOL.md"
 install -m 0644 "$ROOT/docs/PRODUCT_SPEC.md" "$DELIVERY/docs/PRODUCT_SPEC.md"
 install -m 0644 "$ROOT/docs/SECURITY.md" "$DELIVERY/docs/SECURITY.md"
 install -m 0644 "$ROOT/docs/WINDOWS_ACCEPTANCE.md" "$DELIVERY/docs/WINDOWS_ACCEPTANCE.md"
+install -m 0644 "$ROOT/docs/images/app-icon.svg" "$DELIVERY/docs/images/app-icon.svg"
+install -m 0644 "$ROOT/docs/images/device-setup.png" "$DELIVERY/docs/images/device-setup.png"
+
+PAYLOAD_FILES=(
+  JKBridge.exe JKBridge.exe.sha256 jkbridge-linux.py
+  Setup-JKBridge.ps1 Verify-JKBridge.ps1
+  README.md README.zh-CN.md CONTRIBUTING.md SECURITY.md LICENSE CHANGELOG.md
+  docs/INSTALLATION.md docs/INSTALLATION.zh-CN.md
+  docs/TROUBLESHOOTING.md docs/TROUBLESHOOTING.zh-CN.md
+  docs/DEVELOPMENT.md docs/ARCHITECTURE.md docs/PAIRING_PROTOCOL.md
+  docs/PRODUCT_SPEC.md docs/SECURITY.md docs/WINDOWS_ACCEPTANCE.md
+  docs/images/app-icon.svg docs/images/device-setup.png
+)
 
 (
   cd -- "$DELIVERY"
   sha256sum JKBridge.exe > JKBridge.exe.sha256
-  sha256sum \
-    JKBridge.exe JKBridge.exe.sha256 jkbridge-linux.py \
-    Setup-JKBridge.ps1 Verify-JKBridge.ps1 \
-    README.md README.zh-CN.md USER_GUIDE.md SECURITY.md LICENSE CHANGELOG.md \
-    docs/ARCHITECTURE.md docs/PAIRING_PROTOCOL.md docs/PRODUCT_SPEC.md \
-    docs/SECURITY.md docs/WINDOWS_ACCEPTANCE.md \
-    > SHA256SUMS
+  sha256sum "${PAYLOAD_FILES[@]}" > SHA256SUMS
   sha256sum --check SHA256SUMS
 )
 
 if command -v zip >/dev/null 2>&1; then
   (
     cd -- "$DELIVERY"
-    zip -q -9 "$ARCHIVE" \
-      JKBridge.exe JKBridge.exe.sha256 jkbridge-linux.py \
-      Setup-JKBridge.ps1 Verify-JKBridge.ps1 \
-      README.md README.zh-CN.md USER_GUIDE.md SECURITY.md LICENSE CHANGELOG.md \
-      docs/ARCHITECTURE.md docs/PAIRING_PROTOCOL.md docs/PRODUCT_SPEC.md \
-      docs/SECURITY.md docs/WINDOWS_ACCEPTANCE.md \
-      SHA256SUMS
+    zip -q -9 "$ARCHIVE" "${PAYLOAD_FILES[@]}" SHA256SUMS
   )
   (
     cd -- "$ARTIFACTS"

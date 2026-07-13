@@ -19,6 +19,11 @@ RG_BASE=(
   --glob '!TestResults/**'
 )
 
+PUBLIC_PATHS=(
+  README.md README.zh-CN.md CONTRIBUTING.md SECURITY.md CHANGELOG.md
+  docs scripts src .github
+)
+
 failed=0
 
 check_all() {
@@ -36,7 +41,7 @@ check_public_sources() {
   local label="$1"
   local pattern="$2"
   local output
-  output="$(rg "${RG_BASE[@]}" --pcre2 -- "$pattern" README.md README.zh-CN.md USER_GUIDE.md docs scripts src .github 2>/dev/null || true)"
+  output="$(rg "${RG_BASE[@]}" --pcre2 -- "$pattern" "${PUBLIC_PATHS[@]}" 2>/dev/null || true)"
   if [[ -n "$output" ]]; then
     printf '\n[%s]\n%s\n' "$label" "$output" >&2
     failed=1
@@ -51,7 +56,7 @@ check_all 'Machine-specific Windows profile path' '(?i)[A-Z]:\\Users\\(?!Public(
 check_public_sources 'Generated Tailscale tailnet suffix' '(?i)\btail[a-f0-9]{6,}\.ts\.net\b'
 check_public_sources 'Embedded valid Ed25519 public key' 'ssh-ed25519\s+AAAAC3NzaC1lZDI1NTE5AAAAI[A-Za-z0-9+/]{42}[A-Za-z0-9+/=]'
 
-tailscale_ips="$(rg "${RG_BASE[@]}" --pcre2 -- '(?<![0-9])100\.(?:6[4-9]|[7-9][0-9]|1[01][0-9]|12[0-7])(?:\.[0-9]{1,3}){2}(?![0-9])' README.md README.zh-CN.md USER_GUIDE.md docs scripts src .github 2>/dev/null || true)"
+tailscale_ips="$(rg "${RG_BASE[@]}" --pcre2 -- '(?<![0-9])100\.(?:6[4-9]|[7-9][0-9]|1[01][0-9]|12[0-7])(?:\.[0-9]{1,3}){2}(?![0-9])' "${PUBLIC_PATHS[@]}" 2>/dev/null || true)"
 tailscale_ips="$(printf '%s\n' "$tailscale_ips" | grep -Ev '100\.64\.0\.(0|10)(/10)?' || true)"
 if [[ -n "$tailscale_ips" ]]; then
   printf '\n[Unexpected literal Tailscale IPv4]\n%s\n' "$tailscale_ips" >&2

@@ -131,5 +131,5 @@ Any running state -> Stopping -> Stopped
 
 - Repository contains no personal machine identity, runtime data, credentials, pairing tokens, or real public keys.
 - Public-release scanner, .NET tests, Python tests, and Release build pass.
-- Windows package contains the EXE, Linux helper, bilingual README files, fallback diagnostics, security document, and checksums.
+- Windows package contains the EXE, Linux helper, bilingual README/installation/troubleshooting guides, fallback diagnostics, contributor and security documents, README images, and checksums.
 - Windows-specific acceptance is completed before marking a GitHub Release stable.

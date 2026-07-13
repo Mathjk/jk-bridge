@@ -526,4 +526,4 @@ Write-Host "  sudo ssh-keygen -y -f /etc/ssh/ssh_host_ed25519_key"
 Write-Host "得到的 ssh-ed25519 公钥必须通过可信渠道核对，然后才能作为 -PinnedHostKey 写入配置。"
 Write-Host "不要从首次 SSH 连接提示或不可信网络复制并自动接受主机密钥。" -ForegroundColor Yellow
 
-Write-Host "`n首次配置准备完成。详细步骤见 USER_GUIDE.md。" -ForegroundColor Green
+Write-Host "`n首次配置准备完成。详细步骤见 README.zh-CN.md 或 docs/INSTALLATION.zh-CN.md。" -ForegroundColor Green

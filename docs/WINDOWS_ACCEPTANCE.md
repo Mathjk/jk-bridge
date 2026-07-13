@@ -8,7 +8,7 @@
 - [ ] Release output contains one distributable EXE with embedded debug information and no separate PDB in the delivery folder.
 - [ ] Application icon is correct at 16, 20, 24, 32, 48, and 256 px.
 - [ ] Unsigned-build SmartScreen behavior is documented; a signed release verifies when signing is later enabled.
-- [ ] ZIP contains `jkbridge-linux.py`, both README languages, recovery scripts, security notes, and all entries are covered by `SHA256SUMS`.
+- [ ] ZIP contains `jkbridge-linux.py`, both README languages, bilingual installation/troubleshooting guides, contributor/security documents, recovery scripts, README images, and all entries are covered by `SHA256SUMS`.
 
 ## Prerequisites and identity
 
