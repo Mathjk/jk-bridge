@@ -1,0 +1,151 @@
+<UserControl xmlns="https://github.com/avaloniaui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:vm="using:JKBridge.App.ViewModels"
+             xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
+             xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
+             mc:Ignorable="d"
+             d:DesignWidth="888"
+             d:DesignHeight="760"
+             x:Class="JKBridge.App.Views.Pages.SetupPage"
+             x:DataType="vm:MainViewModel">
+    <Border Classes="page-surface">
+        <Grid RowDefinitions="Auto,22,*">
+            <Grid Grid.Row="0" ColumnDefinitions="*,Auto">
+                <StackPanel>
+                    <TextBlock Text="设备配置" Classes="page-title" />
+                    <TextBlock Text="通过 Tailscale 一次性配对，自动完成 Windows 密钥、Linux 授权和固定主机身份。"
+                               Classes="page-subtitle" Margin="0,4,0,0" />
+                </StackPanel>
+                <Border Grid.Column="1" Classes="code-chip" VerticalAlignment="Center">
+                    <TextBlock Text="PAIRING · V1" Classes="technical-strong" />
+                </Border>
+            </Grid>
+
+            <ScrollViewer Grid.Row="2" HorizontalScrollBarVisibility="Disabled">
+                <Grid ColumnDefinitions="1.15*,18,*" RowDefinitions="Auto,16,Auto">
+                    <Border Grid.Row="0" Grid.Column="0" Classes="card" Padding="22">
+                        <StackPanel>
+                            <Grid ColumnDefinitions="Auto,*">
+                                <Border Width="38" Height="38" Classes="bridge-node info">
+                                    <TextBlock Text="01" Classes="technical-strong"
+                                               HorizontalAlignment="Center" VerticalAlignment="Center" />
+                                </Border>
+                                <StackPanel Grid.Column="1" Margin="12,0,0,0">
+                                    <TextBlock Text="在 Linux 启动一次性配对" Classes="section-title" />
+                                    <TextBlock Text="脚本不安装后台服务，成功一次或十分钟超时后自动退出。请以目标 SSH 用户运行，不要使用 sudo。"
+                                               Classes="page-subtitle" TextWrapping="Wrap" />
+                                </StackPanel>
+                            </Grid>
+
+                            <Border Classes="log-surface" Margin="0,18,0,0">
+                                <Grid ColumnDefinitions="Auto,*">
+                                    <TextBlock Text="$" Classes="technical-strong" Margin="0,0,9,0" />
+                                    <TextBlock Grid.Column="1" Text="python3 jkbridge-linux.py pair"
+                                               Classes="technical-strong" TextWrapping="Wrap" />
+                                </Grid>
+                            </Border>
+                            <TextBlock Text="脚本会显示以 jkbridge:// 开头的单行配对码。该配对码是十分钟有效的一次性凭据，请勿截图或转发。"
+                                       Classes="caption" TextWrapping="Wrap" Margin="0,8,0,0" />
+
+                            <Separator Classes="quiet" Margin="0,18" />
+
+                            <Grid ColumnDefinitions="Auto,*">
+                                <Border Width="38" Height="38" Classes="bridge-node info">
+                                    <TextBlock Text="02" Classes="technical-strong"
+                                               HorizontalAlignment="Center" VerticalAlignment="Center" />
+                                </Border>
+                                <StackPanel Grid.Column="1" Margin="12,0,0,0">
+                                    <TextBlock Text="粘贴配对码并开始" Classes="section-title" />
+                                    <TextBlock Text="软件只连接配对码中的 Tailscale IPv4；系统代理不会参与配对请求。"
+                                               Classes="page-subtitle" TextWrapping="Wrap" />
+                                </StackPanel>
+                            </Grid>
+
+                            <TextBlock Text="一次性配对码" Classes="body-strong" Margin="0,18,0,6" />
+                            <TextBox Text="{Binding PairingCode}" Classes="field technical"
+                                     PlaceholderText="jkbridge://100.64.x.x:port/v1?token=…"
+                                     AutomationProperties.Name="一次性 Linux 配对码" />
+
+                            <TextBlock Text="Windows 专用私钥" Classes="body-strong" Margin="0,14,0,6" />
+                            <TextBox Text="{Binding PairingIdentityFile}" Classes="field technical"
+                                     AutomationProperties.Name="Windows 专用私钥路径" />
+                            <TextBlock Text="已有专用密钥会安全复用；普通个人 SSH 密钥不应填在这里。"
+                                       Classes="caption" TextWrapping="Wrap" Margin="0,6,0,0" />
+
+                            <Button Content="一键配对并连接" Classes="primary" HorizontalAlignment="Stretch"
+                                    Margin="0,20,0,0" MinHeight="44"
+                                    IsEnabled="{Binding CanStartPairing}"
+                                    Command="{Binding PairDeviceCommand}"
+                                    AutomationProperties.Name="一键配对并连接" />
+                        </StackPanel>
+                    </Border>
+
+                    <StackPanel Grid.Row="0" Grid.Column="2">
+                        <Border Classes="card" Padding="20">
+                            <StackPanel>
+                                <TextBlock Text="当前设备" Classes="section-title" />
+                                <TextBlock Text="{Binding ConfiguredDeviceText}" Classes="body-strong"
+                                           Margin="0,8,0,0" TextWrapping="Wrap" />
+                                <TextBlock Text="配对会替换 Windows 当前服务器配置；旧 Linux 授权不会被远程删除，可稍后用 Linux 脚本按指纹撤销。"
+                                           Classes="caption" TextWrapping="Wrap" Margin="0,6,0,0" />
+                            </StackPanel>
+                        </Border>
+
+                        <Border Classes="card" Padding="20" Margin="0,16,0,0">
+                            <StackPanel>
+                                <TextBlock Text="配置进度" Classes="section-title" />
+                                <TextBlock Text="{Binding SetupFeedback}" Classes="page-subtitle"
+                                           TextWrapping="Wrap" Margin="0,3,0,16" />
+
+                                <Grid ColumnDefinitions="28,*,Auto" Margin="0,6">
+                                    <TextBlock Text="01" Classes="technical-strong" VerticalAlignment="Center" />
+                                    <StackPanel Grid.Column="1">
+                                        <TextBlock Text="环境与配对码" Classes="body-strong" />
+                                        <TextBlock Text="Tailscale · OpenSSH" Classes="caption" />
+                                    </StackPanel>
+                                    <TextBlock Grid.Column="2" Text="{Binding PairingPrerequisiteStatus}"
+                                               Classes="technical-strong" VerticalAlignment="Center" />
+                                </Grid>
+                                <Separator Classes="quiet" />
+                                <Grid ColumnDefinitions="28,*,Auto" Margin="0,6">
+                                    <TextBlock Text="02" Classes="technical-strong" VerticalAlignment="Center" />
+                                    <StackPanel Grid.Column="1">
+                                        <TextBlock Text="Windows 专用密钥" Classes="body-strong" />
+                                        <TextBlock Text="Ed25519 · 精确 ACL" Classes="caption" />
+                                    </StackPanel>
+                                    <TextBlock Grid.Column="2" Text="{Binding PairingKeyStatus}"
+                                               Classes="technical-strong" VerticalAlignment="Center" />
+                                </Grid>
+                                <Separator Classes="quiet" />
+                                <Grid ColumnDefinitions="28,*,Auto" Margin="0,6">
+                                    <TextBlock Text="03" Classes="technical-strong" VerticalAlignment="Center" />
+                                    <StackPanel Grid.Column="1">
+                                        <TextBlock Text="Linux 受限授权" Classes="body-strong" />
+                                        <TextBlock Text="备份 · 文件锁 · 原子写入" Classes="caption" />
+                                    </StackPanel>
+                                    <TextBlock Grid.Column="2" Text="{Binding PairingLinuxStatus}"
+                                               Classes="technical-strong" VerticalAlignment="Center" />
+                                </Grid>
+                                <Separator Classes="quiet" />
+                                <Grid ColumnDefinitions="28,*,Auto" Margin="0,6">
+                                    <TextBlock Text="04" Classes="technical-strong" VerticalAlignment="Center" />
+                                    <StackPanel Grid.Column="1">
+                                        <TextBlock Text="保存并连接" Classes="body-strong" />
+                                        <TextBlock Text="固定主机公钥 · 健康检查" Classes="caption" />
+                                    </StackPanel>
+                                    <TextBlock Grid.Column="2" Text="{Binding PairingFinishStatus}"
+                                               Classes="technical-strong" VerticalAlignment="Center" />
+                                </Grid>
+                            </StackPanel>
+                        </Border>
+
+                        <Border Classes="issue-banner warning" Margin="0,16,0,0">
+                            <TextBlock Text="安全边界：临时服务仅绑定 Linux 的 Tailscale 地址；请求使用 256 位一次性令牌；授权仅允许当前启用服务对应的 Linux 127.0.0.1 端口。"
+                                       Classes="body" TextWrapping="Wrap" />
+                        </Border>
+                    </StackPanel>
+                </Grid>
+            </ScrollViewer>
+        </Grid>
+    </Border>
+</UserControl>

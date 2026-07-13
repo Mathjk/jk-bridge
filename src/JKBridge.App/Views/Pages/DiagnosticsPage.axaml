@@ -1,0 +1,161 @@
+<UserControl xmlns="https://github.com/avaloniaui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:vm="using:JKBridge.App.ViewModels"
+             xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
+             xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
+             mc:Ignorable="d"
+             d:DesignWidth="888"
+             d:DesignHeight="760"
+             x:Class="JKBridge.App.Views.Pages.DiagnosticsPage"
+             x:DataType="vm:MainViewModel">
+    <Border Classes="page-surface">
+        <ScrollViewer HorizontalScrollBarVisibility="Disabled">
+            <StackPanel MaxWidth="1040" HorizontalAlignment="Stretch">
+                <Grid ColumnDefinitions="*,Auto" Margin="0,0,0,22">
+                    <StackPanel>
+                        <TextBlock Text="诊断" Classes="page-title" />
+                        <TextBlock Text="从网络身份到网页健康检查，逐段确认连接。"
+                                   Classes="page-subtitle" Margin="0,4,0,0" />
+                    </StackPanel>
+                    <StackPanel Grid.Column="1" Orientation="Horizontal" Spacing="8" VerticalAlignment="Center">
+                        <Button Content="复制摘要" Classes="secondary" Command="{Binding CopyDiagnosticSummaryCommand}" />
+                        <Button Content="重新检查" Classes="primary" Command="{Binding RunDiagnosticsCommand}" />
+                    </StackPanel>
+                </Grid>
+
+                <Grid ColumnDefinitions="*,12,*" RowDefinitions="Auto,12,Auto" Margin="0,0,0,22">
+                    <Border Grid.Row="0" Grid.Column="0" Classes="card">
+                        <Grid ColumnDefinitions="Auto,*">
+                            <Border Width="36" Height="36" CornerRadius="8" Classes="bridge-node"
+                                    Classes.connected="{Binding IsTailscaleHealthy}"
+                                    Classes.error="{Binding HasTailscaleIssue}">
+                                <TextBlock Text="TS" Classes="technical-strong" HorizontalAlignment="Center" VerticalAlignment="Center" />
+                            </Border>
+                            <StackPanel Grid.Column="1" Margin="12,0,0,0">
+                                <Grid ColumnDefinitions="*,Auto">
+                                    <TextBlock Text="Tailscale" Classes="card-title" />
+                                    <TextBlock Grid.Column="1" Text="{Binding TailscaleStatusText}" Classes="status-text"
+                                               Classes.connected="{Binding IsTailscaleHealthy}"
+                                               Classes.error="{Binding HasTailscaleIssue}" />
+                                </Grid>
+                                <TextBlock Text="{Binding TailscaleIdentity}" Classes="body" Margin="0,6,0,0" />
+                                <TextBlock Text="{Binding TailnetName}" Classes="technical" />
+                                <TextBlock Text="{Binding TailscaleExecutable}" Classes="caption" TextTrimming="CharacterEllipsis" Margin="0,5,0,0" />
+                            </StackPanel>
+                        </Grid>
+                    </Border>
+
+                    <Border Grid.Row="0" Grid.Column="2" Classes="card">
+                        <Grid ColumnDefinitions="Auto,*">
+                            <Border Width="36" Height="36" CornerRadius="8" Classes="bridge-node"
+                                    Classes.connected="{Binding IsLinuxHealthy}"
+                                    Classes.error="{Binding HasLinuxIssue}">
+                                <TextBlock Text="L" Classes="technical-strong" HorizontalAlignment="Center" VerticalAlignment="Center" />
+                            </Border>
+                            <StackPanel Grid.Column="1" Margin="12,0,0,0">
+                                <Grid ColumnDefinitions="*,Auto">
+                                    <TextBlock Text="Linux 节点" Classes="card-title" />
+                                    <TextBlock Grid.Column="1" Text="{Binding LinuxStatusText}" Classes="status-text"
+                                               Classes.connected="{Binding IsLinuxHealthy}"
+                                               Classes.error="{Binding HasLinuxIssue}" />
+                                </Grid>
+                                <TextBlock Text="{Binding LinuxPeerName}" Classes="body" Margin="0,6,0,0" />
+                                <TextBlock Text="{Binding LinuxPeerDnsName}" Classes="technical" TextTrimming="CharacterEllipsis" />
+                                <TextBlock Text="{Binding PeerRoute}" Classes="caption" Margin="0,5,0,0" />
+                            </StackPanel>
+                        </Grid>
+                    </Border>
+
+                    <Border Grid.Row="2" Grid.Column="0" Classes="card">
+                        <Grid ColumnDefinitions="Auto,*">
+                            <Border Width="36" Height="36" CornerRadius="8" Classes="bridge-node"
+                                    Classes.connected="{Binding IsSshHealthy}"
+                                    Classes.error="{Binding HasSshIssue}">
+                                <TextBlock Text="SSH" FontSize="9" Classes="technical-strong" HorizontalAlignment="Center" VerticalAlignment="Center" />
+                            </Border>
+                            <StackPanel Grid.Column="1" Margin="12,0,0,0">
+                                <Grid ColumnDefinitions="*,Auto">
+                                    <TextBlock Text="OpenSSH 隧道" Classes="card-title" />
+                                    <TextBlock Grid.Column="1" Text="{Binding SshStatusText}" Classes="status-text"
+                                               Classes.connected="{Binding IsSshHealthy}"
+                                               Classes.error="{Binding HasSshIssue}" />
+                                </Grid>
+                                <TextBlock Text="{Binding SshProcess}" Classes="body" Margin="0,6,0,0" />
+                                <TextBlock Text="{Binding SshExecutable}" Classes="technical" TextTrimming="CharacterEllipsis" />
+                                <TextBlock Text="{Binding HostFingerprint}" Classes="caption" TextTrimming="CharacterEllipsis" Margin="0,5,0,0" />
+                            </StackPanel>
+                        </Grid>
+                    </Border>
+
+                    <Border Grid.Row="2" Grid.Column="2" Classes="card">
+                        <Grid ColumnDefinitions="Auto,*">
+                            <Border Width="36" Height="36" CornerRadius="8" Classes="bridge-node"
+                                    Classes.connected="{Binding IsConnected}"
+                                    Classes.warning="{Binding IsDegraded}">
+                                <TextBlock Text="HTTP" FontSize="8" Classes="technical-strong" HorizontalAlignment="Center" VerticalAlignment="Center" />
+                            </Border>
+                            <StackPanel Grid.Column="1" Margin="12,0,0,0">
+                                <Grid ColumnDefinitions="*,Auto">
+                                    <TextBlock Text="网页健康检查" Classes="card-title" />
+                                    <TextBlock Grid.Column="1" Text="{Binding AvailableServicesText}" Classes="status-text"
+                                               Classes.connected="{Binding IsConnected}"
+                                               Classes.warning="{Binding IsDegraded}" />
+                                </Grid>
+                                <ItemsControl ItemsSource="{Binding Services}" Margin="0,5,0,0">
+                                    <ItemsControl.ItemTemplate>
+                                        <DataTemplate x:DataType="vm:ServiceCardViewModel">
+                                            <Grid ColumnDefinitions="*,Auto" Margin="0,2">
+                                                <TextBlock Text="{Binding Name}" Classes="body" />
+                                                <TextBlock Grid.Column="1" Text="{Binding HealthDetail}" Classes="caption" />
+                                            </Grid>
+                                        </DataTemplate>
+                                    </ItemsControl.ItemTemplate>
+                                </ItemsControl>
+                            </StackPanel>
+                        </Grid>
+                    </Border>
+                </Grid>
+
+                <Grid ColumnDefinitions="*,Auto" Margin="0,0,0,10">
+                    <StackPanel>
+                        <TextBlock Text="最近记录" Classes="section-title" />
+                        <TextBlock Text="日志中的用户名、密钥路径与令牌会在复制前脱敏。" Classes="page-subtitle" />
+                    </StackPanel>
+                    <Button Grid.Column="1" Content="打开日志目录" Classes="ghost"
+                            Command="{Binding OpenLogFolderCommand}" VerticalAlignment="Bottom" />
+                </Grid>
+
+                <ItemsControl ItemsSource="{Binding Diagnostics}">
+                    <ItemsControl.ItemTemplate>
+                        <DataTemplate x:DataType="vm:DiagnosticItemViewModel">
+                            <Expander Classes="diagnostic">
+                                <Expander.Header>
+                                    <Grid ColumnDefinitions="80,Auto,*,Auto" Margin="0,2">
+                                        <TextBlock Text="{Binding Time}" Classes="technical" VerticalAlignment="Center" />
+                                        <Border Grid.Column="1" Classes="status-pill"
+                                                Classes.connected="{Binding IsConnected}"
+                                                Classes.info="{Binding IsInfo}"
+                                                Classes.warning="{Binding IsWarning}"
+                                                Classes.error="{Binding IsError}"
+                                                Margin="0,0,12,0">
+                                            <TextBlock Text="{Binding Level}" Classes="status-text"
+                                                       Classes.connected="{Binding IsConnected}"
+                                                       Classes.info="{Binding IsInfo}"
+                                                       Classes.warning="{Binding IsWarning}"
+                                                       Classes.error="{Binding IsError}" />
+                                        </Border>
+                                        <TextBlock Grid.Column="2" Text="{Binding Title}" Classes="body-strong" VerticalAlignment="Center" />
+                                        <TextBlock Grid.Column="3" Text="展开" Classes="caption" VerticalAlignment="Center" Margin="18,0,0,0" />
+                                    </Grid>
+                                </Expander.Header>
+                                <Border Classes="log-surface" Margin="0,10,0,0">
+                                    <TextBlock Text="{Binding Detail}" Classes="technical" TextWrapping="Wrap" />
+                                </Border>
+                            </Expander>
+                        </DataTemplate>
+                    </ItemsControl.ItemTemplate>
+                </ItemsControl>
+            </StackPanel>
+        </ScrollViewer>
+    </Border>
+</UserControl>

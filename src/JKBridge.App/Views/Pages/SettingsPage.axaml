@@ -1,0 +1,147 @@
+<UserControl xmlns="https://github.com/avaloniaui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:vm="using:JKBridge.App.ViewModels"
+             xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
+             xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
+             mc:Ignorable="d"
+             d:DesignWidth="888"
+             d:DesignHeight="760"
+             x:Class="JKBridge.App.Views.Pages.SettingsPage"
+             x:DataType="vm:MainViewModel">
+    <Border Classes="page-surface">
+        <Grid RowDefinitions="Auto,22,*">
+            <Grid Grid.Row="0" ColumnDefinitions="*,Auto">
+                <StackPanel>
+                    <TextBlock Text="设置" Classes="page-title" />
+                    <TextBlock Text="管理 Linux 身份、连接行为与界面偏好。"
+                               Classes="page-subtitle" Margin="0,4,0,0" />
+                </StackPanel>
+                <Button Grid.Column="1" Content="保存设置" Classes="primary"
+                        Command="{Binding SaveSettingsCommand}" VerticalAlignment="Center" />
+            </Grid>
+
+            <ScrollViewer Grid.Row="2" HorizontalScrollBarVisibility="Disabled">
+                <Grid ColumnDefinitions="*,16,*" RowDefinitions="Auto,16,Auto">
+                    <Border Grid.Row="0" Grid.Column="0" Classes="card" Padding="20">
+                        <StackPanel>
+                            <TextBlock Text="Linux 连接" Classes="section-title" />
+                            <TextBlock Text="使用 MagicDNS 名称定位主机，不保存易变化的 Tailscale IP。"
+                                       Classes="page-subtitle" TextWrapping="Wrap" Margin="0,2,0,18" />
+
+                            <TextBlock Text="主机 / MagicDNS" Classes="body-strong" Margin="0,0,0,6" />
+                            <TextBox Text="{Binding LinuxHost}" Classes="field technical" />
+
+                            <Grid ColumnDefinitions="*,12,116" Margin="0,14,0,0">
+                                <StackPanel>
+                                    <TextBlock Text="Linux 用户" Classes="body-strong" Margin="0,0,0,6" />
+                                    <TextBox Text="{Binding LinuxUser}" Classes="field technical" />
+                                </StackPanel>
+                                <StackPanel Grid.Column="2">
+                                    <TextBlock Text="SSH 端口" Classes="body-strong" Margin="0,0,0,6" />
+                                    <TextBox Text="{Binding SshPort}" Classes="field technical" />
+                                </StackPanel>
+                            </Grid>
+
+                            <TextBlock Text="专用私钥" Classes="body-strong" Margin="0,14,0,6" />
+                            <TextBox Text="{Binding IdentityFile}" Classes="field technical" />
+                            <TextBlock Text="推荐使用仅允许本机端口转发、不可登录 Shell 的专用密钥。"
+                                       Classes="caption" TextWrapping="Wrap" Margin="0,5,0,0" />
+
+                            <Button Content="打开设备配置 / 重新配对" Classes="secondary"
+                                    HorizontalAlignment="Left" Margin="0,14,0,0"
+                                    Command="{Binding ShowSetupCommand}" />
+
+                            <TextBlock Text="固定主机公钥" Classes="body-strong" Margin="0,14,0,6" />
+                            <TextBox Text="{Binding PinnedHostKey}" Classes="field technical"
+                                     AcceptsReturn="True" MinHeight="70" TextWrapping="Wrap" />
+                        </StackPanel>
+                    </Border>
+
+                    <Border Grid.Row="0" Grid.Column="2" Classes="card" Padding="20">
+                        <StackPanel>
+                            <TextBlock Text="运行方式" Classes="section-title" />
+                            <TextBlock Text="让连接保持安静，需要处理时再提醒你。"
+                                       Classes="page-subtitle" Margin="0,2,0,12" />
+
+                            <Grid ColumnDefinitions="*,Auto" Margin="0,8">
+                                <StackPanel>
+                                    <TextBlock Text="启动后自动连接" Classes="body-strong" />
+                                    <TextBlock Text="环境检查通过后建立隧道" Classes="caption" />
+                                </StackPanel>
+                                <ToggleSwitch Grid.Column="1" IsChecked="{Binding AutoConnect}" VerticalAlignment="Center" />
+                            </Grid>
+                            <Separator Classes="quiet" Margin="0,6" />
+                            <Grid ColumnDefinitions="*,Auto" Margin="0,8">
+                                <StackPanel>
+                                    <TextBlock Text="连接中断后自动重试" Classes="body-strong" />
+                                    <TextBlock Text="使用渐进等待，避免频繁打扰" Classes="caption" />
+                                </StackPanel>
+                                <ToggleSwitch Grid.Column="1" IsChecked="{Binding AutoReconnect}" VerticalAlignment="Center" />
+                            </Grid>
+                            <Separator Classes="quiet" Margin="0,6" />
+                            <Grid ColumnDefinitions="*,Auto" Margin="0,8">
+                                <StackPanel>
+                                    <TextBlock Text="关闭窗口时留在托盘" Classes="body-strong" />
+                                    <TextBlock Text="显式“退出”才会终止 SSH" Classes="caption" />
+                                </StackPanel>
+                                <ToggleSwitch Grid.Column="1" IsChecked="{Binding CloseToTray}" VerticalAlignment="Center" />
+                            </Grid>
+                            <Separator Classes="quiet" Margin="0,6" />
+                            <Grid ColumnDefinitions="*,Auto" Margin="0,8">
+                                <StackPanel>
+                                    <TextBlock Text="随 Windows 登录启动" Classes="body-strong" />
+                                    <TextBlock Text="只为当前 Windows 用户注册" Classes="caption" />
+                                </StackPanel>
+                                <ToggleSwitch Grid.Column="1" IsChecked="{Binding StartWithWindows}" VerticalAlignment="Center" />
+                            </Grid>
+
+                            <Border Classes="issue-banner warning" Margin="0,14,0,0">
+                                <TextBlock Text="更改主机、用户、端口或密钥后，活动连接会重新建立一次。"
+                                           Classes="body" TextWrapping="Wrap" />
+                            </Border>
+                        </StackPanel>
+                    </Border>
+
+                    <Border Grid.Row="2" Grid.Column="0" Classes="card" Padding="20">
+                        <StackPanel>
+                            <TextBlock Text="外观" Classes="section-title" />
+                            <TextBlock Text="默认跟随 Windows 主题。" Classes="page-subtitle" Margin="0,2,0,16" />
+
+                            <TextBlock Text="颜色模式" Classes="body-strong" Margin="0,0,0,6" />
+                            <ComboBox SelectedIndex="{Binding ThemeIndex}" Classes="field">
+                                <ComboBoxItem Content="跟随系统" />
+                                <ComboBoxItem Content="浅色" />
+                                <ComboBoxItem Content="深色" />
+                            </ComboBox>
+
+                        </StackPanel>
+                    </Border>
+
+                    <Border Grid.Row="2" Grid.Column="2" Classes="card" Padding="20">
+                        <StackPanel>
+                            <TextBlock Text="关于与数据" Classes="section-title" />
+                            <TextBlock Text="JK Bridge 仅在本机保存配置与脱敏日志。"
+                                       Classes="page-subtitle" Margin="0,2,0,16" />
+                            <Grid ColumnDefinitions="140,*" Margin="0,3">
+                                <TextBlock Text="产品" Classes="muted" />
+                                <TextBlock Grid.Column="1" Text="JK Bridge 2.0" Classes="body-strong" />
+                            </Grid>
+                            <Grid ColumnDefinitions="140,*" Margin="0,3">
+                                <TextBlock Text="配置目录" Classes="muted" />
+                                <TextBlock Grid.Column="1" Text="%LOCALAPPDATA%\JKBridge" Classes="technical-strong" />
+                            </Grid>
+                            <Grid ColumnDefinitions="140,*" Margin="0,3">
+                                <TextBlock Text="远程暴露" Classes="muted" />
+                                <TextBlock Grid.Column="1" Text="无 · 仅 127.0.0.1" Classes="body-strong" />
+                            </Grid>
+                            <Separator Classes="quiet" />
+                            <TextBlock Text="{Binding SettingsFeedback}" Classes="caption" TextWrapping="Wrap" />
+                            <Button Content="打开诊断与日志" Classes="secondary" HorizontalAlignment="Left"
+                                    Margin="0,14,0,0" Command="{Binding ShowDiagnosticsCommand}" />
+                        </StackPanel>
+                    </Border>
+                </Grid>
+            </ScrollViewer>
+        </Grid>
+    </Border>
+</UserControl>

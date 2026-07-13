@@ -1,0 +1,204 @@
+<UserControl xmlns="https://github.com/avaloniaui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:vm="using:JKBridge.App.ViewModels"
+             xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
+             xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
+             mc:Ignorable="d"
+             d:DesignWidth="888"
+             d:DesignHeight="760"
+             x:Class="JKBridge.App.Views.Pages.OverviewPage"
+             x:DataType="vm:MainViewModel">
+    <Border Classes="page-surface">
+        <ScrollViewer HorizontalScrollBarVisibility="Disabled">
+            <StackPanel MaxWidth="1040" HorizontalAlignment="Stretch">
+                <Grid ColumnDefinitions="*,Auto" Margin="0,0,0,24">
+                    <StackPanel>
+                        <TextBlock Text="本地服务桥" Classes="page-title" />
+                        <TextBlock Text="不记 IP，只连接确认过的 Linux 主机。"
+                                   Classes="page-subtitle" Margin="0,4,0,0" />
+                    </StackPanel>
+                    <StackPanel Grid.Column="1" Orientation="Horizontal" VerticalAlignment="Center" Spacing="8">
+                        <Button Content="刷新" Classes="secondary"
+                                Command="{Binding RefreshCommand}"
+                                AutomationProperties.Name="刷新连接状态" />
+                        <Button Content="{Binding ConnectionActionText}" Classes="primary"
+                                Command="{Binding ToggleBridgeCommand}"
+                                IsEnabled="{Binding !IsBusy}"
+                                AutomationProperties.Name="连接或断开全部服务" />
+                    </StackPanel>
+                </Grid>
+
+                <Border Classes="bridge-rail" Margin="0,0,0,18">
+                    <Grid ColumnDefinitions="88,*,88,*,88,*,88,*,88">
+                        <StackPanel Grid.Column="0" HorizontalAlignment="Center">
+                            <Border Classes="bridge-node info" HorizontalAlignment="Center">
+                                <TextBlock Text="W" Classes="technical-strong" HorizontalAlignment="Center" VerticalAlignment="Center" />
+                            </Border>
+                            <TextBlock Text="Windows" Classes="card-title" HorizontalAlignment="Center" Margin="0,7,0,0" />
+                            <TextBlock Text="就绪" Classes="caption" HorizontalAlignment="Center" />
+                        </StackPanel>
+                        <Border Grid.Column="1" Classes="rail-line active" VerticalAlignment="Top" Margin="4,16" />
+
+                        <StackPanel Grid.Column="2" HorizontalAlignment="Center">
+                            <Border Classes="bridge-node"
+                                    Classes.connected="{Binding IsConnected}"
+                                    Classes.info="{Binding IsConnecting}"
+                                    HorizontalAlignment="Center">
+                                <TextBlock Text="TS" Classes="technical-strong" HorizontalAlignment="Center" VerticalAlignment="Center" />
+                            </Border>
+                            <TextBlock Text="Tailscale" Classes="card-title" HorizontalAlignment="Center" Margin="0,7,0,0" />
+                            <TextBlock Text="同一网络" Classes="caption" HorizontalAlignment="Center" />
+                        </StackPanel>
+                        <Border Grid.Column="3" Classes="rail-line"
+                                Classes.connected="{Binding IsConnected}"
+                                Classes.warning="{Binding IsDegraded}"
+                                VerticalAlignment="Top" Margin="4,16" />
+
+                        <StackPanel Grid.Column="4" HorizontalAlignment="Center">
+                            <Border Classes="bridge-node"
+                                    Classes.connected="{Binding IsConnected}"
+                                    Classes.warning="{Binding IsDegraded}"
+                                    HorizontalAlignment="Center">
+                                <TextBlock Text="L" Classes="technical-strong" HorizontalAlignment="Center" VerticalAlignment="Center" />
+                            </Border>
+                            <TextBlock Text="Linux" Classes="card-title" HorizontalAlignment="Center" Margin="0,7,0,0" />
+                            <TextBlock Text="精确匹配" Classes="caption" HorizontalAlignment="Center" />
+                        </StackPanel>
+                        <Border Grid.Column="5" Classes="rail-line"
+                                Classes.connected="{Binding IsConnected}"
+                                Classes.warning="{Binding IsDegraded}"
+                                VerticalAlignment="Top" Margin="4,16" />
+
+                        <StackPanel Grid.Column="6" HorizontalAlignment="Center">
+                            <Border Classes="bridge-node"
+                                    Classes.connected="{Binding IsConnected}"
+                                    Classes.warning="{Binding IsDegraded}"
+                                    HorizontalAlignment="Center">
+                                <TextBlock Text="SSH" FontSize="10" Classes="technical-strong" HorizontalAlignment="Center" VerticalAlignment="Center" />
+                            </Border>
+                            <TextBlock Text="安全隧道" Classes="card-title" HorizontalAlignment="Center" Margin="0,7,0,0" />
+                            <TextBlock Text="密钥已固定" Classes="caption" HorizontalAlignment="Center" />
+                        </StackPanel>
+                        <Border Grid.Column="7" Classes="rail-line"
+                                Classes.connected="{Binding IsConnected}"
+                                Classes.warning="{Binding IsDegraded}"
+                                VerticalAlignment="Top" Margin="4,16" />
+
+                        <StackPanel Grid.Column="8" HorizontalAlignment="Center">
+                            <Border Classes="bridge-node"
+                                    Classes.connected="{Binding IsConnected}"
+                                    Classes.warning="{Binding IsDegraded}"
+                                    HorizontalAlignment="Center">
+                                <TextBlock Text="2" Classes="technical-strong" HorizontalAlignment="Center" VerticalAlignment="Center" />
+                            </Border>
+                            <TextBlock Text="服务" Classes="card-title" HorizontalAlignment="Center" Margin="0,7,0,0" />
+                            <TextBlock Text="{Binding AvailableServicesText}" Classes="caption" HorizontalAlignment="Center" />
+                        </StackPanel>
+                    </Grid>
+                </Border>
+
+                <Border Classes="issue-banner"
+                        Classes.warning="{Binding IsDegraded}"
+                        Classes.error="{Binding IsStopped}"
+                        IsVisible="{Binding HasIssue}"
+                        Margin="0,0,0,20">
+                    <Grid ColumnDefinitions="Auto,*,Auto">
+                        <Border Width="28" Height="28" CornerRadius="7"
+                                Background="{DynamicResource JkWarningSurfaceBrush}"
+                                BorderBrush="{DynamicResource JkWarningBorderBrush}"
+                                BorderThickness="1">
+                            <TextBlock Text="!" FontWeight="Bold" Foreground="{DynamicResource JkWarningBrush}"
+                                       HorizontalAlignment="Center" VerticalAlignment="Center" />
+                        </Border>
+                        <StackPanel Grid.Column="1" Margin="12,0,16,0">
+                            <TextBlock Text="{Binding IssueTitle}" Classes="body-strong" />
+                            <TextBlock Text="{Binding IssueDetail}" Classes="muted" TextWrapping="Wrap" />
+                        </StackPanel>
+                        <Button Grid.Column="2" Content="查看诊断" Classes="secondary"
+                                Command="{Binding ShowDiagnosticsCommand}" />
+                    </Grid>
+                </Border>
+
+                <Grid ColumnDefinitions="*,Auto" Margin="0,0,0,12">
+                    <StackPanel>
+                        <TextBlock Text="可访问的服务" Classes="section-title" />
+                        <TextBlock Text="浏览器始终打开 127.0.0.1，流量由加密隧道转发。" Classes="page-subtitle" />
+                    </StackPanel>
+                    <TextBlock Grid.Column="1" Text="{Binding LastUpdatedText}" Classes="caption" VerticalAlignment="Bottom" Margin="0,0,0,3" />
+                </Grid>
+
+                <ItemsControl ItemsSource="{Binding Services}">
+                    <ItemsControl.ItemsPanel>
+                        <ItemsPanelTemplate>
+                            <UniformGrid Columns="2" />
+                        </ItemsPanelTemplate>
+                    </ItemsControl.ItemsPanel>
+                    <ItemsControl.ItemTemplate>
+                        <DataTemplate x:DataType="vm:ServiceCardViewModel">
+                            <Border Classes="card service-card interactive" Margin="0,0,12,12">
+                                <Grid RowDefinitions="Auto,*,Auto">
+                                    <Grid ColumnDefinitions="Auto,*,Auto">
+                                        <Border Width="42" Height="42" CornerRadius="8"
+                                                Background="{DynamicResource JkIrisSurfaceBrush}"
+                                                BorderBrush="{DynamicResource JkIrisBorderBrush}"
+                                                BorderThickness="1">
+                                            <TextBlock Text="{Binding ShortCode}" Classes="technical-strong"
+                                                       Foreground="{DynamicResource JkIrisBrush}"
+                                                       HorizontalAlignment="Center" VerticalAlignment="Center" />
+                                        </Border>
+                                        <StackPanel Grid.Column="1" Margin="12,0,8,0">
+                                            <TextBlock Text="{Binding Name}" Classes="card-title" FontSize="15" />
+                                            <TextBlock Text="{Binding Description}" Classes="caption" />
+                                        </StackPanel>
+                                        <Border Grid.Column="2" Classes="status-pill"
+                                                Classes.connected="{Binding IsAvailable}"
+                                                Classes.warning="{Binding HasWarning}"
+                                                VerticalAlignment="Top">
+                                            <TextBlock Text="{Binding Status}" Classes="status-text"
+                                                       Classes.connected="{Binding IsAvailable}"
+                                                       Classes.warning="{Binding HasWarning}" />
+                                        </Border>
+                                    </Grid>
+                                    <StackPanel Grid.Row="1" Margin="0,14,0,12">
+                                        <TextBlock Text="{Binding LocalUrl}" Classes="technical-strong" TextTrimming="CharacterEllipsis" />
+                                        <TextBlock Text="{Binding HealthDetail}" Classes="caption" Margin="0,3,0,0" />
+                                    </StackPanel>
+                                    <Grid Grid.Row="2" ColumnDefinitions="*,Auto,8,Auto">
+                                        <Button Content="复制地址" Classes="ghost" HorizontalAlignment="Left"
+                                                Command="{Binding CopyAddressCommand}" />
+                                        <Button Grid.Column="1" Content="检查" Classes="ghost"
+                                                Command="{Binding RetryCommand}" />
+                                        <Button Grid.Column="3" Content="打开 ↗" Classes="primary service-open"
+                                                Command="{Binding OpenCommand}"
+                                                IsEnabled="{Binding IsAvailable}"
+                                                AutomationProperties.Name="打开服务" />
+                                    </Grid>
+                                </Grid>
+                            </Border>
+                        </DataTemplate>
+                    </ItemsControl.ItemTemplate>
+                </ItemsControl>
+
+                <Grid ColumnDefinitions="*,Auto" Margin="0,12,0,10">
+                    <TextBlock Text="最近活动" Classes="section-title" />
+                    <Button Grid.Column="1" Content="全部诊断" Classes="ghost" Command="{Binding ShowDiagnosticsCommand}" />
+                </Grid>
+                <Border Classes="log-surface">
+                    <ItemsControl ItemsSource="{Binding Diagnostics}">
+                        <ItemsControl.ItemTemplate>
+                            <DataTemplate x:DataType="vm:DiagnosticItemViewModel">
+                                <Grid ColumnDefinitions="76,Auto,*" Margin="0,4">
+                                    <TextBlock Text="{Binding Time}" Classes="technical" />
+                                    <Border Grid.Column="1" Width="7" Height="7" CornerRadius="4"
+                                            Margin="2,5,12,0" VerticalAlignment="Top"
+                                            Background="{DynamicResource JkBridgeTealBrush}" />
+                                    <TextBlock Grid.Column="2" Text="{Binding Title}" Classes="body" />
+                                </Grid>
+                            </DataTemplate>
+                        </ItemsControl.ItemTemplate>
+                    </ItemsControl>
+                </Border>
+            </StackPanel>
+        </ScrollViewer>
+    </Border>
+</UserControl>

@@ -1,0 +1,144 @@
+<Styles xmlns="https://github.com/avaloniaui"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml">
+  <!--
+    JK Bridge — Quiet Infrastructure palette.
+
+    These resources intentionally describe roles rather than individual controls.
+    Keep literal colors here so the rest of the UI can stay theme-aware.
+  -->
+  <Styles.Resources>
+    <ResourceDictionary>
+      <FontFamily x:Key="JkUiFontFamily">Segoe UI Variable Text,Segoe UI</FontFamily>
+      <FontFamily x:Key="JkDisplayFontFamily">Segoe UI Variable Display,Segoe UI,Bahnschrift</FontFamily>
+      <FontFamily x:Key="JkTechnicalFontFamily">Cascadia Mono,Consolas</FontFamily>
+
+      <ResourceDictionary.ThemeDictionaries>
+        <ResourceDictionary x:Key="Light">
+          <!-- Foundation -->
+          <SolidColorBrush x:Key="JkWindowBrush">#F4F7F8</SolidColorBrush>
+          <SolidColorBrush x:Key="JkNavigationBrush">#EDF2F3</SolidColorBrush>
+          <SolidColorBrush x:Key="JkSurfaceBrush">#FFFFFF</SolidColorBrush>
+          <SolidColorBrush x:Key="JkSurfaceAltBrush">#F6F9F9</SolidColorBrush>
+          <SolidColorBrush x:Key="JkSurfaceRaisedBrush">#FBFDFD</SolidColorBrush>
+          <SolidColorBrush x:Key="JkSurfaceHoverBrush">#EAF0F1</SolidColorBrush>
+          <SolidColorBrush x:Key="JkSurfacePressedBrush">#DDE7E9</SolidColorBrush>
+          <SolidColorBrush x:Key="JkCodeSurfaceBrush">#EEF3F4</SolidColorBrush>
+          <SolidColorBrush x:Key="JkScrimBrush">#520B1115</SolidColorBrush>
+
+          <!-- Structure -->
+          <SolidColorBrush x:Key="JkBorderBrush">#D5E0E3</SolidColorBrush>
+          <SolidColorBrush x:Key="JkBorderStrongBrush">#B9CACF</SolidColorBrush>
+          <SolidColorBrush x:Key="JkDividerBrush">#C7D4D7</SolidColorBrush>
+
+          <!-- Type -->
+          <SolidColorBrush x:Key="JkTextBrush">#172126</SolidColorBrush>
+          <SolidColorBrush x:Key="JkTextMutedBrush">#586B73</SolidColorBrush>
+          <SolidColorBrush x:Key="JkTextSubtleBrush">#75878E</SolidColorBrush>
+          <SolidColorBrush x:Key="JkTextOnAccentBrush">#FFFFFF</SolidColorBrush>
+
+          <!-- Brand and interaction -->
+          <SolidColorBrush x:Key="JkIrisBrush">#5B57C8</SolidColorBrush>
+          <SolidColorBrush x:Key="JkIrisHoverBrush">#4F4BB5</SolidColorBrush>
+          <SolidColorBrush x:Key="JkIrisPressedBrush">#423E9D</SolidColorBrush>
+          <SolidColorBrush x:Key="JkIrisSurfaceBrush">#ECEBFB</SolidColorBrush>
+          <SolidColorBrush x:Key="JkIrisBorderBrush">#C8C5F2</SolidColorBrush>
+          <SolidColorBrush x:Key="JkBridgeTealBrush">#147E78</SolidColorBrush>
+          <SolidColorBrush x:Key="JkBridgeTealSurfaceBrush">#E2F4F1</SolidColorBrush>
+          <SolidColorBrush x:Key="JkFocusBrush">#4F4BB5</SolidColorBrush>
+          <LinearGradientBrush x:Key="JkBridgeGradientBrush"
+                               StartPoint="0%,50%"
+                               EndPoint="100%,50%">
+            <GradientStop Offset="0" Color="#5B57C8" />
+            <GradientStop Offset="1" Color="#147E78" />
+          </LinearGradientBrush>
+
+          <!-- Semantic status -->
+          <SolidColorBrush x:Key="JkNeutralBrush">#64777F</SolidColorBrush>
+          <SolidColorBrush x:Key="JkNeutralSurfaceBrush">#EDF2F3</SolidColorBrush>
+          <SolidColorBrush x:Key="JkNeutralBorderBrush">#CAD7DA</SolidColorBrush>
+
+          <SolidColorBrush x:Key="JkInfoBrush">#275EAD</SolidColorBrush>
+          <SolidColorBrush x:Key="JkInfoSurfaceBrush">#EAF1FC</SolidColorBrush>
+          <SolidColorBrush x:Key="JkInfoBorderBrush">#BDD1F1</SolidColorBrush>
+
+          <SolidColorBrush x:Key="JkSuccessBrush">#0E7747</SolidColorBrush>
+          <SolidColorBrush x:Key="JkSuccessSurfaceBrush">#E5F5EC</SolidColorBrush>
+          <SolidColorBrush x:Key="JkSuccessBorderBrush">#ADDEC3</SolidColorBrush>
+
+          <SolidColorBrush x:Key="JkWarningBrush">#875500</SolidColorBrush>
+          <SolidColorBrush x:Key="JkWarningSurfaceBrush">#FFF4D8</SolidColorBrush>
+          <SolidColorBrush x:Key="JkWarningBorderBrush">#EBD292</SolidColorBrush>
+
+          <SolidColorBrush x:Key="JkErrorBrush">#B42330</SolidColorBrush>
+          <SolidColorBrush x:Key="JkErrorHoverBrush">#9E1D29</SolidColorBrush>
+          <SolidColorBrush x:Key="JkErrorPressedBrush">#861722</SolidColorBrush>
+          <SolidColorBrush x:Key="JkErrorSurfaceBrush">#FDEBED</SolidColorBrush>
+          <SolidColorBrush x:Key="JkErrorBorderBrush">#EFB9BE</SolidColorBrush>
+        </ResourceDictionary>
+
+        <ResourceDictionary x:Key="Dark">
+          <!-- Foundation -->
+          <SolidColorBrush x:Key="JkWindowBrush">#0C1116</SolidColorBrush>
+          <SolidColorBrush x:Key="JkNavigationBrush">#10171D</SolidColorBrush>
+          <SolidColorBrush x:Key="JkSurfaceBrush">#121A21</SolidColorBrush>
+          <SolidColorBrush x:Key="JkSurfaceAltBrush">#17222B</SolidColorBrush>
+          <SolidColorBrush x:Key="JkSurfaceRaisedBrush">#1B2730</SolidColorBrush>
+          <SolidColorBrush x:Key="JkSurfaceHoverBrush">#21303A</SolidColorBrush>
+          <SolidColorBrush x:Key="JkSurfacePressedBrush">#293B46</SolidColorBrush>
+          <SolidColorBrush x:Key="JkCodeSurfaceBrush">#0F171D</SolidColorBrush>
+          <SolidColorBrush x:Key="JkScrimBrush">#A6000000</SolidColorBrush>
+
+          <!-- Structure -->
+          <SolidColorBrush x:Key="JkBorderBrush">#2A3842</SolidColorBrush>
+          <SolidColorBrush x:Key="JkBorderStrongBrush">#40515C</SolidColorBrush>
+          <SolidColorBrush x:Key="JkDividerBrush">#354651</SolidColorBrush>
+
+          <!-- Type -->
+          <SolidColorBrush x:Key="JkTextBrush">#ECF2F4</SolidColorBrush>
+          <SolidColorBrush x:Key="JkTextMutedBrush">#9BACB3</SolidColorBrush>
+          <SolidColorBrush x:Key="JkTextSubtleBrush">#7F929A</SolidColorBrush>
+          <SolidColorBrush x:Key="JkTextOnAccentBrush">#FFFFFF</SolidColorBrush>
+
+          <!-- Brand and interaction -->
+          <SolidColorBrush x:Key="JkIrisBrush">#7D79F2</SolidColorBrush>
+          <SolidColorBrush x:Key="JkIrisHoverBrush">#908CF8</SolidColorBrush>
+          <SolidColorBrush x:Key="JkIrisPressedBrush">#6965D8</SolidColorBrush>
+          <SolidColorBrush x:Key="JkIrisSurfaceBrush">#292742</SolidColorBrush>
+          <SolidColorBrush x:Key="JkIrisBorderBrush">#4C497C</SolidColorBrush>
+          <SolidColorBrush x:Key="JkBridgeTealBrush">#39B8AE</SolidColorBrush>
+          <SolidColorBrush x:Key="JkBridgeTealSurfaceBrush">#163A38</SolidColorBrush>
+          <SolidColorBrush x:Key="JkFocusBrush">#9A96FF</SolidColorBrush>
+          <LinearGradientBrush x:Key="JkBridgeGradientBrush"
+                               StartPoint="0%,50%"
+                               EndPoint="100%,50%">
+            <GradientStop Offset="0" Color="#7D79F2" />
+            <GradientStop Offset="1" Color="#39B8AE" />
+          </LinearGradientBrush>
+
+          <!-- Semantic status -->
+          <SolidColorBrush x:Key="JkNeutralBrush">#A5B3B8</SolidColorBrush>
+          <SolidColorBrush x:Key="JkNeutralSurfaceBrush">#202C34</SolidColorBrush>
+          <SolidColorBrush x:Key="JkNeutralBorderBrush">#3A4A54</SolidColorBrush>
+
+          <SolidColorBrush x:Key="JkInfoBrush">#77ADFA</SolidColorBrush>
+          <SolidColorBrush x:Key="JkInfoSurfaceBrush">#172B45</SolidColorBrush>
+          <SolidColorBrush x:Key="JkInfoBorderBrush">#2E5381</SolidColorBrush>
+
+          <SolidColorBrush x:Key="JkSuccessBrush">#54C987</SolidColorBrush>
+          <SolidColorBrush x:Key="JkSuccessSurfaceBrush">#173628</SolidColorBrush>
+          <SolidColorBrush x:Key="JkSuccessBorderBrush">#2D6949</SolidColorBrush>
+
+          <SolidColorBrush x:Key="JkWarningBrush">#E7AD55</SolidColorBrush>
+          <SolidColorBrush x:Key="JkWarningSurfaceBrush">#3A2C17</SolidColorBrush>
+          <SolidColorBrush x:Key="JkWarningBorderBrush">#6A4E26</SolidColorBrush>
+
+          <SolidColorBrush x:Key="JkErrorBrush">#F07178</SolidColorBrush>
+          <SolidColorBrush x:Key="JkErrorHoverBrush">#F4878D</SolidColorBrush>
+          <SolidColorBrush x:Key="JkErrorPressedBrush">#D95C64</SolidColorBrush>
+          <SolidColorBrush x:Key="JkErrorSurfaceBrush">#3B2025</SolidColorBrush>
+          <SolidColorBrush x:Key="JkErrorBorderBrush">#743942</SolidColorBrush>
+        </ResourceDictionary>
+      </ResourceDictionary.ThemeDictionaries>
+    </ResourceDictionary>
+  </Styles.Resources>
+</Styles>

@@ -1,0 +1,124 @@
+<Window xmlns="https://github.com/avaloniaui"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        xmlns:vm="using:JKBridge.App.ViewModels"
+        xmlns:pages="using:JKBridge.App.Views.Pages"
+        xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
+        xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
+        mc:Ignorable="d"
+        d:DesignWidth="1120"
+        d:DesignHeight="760"
+        x:Class="JKBridge.App.Views.MainWindow"
+        x:DataType="vm:MainViewModel"
+        Classes="jk-root"
+        Icon="/Assets/jkbridge.ico"
+        Title="JK Bridge — 本地服务桥"
+        Width="1120"
+        Height="760"
+        MinWidth="980"
+        MinHeight="680"
+        WindowStartupLocation="CenterScreen">
+
+    <Design.DataContext>
+        <!-- This only sets the DataContext for the previewer in an IDE,
+             to set the actual DataContext for runtime, set the DataContext property in code (look at App.axaml.cs) -->
+        <vm:MainViewModel />
+    </Design.DataContext>
+
+    <Grid ColumnDefinitions="232,*">
+        <Border Grid.Column="0" Classes="nav-pane">
+            <Grid RowDefinitions="48,24,*,Auto">
+                <Grid Grid.Row="0" ColumnDefinitions="Auto,*" Margin="7,2,6,0">
+                    <Border Width="42" Height="42" CornerRadius="10">
+                        <Image Source="/Assets/app-icon.png"
+                               Width="42" Height="42" Stretch="Uniform"
+                               AutomationProperties.Name="JK Bridge 标志" />
+                    </Border>
+                    <StackPanel Grid.Column="1" Margin="11,1,0,0">
+                        <TextBlock Text="JK Bridge" Classes="body-strong" FontSize="15" />
+                        <TextBlock Text="LOCAL SERVICES" Classes="eyebrow" Margin="0,1,0,0" />
+                    </StackPanel>
+                </Grid>
+
+                <StackPanel Grid.Row="2">
+                    <TextBlock Text="工作区" Classes="eyebrow" Margin="12,0,0,8" />
+                    <ToggleButton Classes="nav-item"
+                                  IsChecked="{Binding IsSetup}"
+                                  Command="{Binding ShowSetupCommand}"
+                                  AutomationProperties.Name="设备配置">
+                        <Grid ColumnDefinitions="28,*">
+                            <TextBlock Text="00" Classes="technical-strong" VerticalAlignment="Center" />
+                            <TextBlock Grid.Column="1" Text="设备配置" VerticalAlignment="Center" />
+                        </Grid>
+                    </ToggleButton>
+                    <ToggleButton Classes="nav-item"
+                                  IsChecked="{Binding IsOverview}"
+                                  Command="{Binding ShowOverviewCommand}"
+                                  AutomationProperties.Name="概览">
+                        <Grid ColumnDefinitions="28,*">
+                            <TextBlock Text="01" Classes="technical-strong" VerticalAlignment="Center" />
+                            <TextBlock Grid.Column="1" Text="概览" VerticalAlignment="Center" />
+                        </Grid>
+                    </ToggleButton>
+                    <ToggleButton Classes="nav-item"
+                                  IsChecked="{Binding IsServices}"
+                                  Command="{Binding ShowServicesCommand}"
+                                  AutomationProperties.Name="服务">
+                        <Grid ColumnDefinitions="28,*">
+                            <TextBlock Text="02" Classes="technical-strong" VerticalAlignment="Center" />
+                            <TextBlock Grid.Column="1" Text="服务" VerticalAlignment="Center" />
+                        </Grid>
+                    </ToggleButton>
+                    <ToggleButton Classes="nav-item"
+                                  IsChecked="{Binding IsDiagnostics}"
+                                  Command="{Binding ShowDiagnosticsCommand}"
+                                  AutomationProperties.Name="诊断">
+                        <Grid ColumnDefinitions="28,*">
+                            <TextBlock Text="03" Classes="technical-strong" VerticalAlignment="Center" />
+                            <TextBlock Grid.Column="1" Text="诊断" VerticalAlignment="Center" />
+                        </Grid>
+                    </ToggleButton>
+                </StackPanel>
+
+                <StackPanel Grid.Row="3">
+                    <Border Classes="card" Padding="12" Margin="0,0,0,8">
+                        <Grid ColumnDefinitions="Auto,*">
+                            <Grid Width="9" Height="9" VerticalAlignment="Center">
+                                <Border CornerRadius="5" Background="{DynamicResource JkNeutralBrush}"
+                                        IsVisible="{Binding IsStopped}" />
+                                <Border CornerRadius="5" Background="{DynamicResource JkIrisBrush}"
+                                        IsVisible="{Binding IsConnecting}" />
+                                <Border CornerRadius="5" Background="{DynamicResource JkWarningBrush}"
+                                        IsVisible="{Binding IsDegraded}" />
+                                <Border CornerRadius="5" Background="{DynamicResource JkSuccessBrush}"
+                                        IsVisible="{Binding IsConnected}" />
+                            </Grid>
+                            <StackPanel Grid.Column="1" Margin="10,0,0,0">
+                                <TextBlock Text="{Binding ConnectionStatus}" Classes="body-strong" />
+                                <TextBlock Text="{Binding AvailableServicesText}" Classes="caption" />
+                            </StackPanel>
+                        </Grid>
+                    </Border>
+                    <ToggleButton Classes="nav-item"
+                                  IsChecked="{Binding IsSettings}"
+                                  Command="{Binding ShowSettingsCommand}"
+                                  AutomationProperties.Name="设置">
+                        <Grid ColumnDefinitions="28,*">
+                            <TextBlock Text="••" Classes="technical-strong" VerticalAlignment="Center" />
+                            <TextBlock Grid.Column="1" Text="设置" VerticalAlignment="Center" />
+                        </Grid>
+                    </ToggleButton>
+                    <TextBlock Text="v2.0 · Windows 11" Classes="caption" Margin="12,8,0,0" />
+                </StackPanel>
+            </Grid>
+        </Border>
+
+        <Grid Grid.Column="1">
+            <pages:SetupPage IsVisible="{Binding IsSetup}" />
+            <pages:OverviewPage IsVisible="{Binding IsOverview}" />
+            <pages:ServicesPage IsVisible="{Binding IsServices}" />
+            <pages:DiagnosticsPage IsVisible="{Binding IsDiagnostics}" />
+            <pages:SettingsPage IsVisible="{Binding IsSettings}" />
+        </Grid>
+    </Grid>
+
+</Window>

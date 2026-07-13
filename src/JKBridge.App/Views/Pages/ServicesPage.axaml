@@ -1,0 +1,127 @@
+<UserControl xmlns="https://github.com/avaloniaui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:vm="using:JKBridge.App.ViewModels"
+             xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
+             xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
+             mc:Ignorable="d"
+             d:DesignWidth="888"
+             d:DesignHeight="760"
+             x:Name="ServicesRoot"
+             x:Class="JKBridge.App.Views.Pages.ServicesPage"
+             x:DataType="vm:MainViewModel">
+    <Border Classes="page-surface">
+        <Grid RowDefinitions="Auto,22,*">
+            <Grid Grid.Row="0" ColumnDefinitions="*,Auto">
+                <StackPanel>
+                    <TextBlock Text="服务" Classes="page-title" />
+                    <TextBlock Text="集中管理 Windows 本地端口与 Linux 回环服务的映射。"
+                               Classes="page-subtitle" Margin="0,4,0,0" />
+                </StackPanel>
+                <Button Grid.Column="1" Content="＋ 添加服务" Classes="primary"
+                        Command="{Binding AddServiceCommand}"
+                        VerticalAlignment="Center" />
+            </Grid>
+
+            <Grid Grid.Row="2" ColumnDefinitions="1.08*,18,0.92*">
+                <Grid Grid.Column="0" RowDefinitions="Auto,12,*">
+                    <Grid ColumnDefinitions="*,Auto">
+                        <TextBlock Text="转发清单" Classes="section-title" />
+                        <Border Grid.Column="1" Classes="status-pill connected" VerticalAlignment="Center">
+                            <TextBlock Text="{Binding AvailableServicesText}" Classes="status-text connected" />
+                        </Border>
+                    </Grid>
+                    <ListBox Grid.Row="2"
+                             ItemsSource="{Binding Services}"
+                             SelectedItem="{Binding SelectedService}"
+                             Classes="service-list">
+                        <ListBox.ItemTemplate>
+                            <DataTemplate x:DataType="vm:ServiceCardViewModel">
+                                <Border Classes="card interactive" Padding="14" Margin="0,0,0,10">
+                                    <Grid ColumnDefinitions="Auto,*,Auto" RowDefinitions="Auto,Auto">
+                                        <Border Grid.RowSpan="2" Width="38" Height="38" CornerRadius="8"
+                                                Background="{DynamicResource JkIrisSurfaceBrush}"
+                                                BorderBrush="{DynamicResource JkIrisBorderBrush}"
+                                                BorderThickness="1">
+                                            <TextBlock Text="{Binding ShortCode}" Classes="technical-strong"
+                                                       Foreground="{DynamicResource JkIrisBrush}"
+                                                       HorizontalAlignment="Center" VerticalAlignment="Center" />
+                                        </Border>
+                                        <StackPanel Grid.Column="1" Margin="12,-1,12,0">
+                                            <TextBlock Text="{Binding Name}" Classes="body-strong" />
+                                            <TextBlock Text="{Binding PortMapping}" Classes="technical" />
+                                        </StackPanel>
+                                        <Border Grid.Column="2" Classes="status-pill"
+                                                Classes.connected="{Binding IsAvailable}"
+                                                Classes.warning="{Binding HasWarning}">
+                                            <TextBlock Text="{Binding Status}" Classes="status-text"
+                                                       Classes.connected="{Binding IsAvailable}"
+                                                       Classes.warning="{Binding HasWarning}" />
+                                        </Border>
+                                        <Grid Grid.Row="1" Grid.Column="1" Grid.ColumnSpan="2"
+                                              ColumnDefinitions="*,Auto,Auto" Margin="12,10,0,0">
+                                            <TextBlock Text="{Binding LocalUrl}" Classes="caption"
+                                                       VerticalAlignment="Center" TextTrimming="CharacterEllipsis" />
+                                            <Button Grid.Column="1" Content="检查" Classes="ghost" Command="{Binding RetryCommand}" />
+                                            <Button Grid.Column="2" Content="打开 ↗" Classes="ghost" Command="{Binding OpenCommand}"
+                                                    IsEnabled="{Binding IsAvailable}" />
+                                        </Grid>
+                                    </Grid>
+                                </Border>
+                            </DataTemplate>
+                        </ListBox.ItemTemplate>
+                    </ListBox>
+                </Grid>
+
+                <Border Grid.Column="2" Classes="card" Padding="20"
+                        DataContext="{Binding SelectedService}"
+                        x:DataType="vm:ServiceCardViewModel">
+                    <ScrollViewer HorizontalScrollBarVisibility="Disabled">
+                        <StackPanel>
+                            <TextBlock Text="编辑转发" Classes="section-title" />
+                            <TextBlock Text="保存后，活动隧道会安全重连一次。" Classes="page-subtitle" Margin="0,2,0,18" />
+
+                            <TextBlock Text="服务名称" Classes="body-strong" Margin="0,0,0,6" />
+                            <TextBox Text="{Binding Name}" Classes="field" PlaceholderText="例如 Overleaf" />
+
+                            <TextBlock Text="说明" Classes="body-strong" Margin="0,14,0,6" />
+                            <TextBox Text="{Binding Description}" Classes="field" PlaceholderText="这项服务做什么" />
+
+                            <Grid ColumnDefinitions="*,14,*" Margin="0,14,0,0">
+                                <StackPanel>
+                                    <TextBlock Text="Windows 本地端口" Classes="body-strong" Margin="0,0,0,6" />
+                                    <TextBox Text="{Binding LocalPortText}" Classes="field technical" />
+                                </StackPanel>
+                                <StackPanel Grid.Column="2">
+                                    <TextBlock Text="Linux 远端端口" Classes="body-strong" Margin="0,0,0,6" />
+                                    <TextBox Text="{Binding RemotePortText}" Classes="field technical" />
+                                </StackPanel>
+                            </Grid>
+
+                            <TextBlock Text="浏览器地址" Classes="body-strong" Margin="0,14,0,6" />
+                            <TextBox Text="{Binding LocalUrl}" Classes="field technical" />
+                            <TextBlock Text="{Binding #ServicesRoot.DataContext.ServiceFeedback}"
+                                       Classes="caption" Margin="0,5,0,0" />
+
+                            <Grid ColumnDefinitions="*,Auto" Margin="0,18,0,0">
+                                <StackPanel>
+                                    <TextBlock Text="启用服务" Classes="body-strong" />
+                                    <TextBlock Text="参与下一次 SSH 转发" Classes="caption" />
+                                </StackPanel>
+                                <ToggleSwitch Grid.Column="1" IsChecked="{Binding IsEnabled}"
+                                              VerticalAlignment="Center" />
+                            </Grid>
+
+                            <Separator Classes="quiet" />
+                            <Grid ColumnDefinitions="Auto,*,Auto">
+                                <Button Content="删除" Classes="ghost" Foreground="{DynamicResource JkErrorBrush}"
+                                        Command="{Binding RemoveCommand}" />
+                                <Button Grid.Column="2" Content="保存更改" Classes="primary"
+                                        Command="{Binding SaveCommand}" />
+                            </Grid>
+                        </StackPanel>
+                    </ScrollViewer>
+                </Border>
+            </Grid>
+        </Grid>
+    </Border>
+</UserControl>

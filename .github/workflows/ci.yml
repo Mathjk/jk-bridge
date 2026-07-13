@@ -1,0 +1,25 @@
+name: CI
+
+on:
+  push:
+  pull_request:
+
+permissions:
+  contents: read
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-dotnet@v4
+        with:
+          global-json-file: global.json
+      - name: Public-release privacy scan
+        run: ./scripts/check-public-release.sh
+      - name: Linux helper tests
+        run: python3 -m unittest discover -s tests/linux -p 'test_*.py'
+      - name: .NET tests
+        run: dotnet test JKBridge.slnx -c Release --nologo
+      - name: Release build with warnings as errors
+        run: dotnet build JKBridge.slnx -c Release --no-restore --nologo -warnaserror

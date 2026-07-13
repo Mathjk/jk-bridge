@@ -1,0 +1,9 @@
+<Solution>
+  <Folder Name="/src/">
+    <Project Path="src/JKBridge.App/JKBridge.App.csproj" />
+    <Project Path="src/JKBridge.Core/JKBridge.Core.csproj" />
+  </Folder>
+  <Folder Name="/tests/">
+    <Project Path="tests/JKBridge.Core.Tests/JKBridge.Core.Tests.csproj" />
+  </Folder>
+</Solution>
