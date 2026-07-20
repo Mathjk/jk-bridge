@@ -129,8 +129,11 @@ python3 ~/jkbridge-linux.py pair
 |---|---|---|
 | Overleaf | `http://127.0.0.1:8080/project` | `127.0.0.1:80` |
 | GPU Dashboard | `http://127.0.0.1:8765/` | `127.0.0.1:8765` |
+| Investment News | `http://127.0.0.1:8793/` | `127.0.0.1:8793` |
 
 这些条目都可以编辑。JK Bridge 不会把它们绑定到公网或普通局域网。
+
+每个服务的 SSH 转发、浏览器地址、健康检查和 Linux 授权端口都由同一条回环路由生成。对于自签名 HTTPS，可在“服务”页选择“TCP 端口”健康检查；健康警告仍会显示，但只要 SSH 转发已经建立，就不会阻止浏览器打开。
 
 ## 首次配置完成以后
 
@@ -142,6 +145,7 @@ python3 ~/jkbridge-linux.py pair
 | 新网页需要新的 Linux 目标端口 | 先启用服务，再在 Linux 运行 `pair`，使用原 Windows 密钥重新配对 |
 | Linux 重装或主动轮换 SSH 主机密钥 | 在 Linux 本机确认变更，然后重新配对 |
 | Windows 设备或私钥丢失 | Linux 运行 `status`，再运行 `remove --fingerprint 'SHA256:...'` |
+| 从 v2.0.x 升级到 v2.1 | 启动新版后按提示重新配对一次，以建立可核验的端口授权记录 |
 
 重新配对只更新 `~/.ssh/authorized_keys` 中 JK Bridge 自己管理的那一行，并会先备份到 `~/.ssh/jkbridge-backups/`。
 
@@ -151,7 +155,8 @@ python3 ~/jkbridge-linux.py pair
 |---|---|
 | `JKBridge.exe` | 便携、自包含的 Windows x64 软件 |
 | `jkbridge-linux.py` | 单文件 Python 3 Linux 工具 |
-| `Setup-JKBridge.ps1` | 高级 V1/人工恢复工具；V2 正常配置不需要运行 |
+| `Setup-JKBridge.ps1` | 高级 V1/人工恢复工具；正常的一键配对不需要运行 |
+| `Add-Investment-News.ps1` | 为已有配置安全添加或更新 Investment News 映射 |
 | `Verify-JKBridge.ps1` | Windows 环境与运行状态诊断 |
 | `README*.md`、`docs/` | 中英文安装、排障、安全和架构文档 |
 | `SHA256SUMS`、`*.sha256` | 发布文件完整性校验记录 |
@@ -167,6 +172,7 @@ python3 ~/jkbridge-linux.py pair
 | 提示“主机密钥不匹配” | 立即停止；确认 Linux 确实重装或轮换密钥后再配对，不要关闭校验 |
 | Windows 本地端口被占用 | 关闭已确认的占用程序，或改用另一个 Windows 本地端口 |
 | 新服务提示不允许转发 | 启用新的 Linux 目标端口后重新配对 |
+| 自签名 HTTPS 显示证书健康错误 | 在服务编辑器选择“TCP 端口”；浏览器仍可打开并由用户确认其证书 |
 
 完整命令、重启行为、重复密钥迁移和安全诊断方式见[故障排查](docs/TROUBLESHOOTING.zh-CN.md)。
 
@@ -176,6 +182,7 @@ python3 ~/jkbridge-linux.py pair
 - Linux 主机密钥在本机读取并固定，后续 SSH 始终严格校验；
 - Windows 专用私钥只允许当前用户与 SYSTEM 访问；
 - Linux 授权不能执行命令或取得 shell，只能访问明确启用的 Linux `127.0.0.1` 端口；
+- Windows 保存配对返回的客户端指纹和精确端口集合；端口发生漂移时会在启动 SSH 前要求重新配对；
 - Windows 监听和 Linux 目标全部固定为 `127.0.0.1`；
 - 配置采用原子写入，诊断会脱敏，公开发布扫描会阻止常见凭据和机器身份进入仓库。
 

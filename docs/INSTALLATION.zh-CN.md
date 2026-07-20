@@ -153,7 +153,8 @@ sudo systemctl restart ssh     # Ubuntu/Debian
 ```bash
 curl -I http://127.0.0.1:80/project
 curl -I http://127.0.0.1:8765/
-ss -ltn | grep -E '127\.0\.0\.1:(80|8765)\b'
+curl -I http://127.0.0.1:8793/
+ss -ltn | grep -E '127\.0\.0\.1:(80|8765|8793)\b'
 ```
 
 HTTP 重定向、登录要求或正常页面都能说明服务存活。如果显示“拒绝连接”，需要先启动网页应用或修正端口；JK Bridge 不能把一个没有运行的服务变为可访问。
@@ -239,14 +240,33 @@ python3 ~/jkbridge-linux.py pair
 
 请保留解压目录：打开开机启动后，如果再移动或删除 `JKBridge.exe`，启动项仍会指向旧路径。
 
+## 从 v2.0.x 升级到 v2.1
+
+直接用新版解压目录替换旧程序即可，设备、服务和行为设置会迁移到 schema v3。旧版本没有记录 Linux 实际授权过的端口，因此新版第一次连接会要求重新配对一次。这不是配置丢失：在 Linux 重新运行 `python3 ~/jkbridge-linux.py pair`，把新代码粘贴到“设备配置”，并保留原专用密钥路径即可。
+
+完成后，配置会记录配对返回的客户端指纹和精确端口集合。以后新增或改变 Linux 远端端口时，JK Bridge 会在启动 SSH 之前列出缺少授权的端口；只改变 Windows 本地端口不会触发重新授权。
+
+## 为已有安装添加 Investment News
+
+先从托盘退出 JK Bridge，再在新版解压目录的 PowerShell 中运行：
+
+```powershell
+.\Add-Investment-News.ps1
+```
+
+脚本会备份 `%LOCALAPPDATA%\JKBridge\config.json`，再写入唯一映射：Windows `127.0.0.1:8793` → Linux `127.0.0.1:8793`。重新启动 JK Bridge；如果当前 Linux 专用密钥尚未授权端口 `8793`，按下一节的步骤重新配对一次。
+
 ## 增加另一个 Linux 网页
 
 1. 在 JK Bridge“服务”页添加唯一的 Windows 本地端口、Linux 回环目标端口和 Windows 回环 URL；
-2. 启用该服务；
-3. 如果 Linux 目标端口上次没有授权，先停止隧道，再在 Linux 运行 `python3 ~/jkbridge-linux.py pair`；
-4. 在“设备配置”中保留原 Windows 密钥路径并重新配对。
+2. 选择健康检查：普通网页用“HTTP 状态码”，返回 `{"ok":true}` 的接口用“JSON ok=true”，自签名 HTTPS 或只需检查端口时用“TCP 端口”；
+3. 启用该服务；
+4. 如果 Linux 目标端口上次没有授权，应用会在连接前提示缺少的端口；在 Linux 运行 `python3 ~/jkbridge-linux.py pair`；
+5. 在“设备配置”中保留原 Windows 密钥路径并重新配对。
 
 重新配对会更新精确的 `permitopen` 白名单并保留备份，不会授权任意 Linux 端口。
+
+健康检查是状态提示，不是浏览器访问控制。只要 SSH 转发已经建立，HTTP/TLS 健康失败仍允许点击“打开”；明确的 SSH 转发拒绝、未连接或服务停用仍会阻止打开。
 
 ## 卸载或撤销访问
 

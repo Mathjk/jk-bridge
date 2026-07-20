@@ -21,6 +21,8 @@
 - [ ] Pairing uses no system HTTP proxy, follows no redirects, and the token never appears in configuration or logs.
 - [ ] Expired, malformed, wrong-token, wrong-IP, mismatched-port, and oversized pairing responses fail without saving configuration.
 - [ ] Re-pairing with the same managed key updates its exact port whitelist idempotently and retains a Linux backup.
+- [ ] Upgrading a configured schema V1/V2 profile preserves device/services, enters Needs pairing before SSH, and becomes current after one successful re-pair.
+- [ ] Schema V3 persists the returned client fingerprint and exact `permitPorts`; a missing enabled port blocks before Tailscale inspection and SSH startup.
 - [ ] Missing key, rejected key, and encrypted/unavailable key produce distinct actions.
 - [ ] `Setup-JKBridge.ps1` rejects a private-key file or parent directory that is a symlink/junction/reparse point.
 - [ ] From a non-elevated PowerShell, `Setup-JKBridge.ps1` creates or reuses the dedicated key without requesting `SeSecurityPrivilege`, changes only the DACL, and leaves any SACL unchanged.
@@ -31,17 +33,23 @@
 
 ## Tunnels and services
 
-- [ ] One SSH process creates both forwards.
+- [ ] One SSH process creates all three default forwards.
 - [ ] Overleaf opens at `http://127.0.0.1:8080/project` and supports editor/WebSocket use.
 - [ ] GPU Dashboard opens at `http://127.0.0.1:8765`.
+- [ ] Investment News opens at `http://127.0.0.1:8793`.
 - [ ] GPU recovery requests remain localhost-originated and function as before.
 - [ ] Listeners bind only `127.0.0.1`, never `0.0.0.0`.
 - [ ] A stopped Overleaf marks only Overleaf unavailable.
 - [ ] A stopped GPU Dashboard marks only GPU Dashboard unavailable.
-- [ ] Adding a third service through the available name/description/local-port/remote-port/URL/enabled fields validates and restarts one tunnel process once.
+- [ ] A stopped Investment News marks only Investment News unavailable.
+- [ ] Adding a fourth service through the available name/description/local-port/remote-port/URL/enabled fields validates and restarts one tunnel process once.
+- [ ] The service editor persists TCP connect, HTTP status, and JSON `ok=true` health choices.
+- [ ] A self-signed HTTPS route in TCP mode reports the forward reachable without disabling Open because of certificate validation.
+- [ ] An HTTP/TLS health failure leaves Open available after the forward exists, while a forwarding denial keeps it disabled.
 - [ ] Duplicate and externally occupied local ports block connection without killing other processes.
 - [ ] With a third Linux loopback service running but absent from the key's `permitopen` list, opening it produces live SSH `administratively prohibited` stderr and the affected service is shown as Forward denied without restarting SSH.
 - [ ] The automatically generated authorization permits only enabled remote ports and never emits a wildcard `permitopen`.
+- [ ] SSH `-L`, browser URL, health target, and paired remote port all match the same validated loopback route after add/edit operations.
 - [ ] If the same public key exists in an unmanaged Linux entry, pairing refuses it and directs the user to generate a new identity instead of adding a restricted duplicate.
 
 ## Resilience
@@ -50,7 +58,7 @@
 - [ ] Wi-Fi disconnect/reconnect recovers automatically.
 - [ ] Tailscale restart recovers automatically.
 - [ ] Linux reboot recovers automatically.
-- [ ] While connected, sleep for at least five minutes: the SSH PID/listeners disappear on suspend; after resume and the settle delay, one new SSH process restores both services automatically.
+- [ ] While connected, sleep for at least five minutes: the SSH PID/listeners disappear on suspend; after resume and the settle delay, one new SSH process restores all enabled services automatically.
 - [ ] Retry delay increases; choosing Refresh/Recheck while reconnecting restarts preflight immediately and resets the backoff attempt.
 - [ ] Authentication, host-key, configuration, and port errors do not enter infinite retries.
 
@@ -59,7 +67,7 @@
 - [ ] Closing the window hides to tray when configured.
 - [ ] Tray Open restores and activates the existing window.
 - [ ] A second EXE launch activates the first instance and does not create another SSH process.
-- [ ] Explicit Exit removes the SSH process and both local listeners.
+- [ ] Explicit Exit removes the SSH process and all local listeners.
 - [ ] Force-killing the GUI closes the Job Object and removes its SSH process.
 - [ ] Enable start-with-Windows and confirm only the HKCU Run value exists. Exit, move the portable folder, launch from the new path, and confirm the stale registration is repaired to the current quoted EXE plus `--background`.
 

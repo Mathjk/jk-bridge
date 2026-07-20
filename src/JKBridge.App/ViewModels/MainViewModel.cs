@@ -2,6 +2,7 @@ using System.Collections.ObjectModel;
 using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
 using JKBridge.App.Services;
+using JKBridge.Core.Models;
 
 namespace JKBridge.App.ViewModels;
 
@@ -128,11 +129,15 @@ public partial class MainViewModel : ViewModelBase
             new ServiceUiState(
                 "overleaf", "OL", "Overleaf", "论文协作与 LaTeX 编辑",
                 "http://127.0.0.1:8080/project", 8080, 80,
-                "等待隧道", "尚未检查", true, false, false),
+                "等待隧道", "尚未检查", true, false, false, false, HealthCheckKind.HttpStatus),
             new ServiceUiState(
                 "gpu-dashboard", "GPU", "GPU Dashboard", "显卡状态与任务监控",
                 "http://127.0.0.1:8765/", 8765, 8765,
-                "等待隧道", "尚未检查", true, false, false),
+                "等待隧道", "尚未检查", true, false, false, false, HealthCheckKind.JsonOk),
+            new ServiceUiState(
+                "investment-news", "NEWS", "Investment News", "A股产业链资讯与 AI 每日要点",
+                "http://127.0.0.1:8793/", 8793, 8793,
+                "等待隧道", "尚未检查", true, false, false, false, HealthCheckKind.HttpStatus),
         ]);
     }
 
@@ -406,7 +411,7 @@ public partial class MainViewModel : ViewModelBase
             "已连接", "全部服务可用", "断开",
             true, false, false,
             "linux-box", "linux-box.example-tailnet.ts.net",
-            "2 / 2 可用", "刚刚检查",
+            "3 / 3 可用", "刚刚检查",
             false, "连接运行正常", "所有转发与网页健康检查均已通过。"));
 
         TailscaleExecutable = @"C:\Program Files\Tailscale\tailscale.exe";
@@ -421,18 +426,23 @@ public partial class MainViewModel : ViewModelBase
             new ServiceUiState(
                 "overleaf", "OL", "Overleaf", "论文协作与 LaTeX 编辑",
                 "http://127.0.0.1:8080/project", 8080, 80,
-                "可用", "HTTP 302 · 18 ms", true, true, false),
+                "可用", "HTTP 302 · 18 ms", true, true, false, true, HealthCheckKind.HttpStatus),
             new ServiceUiState(
                 "gpu-dashboard", "GPU", "GPU Dashboard", "显卡状态与任务监控",
                 "http://127.0.0.1:8765/", 8765, 8765,
-                "可用", "健康检查 · 11 ms", true, true, false),
+                "可用", "健康检查 · 11 ms", true, true, false, true, HealthCheckKind.JsonOk),
+            new ServiceUiState(
+                "investment-news", "NEWS", "Investment News", "A股产业链资讯与 AI 每日要点",
+                "http://127.0.0.1:8793/", 8793, 8793,
+                "可用", "HTTP 200 · 9 ms", true, true, false, true, HealthCheckKind.HttpStatus),
         ]);
 
         SetDiagnostics(
         [
-            new DiagnosticUiState("12:42:10", "成功", "SSH 隧道已建立", "已验证固定主机密钥，2 条本地转发开始监听。", "connected"),
+            new DiagnosticUiState("12:42:10", "成功", "SSH 隧道已建立", "已验证固定主机密钥，3 条本地转发开始监听。", "connected"),
             new DiagnosticUiState("12:42:11", "信息", "Overleaf 健康检查通过", "GET /project 返回 HTTP 302，服务可访问。", "info"),
             new DiagnosticUiState("12:42:11", "信息", "GPU Dashboard 健康检查通过", "GET /api/health 返回 ok=true。", "info"),
+            new DiagnosticUiState("12:42:11", "信息", "Investment News 健康检查通过", "GET / 返回 HTTP 200，服务可访问。", "info"),
         ]);
     }
 }

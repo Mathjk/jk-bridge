@@ -170,7 +170,7 @@
                                                 Command="{Binding RetryCommand}" />
                                         <Button Grid.Column="3" Content="打开 ↗" Classes="primary service-open"
                                                 Command="{Binding OpenCommand}"
-                                                IsEnabled="{Binding IsAvailable}"
+                                                IsEnabled="{Binding CanOpen}"
                                                 AutomationProperties.Name="打开服务" />
                                     </Grid>
                                 </Grid>

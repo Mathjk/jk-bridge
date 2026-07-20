@@ -155,7 +155,8 @@ The destination must listen on Linux loopback. Examples:
 ```bash
 curl -I http://127.0.0.1:80/project
 curl -I http://127.0.0.1:8765/
-ss -ltn | grep -E '127\.0\.0\.1:(80|8765)\b'
+curl -I http://127.0.0.1:8793/
+ss -ltn | grep -E '127\.0\.0\.1:(80|8765|8793)\b'
 ```
 
 An HTTP redirect, authentication response, or application page can all prove that a service is alive. A connection-refused error means the application itself must be started or its configured port corrected before JK Bridge can make it reachable.
@@ -241,12 +242,31 @@ Without that option, simply start `JKBridge.exe` after a reboot. No pairing code
 
 Keep the extracted directory in place: moving or deleting `JKBridge.exe` after enabling startup leaves the startup entry pointing to the old path.
 
+## Upgrade from v2.0.x to v2.1
+
+Replace the old extracted application with the new one. Device, service, and behavior settings migrate to schema V3. Earlier versions did not record which Linux ports were actually authorized, so the first v2.1 connection asks you to pair once. This is not configuration loss: run `python3 ~/jkbridge-linux.py pair` again, paste the new code into Device setup, and keep the existing dedicated identity path.
+
+The completed pair records the returned client fingerprint and exact port set. Later Linux destination-port changes are listed before SSH starts; changing only a Windows local port does not require new Linux authorization.
+
+## Add Investment News to an existing installation
+
+Exit JK Bridge from the tray, then run this from PowerShell in the updated extracted directory:
+
+```powershell
+.\Add-Investment-News.ps1
+```
+
+The script backs up `%LOCALAPPDATA%\JKBridge\config.json` and adds one exact mapping: Windows `127.0.0.1:8793` → Linux `127.0.0.1:8793`. Restart JK Bridge. If the current Linux tunnel key has not been authorized for port `8793`, re-pair once as described below.
+
 ## Add another Linux web service
 
 1. Add the service in JK Bridge with a unique Windows local port, the Linux loopback destination port, and a Windows loopback URL.
-2. Enable the service.
-3. If the Linux destination port was not part of the previous authorization, stop the tunnel and run `python3 ~/jkbridge-linux.py pair` again.
-4. Re-pair from Device setup while keeping the existing Windows identity path.
+2. Choose a health mode: **HTTP status** for ordinary pages, **JSON ok=true** for that response shape, or **TCP connect** for self-signed HTTPS and port-only readiness.
+3. Enable the service.
+4. If the Linux destination port was not part of the previous authorization, the app lists it before connecting; run `python3 ~/jkbridge-linux.py pair` again.
+5. Re-pair from Device setup while keeping the existing Windows identity path.
+
+Health is advisory rather than browser access control. Once the SSH forward exists, an HTTP/TLS health failure still leaves **Open** available. A confirmed forwarding denial, disconnected tunnel, or disabled service remains blocking.
 
 Re-pairing updates the exact `permitopen` list and retains a backup. It does not grant arbitrary access to every Linux port.
 

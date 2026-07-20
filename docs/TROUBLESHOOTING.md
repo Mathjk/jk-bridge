@@ -109,6 +109,12 @@ Run that before connecting. After JK Bridge reports connected, use:
 
 The temporary server binds only the Linux Tailscale IPv4, not the LAN or public interfaces.
 
+## “Re-pair required” after upgrading
+
+Schema V3 in v2.1 compares the currently enabled Linux destination ports with the exact ports returned by the last pair. V1/V2 did not store that receipt, so an upgraded profile must pair once. Device and service settings are preserved; start `pair` on Linux and keep the existing dedicated identity path in Windows.
+
+After that baseline exists, only a new or changed Linux destination port blocks connection. The app lists the missing ports. Changing only a Windows local port does not require new authorization.
+
 ## A duplicate public key or managed-entry warning appears
 
 JK Bridge refuses to add a restricted copy of a key that already exists in an unmanaged `authorized_keys` entry, because the older entry may still grant broader access.
@@ -172,6 +178,8 @@ Common causes are:
 - the app returns a slow or unusual health response even though it is usable.
 
 JK Bridge forwards TCP; it does not repair application routing, authentication, TLS, containers, or reverse-proxy configuration.
+
+For a self-signed HTTPS service whose port and browser access are otherwise correct, select **TCP connect** in the Services editor. That checks TCP reachability without deciding whether the browser should trust the certificate. An HTTP/TLS health failure no longer disables **Open** after the SSH forward exists; you still make the certificate decision in the browser.
 
 ## A new service says forwarding is prohibited
 

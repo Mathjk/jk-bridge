@@ -71,7 +71,7 @@ Linux 重装或主动轮换主机密钥后，旧配置应立即阻断。确认�
 脚本为启用的远端端口生成一条类似：
 
 ```text
-restrict,port-forwarding,command="/usr/bin/false",from="100.64.0.0/10,fd7a:115c:a1e0::/48",permitopen="127.0.0.1:80",permitopen="127.0.0.1:8765" ssh-ed25519 <客户端公钥> JK Bridge managed SHA256:<指纹>
+restrict,port-forwarding,command="/usr/bin/false",from="100.64.0.0/10,fd7a:115c:a1e0::/48",permitopen="127.0.0.1:80",permitopen="127.0.0.1:8765",permitopen="127.0.0.1:8793" ssh-ed25519 <客户端公钥> JK Bridge managed SHA256:<指纹>
 ```
 
 - `restrict` 关闭 PTY、agent/X11 转发、用户 rc 等默认能力；
@@ -81,6 +81,8 @@ restrict,port-forwarding,command="/usr/bin/false",from="100.64.0.0/10,fd7a:115c:
 - 每个 `permitopen` 只允许一个精确 Linux IPv4 loopback 端口。
 
 脚本不会生成任意端口通配规则。新增远端端口时必须重新配对，脚本只更新同一托管公钥的精确白名单。
+
+schema v3 在 Windows 配置中保存配对响应里的客户端公钥指纹和精确 `permitPorts` 集合。应用不会因为本地服务列表被编辑，就假定 Linux 的 `authorized_keys` 也同步改变。每次启动 SSH 前都会比较已启用路由与这份记录：缺少端口或旧版授权未知时阻断并要求重新配对；记录中仍有未使用端口时允许连接，但建议重新配对收紧权限。v1/v2 升级因此需要一次性重新配对来建立可信基线。
 
 写入前，脚本会检查 `~/.ssh` 与 `authorized_keys` 不是符号链接且属于当前用户，使用文件锁，备份到 `~/.ssh/jkbridge-backups/`，通过临时文件、`fsync` 和原子替换写入 `0600` 文件。
 
@@ -97,6 +99,8 @@ OpenSSH 的 `port-forwarding` 同时允许 `-L` 和 `-R`，而 `permitopen` 约�
 ```
 
 不要把任一端改成 `0.0.0.0`，不要为 Windows 本地端口增加入站防火墙规则，不要为了省事把 Linux 服务改绑普通 LAN 地址，也不要使用 Tailscale Funnel 公开后台服务。
+
+同一份经过验证的服务路由同时生成 `ssh -L` 参数、浏览器 URL、健康目标和配对端口，避免这些安全边界各自解析后产生偏差。健康检查与授权边界不同：TCP/HTTP/JSON 健康结果只描述本地入口的可用性。SSH 转发已经建立时，健康失败不会阻止浏览器打开；明确的转发拒绝仍然阻断。
 
 可运行以下命令验收 Windows 监听边界：
 

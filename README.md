@@ -129,8 +129,11 @@ Default examples:
 |---|---|---|
 | Overleaf | `http://127.0.0.1:8080/project` | `127.0.0.1:80` |
 | GPU Dashboard | `http://127.0.0.1:8765/` | `127.0.0.1:8765` |
+| Investment News | `http://127.0.0.1:8793/` | `127.0.0.1:8793` |
 
 These entries are editable. Nothing is bound to the public internet or ordinary LAN.
+
+Each service's SSH forward, browser URL, health target, and Linux authorization port come from one loopback route. For self-signed HTTPS, choose **TCP connect** health in the Services editor. Health warnings remain visible, but they no longer block browser launch after the SSH forward exists.
 
 ## After the first setup
 
@@ -142,6 +145,7 @@ These entries are editable. Nothing is bound to the public internet or ordinary 
 | Add a new Linux destination port | Enable the service, run `pair` again on Linux, and re-pair with the existing Windows key |
 | Linux is reinstalled or its SSH host key is intentionally rotated | Verify the change locally, then re-pair |
 | A Windows device/key is lost | Run Linux `status`, then `remove --fingerprint 'SHA256:...'` |
+| Upgrade from v2.0.x to v2.1 | Start the new app and re-pair once when prompted to establish a verifiable port-authorization receipt |
 
 Pairing updates only the JK Bridge-managed line in `~/.ssh/authorized_keys` and first backs up the file under `~/.ssh/jkbridge-backups/`.
 
@@ -151,7 +155,8 @@ Pairing updates only the JK Bridge-managed line in `~/.ssh/authorized_keys` and 
 |---|---|
 | `JKBridge.exe` | Portable, self-contained Windows x64 app |
 | `jkbridge-linux.py` | Standalone Python 3 Linux helper |
-| `Setup-JKBridge.ps1` | Advanced V1/manual recovery path; not needed for normal V2 setup |
+| `Setup-JKBridge.ps1` | Advanced V1/manual recovery path; not needed for normal one-click pairing |
+| `Add-Investment-News.ps1` | Safely add or update Investment News in an existing configuration |
 | `Verify-JKBridge.ps1` | Windows environment and runtime diagnostics |
 | `README*.md`, `docs/` | English and Chinese setup, troubleshooting, security, and architecture |
 | `SHA256SUMS`, `*.sha256` | Release integrity records |
@@ -167,6 +172,7 @@ Pairing updates only the JK Bridge-managed line in `~/.ssh/authorized_keys` and 
 | “Host key mismatch” | Stop; verify a legitimate Linux reinstall/key rotation, then re-pair—never disable checking |
 | Local port is occupied | Close the known owner or choose another Windows local port |
 | New service says forwarding is prohibited | Re-pair after enabling its new Linux destination port |
+| Self-signed HTTPS shows a certificate health error | Select **TCP connect** health; the browser can still open so you can decide whether to trust the certificate |
 
 See [Troubleshooting](docs/TROUBLESHOOTING.md) for exact commands, restart behavior, duplicate-key migration, and safe diagnostics.
 
@@ -176,6 +182,7 @@ See [Troubleshooting](docs/TROUBLESHOOTING.md) for exact commands, restart behav
 - The Linux host key is read locally during pairing and pinned; subsequent SSH connections use strict verification.
 - The dedicated Windows private key is limited to the current user and SYSTEM.
 - The Linux key cannot open a shell or run commands and can reach only explicitly enabled Linux `127.0.0.1` ports.
+- Windows records the paired client fingerprint and exact port set, then requires re-pairing before SSH when enabled routes drift beyond that grant.
 - Every Windows listener and Linux destination is fixed to `127.0.0.1`.
 - Configuration writes are atomic; diagnostics are redacted; the public-release scanner blocks common credentials and machine identities.
 

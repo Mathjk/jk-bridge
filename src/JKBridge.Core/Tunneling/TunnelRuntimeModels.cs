@@ -13,6 +13,7 @@ public enum TunnelPhase
     WrongTailnet,
     PeerUnavailable,
     NeedsKeySetup,
+    NeedsPairing,
     HostKeyBlocked,
     PortConflict,
     Starting,
@@ -43,7 +44,10 @@ public sealed record ServiceSnapshot(
     int? HttpStatus = null,
     string? Detail = null)
 {
-    public bool CanOpen => Phase == ServicePhase.Available;
+    public bool CanOpen => Phase is
+        ServicePhase.Checking or
+        ServicePhase.Available or
+        ServicePhase.RemoteUnavailable;
 
     public static ServiceSnapshot FromHealth(string name, ServiceHealth health) =>
         new(

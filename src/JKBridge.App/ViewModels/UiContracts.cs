@@ -1,3 +1,5 @@
+using JKBridge.Core.Models;
+
 namespace JKBridge.App.ViewModels;
 
 public sealed record BridgeUiState(
@@ -27,7 +29,9 @@ public sealed record ServiceUiState(
     string HealthDetail,
     bool IsEnabled,
     bool IsAvailable,
-    bool HasWarning);
+    bool HasWarning,
+    bool CanOpen,
+    HealthCheckKind HealthKind);
 
 public sealed record DiagnosticUiState(
     string Time,

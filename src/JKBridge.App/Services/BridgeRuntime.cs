@@ -1,5 +1,6 @@
 using System.ComponentModel;
 using System.Net.Sockets;
+using JKBridge.Core.Authorization;
 using JKBridge.Core.Configuration;
 using JKBridge.Core.Diagnostics;
 using JKBridge.Core.Health;
@@ -119,7 +120,7 @@ public sealed class BridgeRuntime : IBridgeRuntime
         BridgeRuntimeOptions? options = null)
     {
         var effectiveOptions = options ?? BridgeRuntimeOptions.CreateDefault();
-        var healthProbe = new HttpServiceHealthProbe();
+        var healthProbe = new ServiceHealthProbe();
         return new BridgeRuntime(
             new TailscaleClient(new CommandRunner()),
             new TunnelProcessFactory(),
@@ -798,6 +799,28 @@ public sealed class BridgeRuntime : IBridgeRuntime
         AppConfig config,
         CancellationToken cancellationToken)
     {
+        var authorization = ForwardAuthorization.Evaluate(config);
+        if (authorization.Status == ForwardAuthorizationStatus.Unknown &&
+            authorization.DesiredPorts.Count > 0)
+        {
+            return PreparedConnection.Failure(
+                "No Linux authorization receipt is stored for this upgraded configuration. " +
+                $"Re-pair once to confirm remote ports {string.Join(", ", authorization.DesiredPorts)}.",
+                TunnelPhase.NeedsPairing,
+                retryable: false,
+                preflight: null);
+        }
+
+        if (authorization.Status == ForwardAuthorizationStatus.PairingRequired)
+        {
+            return PreparedConnection.Failure(
+                $"Linux authorization is missing remote port{(authorization.MissingPorts.Count == 1 ? string.Empty : "s")} " +
+                $"{string.Join(", ", authorization.MissingPorts)}. Re-pair before connecting.",
+                TunnelPhase.NeedsPairing,
+                retryable: false,
+                preflight: null);
+        }
+
         var preflight = await _tailscale.InspectAsync(config, cancellationToken).ConfigureAwait(false);
         if (!preflight.IsReady)
         {
@@ -1050,6 +1073,10 @@ public sealed class BridgeRuntime : IBridgeRuntime
         {
             Server = config.Server with { },
             Behavior = config.Behavior with { },
+            Authorization = config.Authorization with
+            {
+                RemotePorts = config.Authorization.RemotePorts.ToList(),
+            },
             Services = config.Services.Select(service => service with { }).ToList(),
         };
     }
