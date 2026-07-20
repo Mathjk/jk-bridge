@@ -72,6 +72,7 @@ mv -- "$STAGE" "$OUT"
 install -m 0644 "$OUT/JKBridge.exe" "$DELIVERY/JKBridge.exe"
 install -m 0755 "$ROOT/scripts/jkbridge-linux.py" "$DELIVERY/jkbridge-linux.py"
 install -m 0644 "$ROOT/scripts/setup-windows.ps1" "$DELIVERY/Setup-JKBridge.ps1"
+install -m 0644 "$ROOT/scripts/add-investment-news.ps1" "$DELIVERY/Add-Investment-News.ps1"
 install -m 0644 "$ROOT/scripts/verify-windows.ps1" "$DELIVERY/Verify-JKBridge.ps1"
 install -m 0644 "$ROOT/README.md" "$DELIVERY/README.md"
 install -m 0644 "$ROOT/README.zh-CN.md" "$DELIVERY/README.zh-CN.md"
@@ -94,7 +95,7 @@ install -m 0644 "$ROOT/docs/images/device-setup.png" "$DELIVERY/docs/images/devi
 
 PAYLOAD_FILES=(
   JKBridge.exe JKBridge.exe.sha256 jkbridge-linux.py
-  Setup-JKBridge.ps1 Verify-JKBridge.ps1
+  Setup-JKBridge.ps1 Add-Investment-News.ps1 Verify-JKBridge.ps1
   README.md README.zh-CN.md CONTRIBUTING.md SECURITY.md LICENSE CHANGELOG.md
   docs/INSTALLATION.md docs/INSTALLATION.zh-CN.md
   docs/TROUBLESHOOTING.md docs/TROUBLESHOOTING.zh-CN.md

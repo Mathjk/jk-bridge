@@ -2,6 +2,7 @@ using System.Diagnostics;
 using System.Net;
 using System.Text.Json;
 using JKBridge.Core.Models;
+using JKBridge.Core.Routing;
 
 namespace JKBridge.Core.Health;
 
@@ -115,12 +116,8 @@ public sealed class HttpServiceHealthProbe : IServiceHealthProbe, IDisposable
     }
 
     private static Uri BuildHealthUri(ServiceDefinition service)
-    {
-        var scheme = Uri.TryCreate(service.OpenUrl, UriKind.Absolute, out var openUri)
-            ? openUri.Scheme
-            : Uri.UriSchemeHttp;
-        return new UriBuilder(scheme, ServiceDefinition.LoopbackHost, service.LocalPort, service.HealthPath).Uri;
-    }
+        => ServiceRouteDefinition.Evaluate(service).Route?.HealthUri
+           ?? throw new ArgumentException("Service route is invalid.", nameof(service));
 
     private static async Task<byte[]> ReadBoundedAsync(
         Stream stream,

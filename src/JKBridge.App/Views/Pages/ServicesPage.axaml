@@ -63,7 +63,7 @@
                                                        VerticalAlignment="Center" TextTrimming="CharacterEllipsis" />
                                             <Button Grid.Column="1" Content="检查" Classes="ghost" Command="{Binding RetryCommand}" />
                                             <Button Grid.Column="2" Content="打开 ↗" Classes="ghost" Command="{Binding OpenCommand}"
-                                                    IsEnabled="{Binding IsAvailable}" />
+                                                    IsEnabled="{Binding CanOpen}" />
                                         </Grid>
                                     </Grid>
                                 </Border>
@@ -99,6 +99,15 @@
 
                             <TextBlock Text="浏览器地址" Classes="body-strong" Margin="0,14,0,6" />
                             <TextBox Text="{Binding LocalUrl}" Classes="field technical" />
+
+                            <TextBlock Text="健康检查方式" Classes="body-strong" Margin="0,14,0,6" />
+                            <ComboBox SelectedIndex="{Binding HealthModeIndex}" Classes="field">
+                                <ComboBoxItem Content="TCP 端口（适合自签名 HTTPS）" />
+                                <ComboBoxItem Content="HTTP 状态码" />
+                                <ComboBoxItem Content="JSON ok=true" />
+                            </ComboBox>
+                            <TextBlock Text="健康检查只用于提示，不再阻止浏览器打开已建立的转发。"
+                                       Classes="caption" Margin="0,5,0,0" />
                             <TextBlock Text="{Binding #ServicesRoot.DataContext.ServiceFeedback}"
                                        Classes="caption" Margin="0,5,0,0" />
 

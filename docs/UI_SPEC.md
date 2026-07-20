@@ -15,7 +15,7 @@ The rail, app icon, and status surfaces share the same two-node bridge geometry.
 - Display name: **JK Bridge**
 - Descriptor: **Local Services** / **本地服务桥**
 - Executable: `JKBridge.exe`
-- Repository name remains `win2linux`.
+- Public repository: `Mathjk/jk-bridge` (the local checkout directory may still be named `win2linux`).
 
 ## Window and navigation
 
@@ -34,13 +34,18 @@ The rail, app icon, and status surfaces share the same two-node bridge geometry.
 │ Overview     │ linux-box · alice                              │
 │ Services     │                                               │
 │ Diagnostics  │                                               │
-│              │ Windows ─ Tailscale ─ Linux ─ SSH ─ 2/2      │
+│              │ Windows ─ Tailscale ─ Linux ─ SSH ─ 3/3      │
 │              │                                               │
 │              │ ┌────────────────┐ ┌────────────────┐        │
 │              │ │ Overleaf       │ │ GPU Dashboard  │        │
 │              │ │ localhost:8080 │ │ localhost:8765 │        │
 │              │ │ Ready     Open │ │ Ready     Open │        │
 │              │ └────────────────┘ └────────────────┘        │
+│              │ ┌────────────────┐                           │
+│              │ │ Investment News│                           │
+│              │ │ localhost:8793 │                           │
+│              │ │ Ready     Open │                           │
+│              │ └────────────────┘                           │
 │ Settings     │                                               │
 └──────────────┴───────────────────────────────────────────────┘
 ```
@@ -82,6 +87,7 @@ Do not display raw stderr as the primary message.
 - Short-code badge, name, local URL, status text, and visible Open button.
 - Overview exposes Copy address, Check now, and Open; editing, enabling, and deleting live on the Services page.
 - Open remains visible rather than hover-only.
+- Open is enabled when the SSH forward exists, including an advisory HTTP/TLS health failure; it remains disabled for no tunnel, a disabled service, or forwarding denial.
 - Do not add decorative uptime, bandwidth, or chart metrics.
 
 ## Device setup
@@ -98,8 +104,9 @@ Do not display raw stderr as the primary message.
 
 - Dense list on the left/main surface; fixed editor panel on the right.
 - V1 has no search field or peer/service picker.
-- Editable fields: name, description, local port, remote port, complete localhost HTTP(S) URL, and enabled state.
-- Icon/favorite values and specialized health modes remain configuration-model fields; newly added services use the generic HTTP status health mode and derive its path from the URL.
+- Editable fields: name, description, local port, remote port, complete localhost HTTP(S) URL, health mode, and enabled state.
+- Health choices are TCP connect, HTTP status, and JSON `ok=true`; newly added services use HTTP status and derive its path from the URL.
+- TCP connect is the recommended readiness signal for self-signed HTTPS when certificate validation should remain a browser decision.
 - Remote host is fixed to `127.0.0.1` in normal mode.
 - Save validates duplicate/configured ports and URL safety; connection preflight performs the live local bind check without killing the occupying process.
 - Save validates the complete proposed configuration before committing and restarting the bridge once.
@@ -111,7 +118,7 @@ The page uses four summary cards followed by expandable recent-log entries:
 1. Tailscale executable, backend state, current identity, tailnet.
 2. Configured peer, exact DNS match, online state, runtime route.
 3. OpenSSH executable, pinned host fingerprint, PID.
-4. Per-service HTTP health summary.
+4. Per-service TCP/HTTP/JSON health summary.
 5. Recent sanitized log, Copy summary, Open log folder.
 
 ## Settings page
@@ -133,6 +140,7 @@ Connect / Disconnect
 ----------------
 Open Overleaf
 Open GPU Dashboard
+Open Investment News
 ----------------
 Diagnostics
 Settings
@@ -156,6 +164,7 @@ Exit
 | Connected | 已连接 · 全部服务可用 | Success | 断开 |
 | Degraded | 部分可用 · 有服务需要处理 | Warning | 断开 |
 | Reconnecting | 连接中断，稍后重试 | Warning | 取消（“刷新”可立即重试） |
+| Needs pairing | 端口授权需要更新 | Error | 重新配对 |
 | Needs action | 需要处理 | Error | 连接全部（详情由问题横幅进入诊断） |
 
 Service vocabulary:
@@ -165,6 +174,7 @@ Service vocabulary:
 - 可用
 - 远端服务未启动
 - 转发未被服务器允许
+- 健康检查失败（仍可打开已建立的转发）
 - 本地端口被占用
 - 已停用
 

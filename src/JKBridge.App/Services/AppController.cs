@@ -8,11 +8,13 @@ using Avalonia.Styling;
 using Avalonia.Threading;
 using JKBridge.App.Platform;
 using JKBridge.App.ViewModels;
+using JKBridge.Core.Authorization;
 using JKBridge.Core.Configuration;
 using JKBridge.Core.Diagnostics;
 using JKBridge.Core.Health;
 using JKBridge.Core.Models;
 using JKBridge.Core.Pairing;
+using JKBridge.Core.Routing;
 using JKBridge.Core.Tunneling;
 
 namespace JKBridge.App.Services;
@@ -131,6 +133,32 @@ public sealed class AppController : IBridgeUiActions, IAsyncDisposable
             return Task.CompletedTask;
         }
 
+        var authorization = ForwardAuthorization.Evaluate(_config);
+        if (authorization.Status == ForwardAuthorizationStatus.Unknown &&
+            authorization.DesiredPorts.Count > 0)
+        {
+            RunOnUi(() =>
+            {
+                ViewModel.SelectedPage = AppPage.Setup;
+                ViewModel.ShowNotice(
+                    "升级后需要重新配对一次",
+                    $"旧版没有保存 Linux 授权记录。重新配对后会确认端口 {string.Join(", ", authorization.DesiredPorts)}，以后端口变化将自动检测。");
+            });
+            return Task.CompletedTask;
+        }
+
+        if (authorization.Status == ForwardAuthorizationStatus.PairingRequired)
+        {
+            RunOnUi(() =>
+            {
+                ViewModel.SelectedPage = AppPage.Setup;
+                ViewModel.ShowNotice(
+                    "需要重新配对",
+                    $"Linux 尚未授权端口 {string.Join(", ", authorization.MissingPorts)}。请运行一次性配对助手。");
+            });
+            return Task.CompletedTask;
+        }
+
         return RunActionAsync("连接", () => _runtime.StartAsync(_config));
     }
 
@@ -182,7 +210,7 @@ public sealed class AppController : IBridgeUiActions, IAsyncDisposable
         {
             var ports = _config.Services
                 .Where(service => service.Enabled)
-                .Select(service => service.RemotePort)
+                .Select(service => ServiceRouteDefinition.Evaluate(service).Route!.RemoteTarget.Port)
                 .Distinct()
                 .Order()
                 .ToArray();
@@ -214,6 +242,12 @@ public sealed class AppController : IBridgeUiActions, IAsyncDisposable
                             IdentityFile = result.PortableIdentityFile,
                             HostKeyAlias = "jk-bridge-linux",
                             PinnedHostKey = result.Server.HostPublicKey,
+                        },
+                        Authorization = new ForwardAuthorizationGrant
+                        {
+                            IsKnown = true,
+                            ClientKeyFingerprint = result.ClientFingerprint,
+                            RemotePorts = result.Server.PermitPorts.Distinct().Order().ToList(),
                         },
                         Behavior = current.Behavior with { AutoConnect = true },
                     },
@@ -292,33 +326,49 @@ public sealed class AppController : IBridgeUiActions, IAsyncDisposable
         }
 
         var service = _config.Services.FirstOrDefault(item => item.Id == serviceId);
-        if (service is null || !IsSafeLocalUrl(service.OpenUrl, service.LocalPort))
+        var route = service is null ? null : ServiceRouteDefinition.Evaluate(service).Route;
+        if (service is null || route is null)
         {
             ShowControllerError("无法打开服务", "配置中的浏览器地址不是有效的 127.0.0.1 地址。");
             return;
         }
 
-        if (_runtime.Snapshot.Services.FirstOrDefault(item => item.ServiceId == serviceId)?.Phase !=
-            ServicePhase.Available)
+        var snapshot = _runtime.Snapshot.Services.FirstOrDefault(item => item.ServiceId == serviceId);
+        if (!_runtime.Snapshot.IsConnected || !service.Enabled || snapshot is null || !snapshot.CanOpen)
         {
-            if (!_runtime.Snapshot.IsConnected || !service.Enabled)
-            {
-                ShowControllerError("服务尚不可用", "请先建立隧道并等待网页健康检查通过。");
-                return;
-            }
+            var detail = snapshot?.Phase == ServicePhase.ForwardDenied
+                ? "SSH 已明确拒绝这条远端转发，请重新配对并授权对应端口。"
+                : "请先建立 SSH 隧道并确认该服务已启用。";
+            ShowControllerError("服务尚不可打开", detail);
+            return;
+        }
 
+        string? healthWarning = null;
+        if (snapshot.Phase != ServicePhase.Available)
+        {
             var health = await ProbeServiceAsync(service).ConfigureAwait(false);
             if (health.State != ServiceHealthState.Available)
             {
-                ShowControllerError("服务尚不可用", health.Detail ?? "网页健康检查没有通过。");
-                return;
+                healthWarning = health.Detail ?? "健康检查没有通过。";
+                await SafeLogAsync(
+                        DiagnosticSeverity.Warning,
+                        "Service",
+                        $"Opening {service.Name} despite an unavailable health result.",
+                        healthWarning)
+                    .ConfigureAwait(false);
             }
         }
 
         try
         {
-            Process.Start(new ProcessStartInfo(service.OpenUrl) { UseShellExecute = true });
+            Process.Start(new ProcessStartInfo(route.OpenUri.AbsoluteUri) { UseShellExecute = true });
             await SafeLogAsync(DiagnosticSeverity.Information, "Service", $"Opened {service.Name} in the browser.");
+            if (healthWarning is not null)
+            {
+                RunOnUi(() => ViewModel.ShowNotice(
+                    "健康检查未通过，已尝试打开",
+                    $"SSH 转发仍在线；浏览器会继续访问本地入口。若是自签名 HTTPS，请确认浏览器证书提示。详情：{healthWarning}"));
+            }
         }
         catch (Exception exception) when (exception is InvalidOperationException or System.ComponentModel.Win32Exception)
         {
@@ -345,13 +395,23 @@ public sealed class AppController : IBridgeUiActions, IAsyncDisposable
 
     public async Task CopyAddressAsync(string localUrl)
     {
-        if (!Uri.TryCreate(localUrl, UriKind.Absolute, out var uri) ||
-            uri.Host != ServiceDefinition.LoopbackHost)
+        if (!Uri.TryCreate(localUrl, UriKind.Absolute, out var requestedUri))
         {
             return;
         }
 
-        await SetClipboardTextAsync(localUrl);
+        var route = _config.Services
+            .Select(ServiceRouteDefinition.Evaluate)
+            .Select(result => result.Route)
+            .FirstOrDefault(candidate =>
+                candidate is not null &&
+                candidate.OpenUri.Equals(requestedUri));
+        if (route is null)
+        {
+            return;
+        }
+
+        await SetClipboardTextAsync(route.OpenUri.AbsoluteUri);
     }
 
     public async Task SetServiceEnabledAsync(string serviceId, bool enabled)
@@ -435,12 +495,9 @@ public sealed class AppController : IBridgeUiActions, IAsyncDisposable
                 {
                     var existing = current.Services.FirstOrDefault(service => service.Id == state.Id)
                         ?? throw new InvalidOperationException("该服务已不存在，请刷新后重试。");
-                    var healthPath = existing.HealthPath;
-                    if (existing.HealthKind == HealthCheckKind.HttpStatus &&
-                        Uri.TryCreate(state.LocalUrl, UriKind.Absolute, out var openUri))
-                    {
-                        healthPath = string.IsNullOrEmpty(openUri.AbsolutePath) ? "/" : openUri.AbsolutePath;
-                    }
+                    var healthPath = state.HealthKind == HealthCheckKind.HttpStatus
+                        ? ServiceRouteDefinition.DeriveHealthPath(state.LocalUrl, existing.HealthPath)
+                        : existing.HealthPath;
 
                     var updated = existing with
                     {
@@ -450,6 +507,7 @@ public sealed class AppController : IBridgeUiActions, IAsyncDisposable
                         RemotePort = state.RemotePort,
                         OpenUrl = state.LocalUrl.Trim(),
                         HealthPath = healthPath,
+                        HealthKind = state.HealthKind,
                         Enabled = state.IsEnabled,
                     };
                     return current with
@@ -514,25 +572,38 @@ public sealed class AppController : IBridgeUiActions, IAsyncDisposable
             2 => ThemePreference.Dark,
             _ => ThemePreference.System,
         };
-        AppConfig BuildSettingsConfig(AppConfig current) => current with
+        AppConfig BuildSettingsConfig(AppConfig current)
         {
-            Server = current.Server with
+            var server = current.Server with
             {
                 Host = settings.LinuxHost.Trim().TrimEnd('.'),
                 User = settings.LinuxUser.Trim(),
                 Port = sshPort,
                 IdentityFile = settings.IdentityFile.Trim(),
                 PinnedHostKey = settings.PinnedHostKey.Trim(),
-            },
-            Behavior = current.Behavior with
+            };
+            var identityChanged = server.Host != current.Server.Host ||
+                                  server.User != current.Server.User ||
+                                  server.Port != current.Server.Port ||
+                                  server.IdentityFile != current.Server.IdentityFile ||
+                                  server.PinnedHostKey != current.Server.PinnedHostKey;
+            return current with
             {
-                AutoConnect = settings.AutoConnect,
-                AutoReconnect = settings.AutoReconnect,
-                CloseToTray = settings.CloseToTray,
-                StartWithWindows = settings.StartWithWindows,
-                Theme = theme,
-            },
-        };
+                Server = server,
+                Authorization = identityChanged ? new ForwardAuthorizationGrant() : current.Authorization with
+                {
+                    RemotePorts = current.Authorization.RemotePorts.ToList(),
+                },
+                Behavior = current.Behavior with
+                {
+                    AutoConnect = settings.AutoConnect,
+                    AutoReconnect = settings.AutoReconnect,
+                    CloseToTray = settings.CloseToTray,
+                    StartWithWindows = settings.StartWithWindows,
+                    Theme = theme,
+                },
+            };
+        }
 
         var validation = ConfigValidator.Validate(BuildSettingsConfig(_config));
         if (!validation.IsValid)
@@ -685,14 +756,25 @@ public sealed class AppController : IBridgeUiActions, IAsyncDisposable
             ConfigValidator.EnsureValid(next);
             await _configStore.SaveAsync(next).ConfigureAwait(false);
             _config = next;
+            var authorization = ForwardAuthorization.Evaluate(next);
+            var effectiveSuccessMessage = authorization.Status switch
+            {
+                ForwardAuthorizationStatus.Unknown when authorization.DesiredPorts.Count > 0 =>
+                    $"{successMessage} 旧版授权记录未知，请重新配对一次。",
+                ForwardAuthorizationStatus.PairingRequired =>
+                    $"{successMessage} 新端口尚未授权，请重新配对。",
+                ForwardAuthorizationStatus.PairingRecommended =>
+                    $"{successMessage} Linux 仍保留未使用端口授权，建议重新配对以收紧权限。",
+                _ => successMessage,
+            };
             RunOnUi(() =>
             {
                 ApplyConfigToViewModel();
-                ViewModel.SettingsFeedback = successMessage;
-                ViewModel.ServiceFeedback = successMessage;
+                ViewModel.SettingsFeedback = effectiveSuccessMessage;
+                ViewModel.ServiceFeedback = effectiveSuccessMessage;
             });
 
-            await SafeLogAsync(DiagnosticSeverity.Information, "Config", successMessage).ConfigureAwait(false);
+            await SafeLogAsync(DiagnosticSeverity.Information, "Config", effectiveSuccessMessage).ConfigureAwait(false);
             if (_config.SetupCompleted)
             {
                 await _runtime.RefreshAsync(_config).ConfigureAwait(false);
@@ -750,13 +832,18 @@ public sealed class AppController : IBridgeUiActions, IAsyncDisposable
         var degraded = snapshot.Phase == TunnelPhase.Degraded;
         var hasIssue = degraded || snapshot.Phase is TunnelPhase.Reconnecting or
             TunnelPhase.NeedsTailscale or TunnelPhase.WrongTailnet or
-            TunnelPhase.PeerUnavailable or TunnelPhase.NeedsKeySetup or TunnelPhase.HostKeyBlocked or
+            TunnelPhase.PeerUnavailable or TunnelPhase.NeedsKeySetup or TunnelPhase.NeedsPairing or
+            TunnelPhase.HostKeyBlocked or
             TunnelPhase.PortConflict or TunnelPhase.Faulted;
 
         ViewModel.ApplyBridgeState(new BridgeUiState(
             StatusFor(snapshot.Phase),
             SummaryFor(snapshot, available, enabled),
-            connected || degraded ? "断开" : connecting ? "取消" : "连接全部",
+            connected || degraded
+                ? "断开"
+                : connecting
+                    ? "取消"
+                    : snapshot.Phase == TunnelPhase.NeedsPairing ? "重新配对" : "连接全部",
             connected,
             connecting,
             degraded,
@@ -810,7 +897,8 @@ public sealed class AppController : IBridgeUiActions, IAsyncDisposable
         ViewModel.SshExecutable = ExecutableLocator.FindOpenSsh() ?? "未找到 ssh.exe";
         ViewModel.SshProcess = snapshot.SshProcessId is int pid ? $"PID {pid} · 正在运行" : "未启动";
         ViewModel.IsSshHealthy = snapshot.SshProcessId is not null && snapshot.IsConnected;
-        ViewModel.HasSshIssue = snapshot.Phase is TunnelPhase.NeedsKeySetup or TunnelPhase.HostKeyBlocked or
+        ViewModel.HasSshIssue = snapshot.Phase is TunnelPhase.NeedsKeySetup or TunnelPhase.NeedsPairing or
+            TunnelPhase.HostKeyBlocked or
             TunnelPhase.PortConflict or TunnelPhase.Faulted;
         ViewModel.SshStatusText = ViewModel.HasSshIssue
             ? "需要处理"
@@ -868,7 +956,7 @@ public sealed class AppController : IBridgeUiActions, IAsyncDisposable
         };
         var detail = snapshot.Phase switch
         {
-            ServicePhase.Available => FormatHealth(snapshot),
+            ServicePhase.Available => FormatHealth(service, snapshot),
             ServicePhase.Checking => "正在检查本地网页入口…",
             ServicePhase.Disabled => "未加入 SSH 转发",
             ServicePhase.WaitingForTunnel => "等待安全隧道",
@@ -886,12 +974,18 @@ public sealed class AppController : IBridgeUiActions, IAsyncDisposable
             detail,
             service.Enabled,
             available,
-            warning);
+            warning,
+            snapshot.CanOpen,
+            service.HealthKind);
     }
 
-    private static string FormatHealth(ServiceSnapshot snapshot)
+    private static string FormatHealth(ServiceDefinition service, ServiceSnapshot snapshot)
     {
-        var status = snapshot.HttpStatus is int code ? $"HTTP {code}" : "可访问";
+        var status = snapshot.HttpStatus is int code
+            ? $"HTTP {code}"
+            : service.HealthKind == HealthCheckKind.TcpConnect
+                ? "TCP 端口可达"
+                : "可访问";
         return snapshot.Latency is TimeSpan latency
             ? $"{status} · {Math.Max(1, (int)Math.Round(latency.TotalMilliseconds))} ms"
             : status;
@@ -918,6 +1012,7 @@ public sealed class AppController : IBridgeUiActions, IAsyncDisposable
         TunnelPhase.WrongTailnet => "账号不一致",
         TunnelPhase.PeerUnavailable => "Linux 节点不可用",
         TunnelPhase.NeedsKeySetup => "需要 SSH 密钥",
+        TunnelPhase.NeedsPairing => "需要重新配对",
         TunnelPhase.HostKeyBlocked => "主机密钥已阻止",
         TunnelPhase.PortConflict => "本地端口冲突",
         TunnelPhase.PausedForSleep => "等待系统唤醒",
@@ -942,6 +1037,9 @@ public sealed class AppController : IBridgeUiActions, IAsyncDisposable
         TunnelPhase.WrongTailnet => "当前 Windows 与 Linux 不在同一个 tailnet，请切换 Tailscale 登录账号。",
         TunnelPhase.PeerUnavailable => "没有精确找到在线的 Linux 节点；请确认 Linux 已开机且 Tailscale 在线。",
         TunnelPhase.NeedsKeySetup => "找不到专用 SSH 私钥，或 Linux 拒绝了该公钥。请运行首次配置脚本。",
+        TunnelPhase.NeedsPairing when snapshot.Message.Contains("authorization receipt", StringComparison.OrdinalIgnoreCase) =>
+            "旧版配置没有可核验的 Linux 端口授权记录。请重新配对一次建立基线。",
+        TunnelPhase.NeedsPairing => "服务使用了尚未授权的 Linux 远端端口。请在 Linux 重新运行一次性配对助手。",
         TunnelPhase.HostKeyBlocked => "Linux 主机公钥与固定值不一致。请先人工核验，应用不会自动信任变更。",
         TunnelPhase.PortConflict => "至少一个 Windows 本地端口已被其他程序占用，请释放端口或修改服务配置。",
         TunnelPhase.Degraded => "SSH 隧道仍然在线，但至少一个 Linux 网页服务没有通过健康检查。",
@@ -980,16 +1078,10 @@ public sealed class AppController : IBridgeUiActions, IAsyncDisposable
     {
         if (service.Id == "overleaf") return "OL";
         if (service.Id == "gpu-dashboard") return "GPU";
+        if (service.Id == "investment-news") return "NEWS";
         var letters = new string(service.Name.Where(char.IsLetterOrDigit).Take(3).ToArray());
         return letters.Length == 0 ? "WEB" : letters.ToUpperInvariant();
     }
-
-    private static bool IsSafeLocalUrl(string value, int expectedPort) =>
-        Uri.TryCreate(value, UriKind.Absolute, out var uri) &&
-        uri.Scheme is "http" or "https" &&
-        uri.Host == ServiceDefinition.LoopbackHost &&
-        uri.Port == expectedPort &&
-        string.IsNullOrEmpty(uri.UserInfo);
 
     private static string ComputeFingerprint(string publicKey)
     {
@@ -1017,7 +1109,7 @@ public sealed class AppController : IBridgeUiActions, IAsyncDisposable
 
     private async Task<ServiceHealth> ProbeServiceAsync(ServiceDefinition service)
     {
-        using var probe = new HttpServiceHealthProbe();
+        using var probe = new ServiceHealthProbe();
         var health = await probe.CheckAsync(service).ConfigureAwait(false);
         await SafeLogAsync(
                 health.State == ServiceHealthState.Available
@@ -1028,12 +1120,19 @@ public sealed class AppController : IBridgeUiActions, IAsyncDisposable
                 health.Detail)
             .ConfigureAwait(false);
 
+        var runtimeService = _runtime.Snapshot.Services.FirstOrDefault(item => item.ServiceId == service.Id);
+        var presentationSnapshot = runtimeService?.CanOpen == true
+            ? ServiceSnapshot.FromHealth(service.Name, health)
+            : runtimeService ?? new ServiceSnapshot(
+                service.Id,
+                service.Name,
+                ServicePhase.WaitingForTunnel,
+                Detail: "The SSH forward is not active.");
+
         RunOnUi(() =>
         {
             var current = ViewModel.Services.FirstOrDefault(item => item.Id == service.Id);
-            current?.ApplyRuntimeState(ToServiceUiState(
-                service,
-                ServiceSnapshot.FromHealth(service.Name, health)));
+            current?.ApplyRuntimeState(ToServiceUiState(service, presentationSnapshot));
         });
         return health;
     }

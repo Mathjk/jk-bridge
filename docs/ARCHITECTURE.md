@@ -12,6 +12,8 @@
 | Client auth | Dedicated Ed25519 key; no password and no private-key transfer |
 | Server identity | Ed25519 host public key obtained locally during pairing, then strict app-owned pinning |
 | Authorization | One managed `authorized_keys` line with no commands and exact loopback `permitopen` entries |
+| Route integrity | One validated route object derives SSH, browser, health, and authorization endpoints |
+| Authorization state | Schema V3 stores the paired client fingerprint and exact granted remote-port set |
 | Persistence | Atomic JSON config, backup recovery, rotating redacted logs |
 | Tests | Unit/integration tests for config, protocol, runtime, view model, Linux file mutation, and packaging |
 
@@ -20,7 +22,7 @@ Avalonia enables Linux-hosted development and Windows cross-publishing while ret
 ## Repository structure
 
 ```text
-src/JKBridge.Core/             config, pairing, process, Tailscale, SSH, health
+src/JKBridge.Core/             config, pairing, routes, authorization, Tailscale, SSH, health
 src/JKBridge.App/              Avalonia UI and Windows platform adapters
 scripts/jkbridge-linux.py      one-shot Linux pairing and managed-key removal
 scripts/setup-windows.ps1      advanced V1/manual recovery path
@@ -45,11 +47,11 @@ Runtime data defaults to:
 %USERPROFILE%\.ssh\jk_bridge_ed25519
 ```
 
-Fresh V2 configuration is intentionally unconfigured:
+Fresh V3 configuration is intentionally unconfigured:
 
 ```json
 {
-  "schemaVersion": 2,
+  "schemaVersion": 3,
   "setupCompleted": false,
   "expectedTailnetDnsSuffix": "",
   "server": {
@@ -60,11 +62,28 @@ Fresh V2 configuration is intentionally unconfigured:
     "identityFile": "%USERPROFILE%\\.ssh\\jk_bridge_ed25519",
     "hostKeyAlias": "jk-bridge-linux",
     "pinnedHostKey": ""
+  },
+  "authorization": {
+    "isKnown": false,
+    "clientKeyFingerprint": "",
+    "remotePorts": []
   }
 }
 ```
 
-An unconfigured app cannot enter tunnel preflight and routes to Device setup. Schema V1 profiles migrate in memory to V2 with `setupCompleted=true`, then persist atomically. Writes use a same-directory temporary file, flush, last-valid backup, and atomic replacement.
+An unconfigured app cannot enter tunnel preflight and routes to Device setup. Schema V1/V2 profiles migrate in memory to V3 while preserving their device and service settings. Because those versions did not record what Linux actually authorized, a configured legacy profile must re-pair once before SSH starts. That pairing establishes the V3 authorization baseline. Writes use a same-directory temporary file, flush, last-valid backup, and atomic replacement.
+
+For every service, `ServiceRouteDefinition` validates one exact IPv4-loopback route and derives four consumers from it:
+
+```text
+ServiceDefinition
+  -> ssh -L 127.0.0.1:<local>:127.0.0.1:<remote>
+  -> browser HTTP(S) URL on 127.0.0.1:<local>
+  -> HTTP health URL or TCP probe on 127.0.0.1:<local>
+  -> pairing/authorization port 127.0.0.1:<remote>
+```
+
+No consumer independently reconstructs or broadens the destination.
 
 ## Pairing flow
 
@@ -86,6 +105,7 @@ lock + backup authorized_keys
 atomic managed-line update
 return MagicDNS/user/host key -------> validate response against endpoint/request
 stop one-shot server                  atomically save config
+                                      save fingerprint + exact granted ports
                                       build known_hosts from pinned key
                                       start strict SSH tunnel
 ```
@@ -132,18 +152,19 @@ On Windows the process is assigned to a Job Object with kill-on-close. A named m
 
 ## Runtime state and health
 
-Only the controller mutates runtime state. Operations are serialized so connect, stop, config changes, process exit, and resume cannot race.
+Only the controller mutates runtime state. Operations are serialized so connect, stop, config changes, process exit, and resume cannot race. Before Tailscale inspection or SSH startup, the runtime compares enabled route ports with the V3 authorization receipt. Missing or unknown grants enter `NeedsPairing`; unused extra grants are non-blocking but recommend re-pairing to restore least privilege.
 
 ```text
 Stopped -> Preflight -> Starting -> Connected -> Degraded
              |                         |
              +-> NeedsAction           +-> Reconnecting -> Preflight
+             +-> NeedsPairing
 Any active state -> Stopping -> Stopped
 ```
 
 Transient retry uses bounded exponential backoff. Authentication, host-key, invalid configuration, and local bind failures do not retry forever.
 
-`ExitOnForwardFailure` proves listener creation, not web-service availability. Every enabled service therefore has an independent short-timeout loopback HTTP health check. A failed service changes only its own status and the aggregate state.
+`ExitOnForwardFailure` proves listener creation, not application availability. Every enabled service therefore has an independent short-timeout health mode: strict HTTP status, JSON `ok=true`, or TCP connect. TCP mode is appropriate for self-signed HTTPS when certificate trust should remain a browser decision. A failed health check changes the service and aggregate status but does not invalidate a proven SSH listener or block the browser-open action. A forwarding denial remains blocking.
 
 ## Authorization line
 
@@ -154,6 +175,8 @@ restrict,port-forwarding,command="/usr/bin/false",from="100.64.0.0/10,fd7a:115c:
 ```
 
 The key cannot run commands or obtain a shell. Only exact IPv4 loopback targets requested for currently enabled services are authorized. `authorized_keys` is locked, backed up, written with mode `0600`, fsynced, and atomically replaced.
+
+After a successful pair, Windows stores only the public client fingerprint and the exact returned port set. It never assumes that editing JSON also changed Linux. Adding or changing a remote port therefore produces an explicit re-pair state before a new SSH process is attempted.
 
 ## Logging and privacy
 

@@ -24,6 +24,12 @@ internal static class TestConfigs
                 User = "alice",
                 PinnedHostKey = TestHostKey,
             },
+            Authorization = new ForwardAuthorizationGrant
+            {
+                IsKnown = true,
+                ClientKeyFingerprint = "SHA256:" + new string('A', 43),
+                RemotePorts = [80, 8765, 8793],
+            },
         };
     }
 }

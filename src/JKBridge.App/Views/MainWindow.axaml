@@ -107,7 +107,7 @@
                             <TextBlock Grid.Column="1" Text="设置" VerticalAlignment="Center" />
                         </Grid>
                     </ToggleButton>
-                    <TextBlock Text="v2.0 · Windows 11" Classes="caption" Margin="12,8,0,0" />
+                    <TextBlock Text="v2.1.0 · Windows 11" Classes="caption" Margin="12,8,0,0" />
                 </StackPanel>
             </Grid>
         </Border>

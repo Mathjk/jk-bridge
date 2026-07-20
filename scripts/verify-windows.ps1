@@ -24,6 +24,7 @@ $script:TailscaleStatus = $null
 $script:MatchedPeer = $null
 $script:Config = $null
 $script:Services = @()
+$script:ClientFingerprint = $null
 
 function Resolve-NativeCommand {
     param([string]$Name, [string[]]$CandidatePaths = @())
@@ -179,6 +180,19 @@ function ConvertTo-NormalizedEd25519Key([string]$PublicKey) {
     return "ssh-ed25519 $($parts[1])"
 }
 
+function Get-Sha256PublicKeyFingerprint([string]$PublicKey) {
+    $normalized = ConvertTo-NormalizedEd25519Key $PublicKey
+    if (-not $normalized) { return $null }
+    $blob = [Convert]::FromBase64String(($normalized -split '\s+')[1])
+    $sha256 = [Security.Cryptography.SHA256]::Create()
+    try {
+        $hash = $sha256.ComputeHash($blob)
+    } finally {
+        $sha256.Dispose()
+    }
+    return "SHA256:$([Convert]::ToBase64String($hash).TrimEnd('='))"
+}
+
 function Get-TcpListeners([int]$Port) {
     return @(Get-NetTCPConnection -State Listen -LocalPort $Port -ErrorAction SilentlyContinue)
 }
@@ -188,6 +202,24 @@ function Test-ServiceEndpoint([object]$Service) {
     $healthPath = [string](Get-JsonPropertyValue $Service "healthPath")
     $healthKind = [string](Get-JsonPropertyValue $Service "healthKind")
     $name = [string](Get-JsonPropertyValue $Service "name")
+    $localPort = [int](Get-JsonPropertyValue $Service "localPort")
+
+    if ($healthKind -ieq "tcpConnect") {
+        $tcpClient = New-Object Net.Sockets.TcpClient
+        try {
+            $connect = $tcpClient.ConnectAsync("127.0.0.1", $localPort)
+            if (-not $connect.Wait(3000) -or -not $tcpClient.Connected) {
+                throw "$name 的 TCP 端口在 3 秒内未连通。"
+            }
+        } catch {
+            throw "$name TCP 健康检查失败：$($_.Exception.GetBaseException().Message)"
+        } finally {
+            $tcpClient.Dispose()
+        }
+        Write-Host "  $name -> TCP 127.0.0.1:$localPort"
+        return
+    }
+
     $baseUri = [Uri]$url
     $healthUri = [Uri]::new($baseUri, $healthPath)
 
@@ -269,7 +301,8 @@ Invoke-VerificationCheck "JK Bridge 配置" {
     if ($script:Services.Count -eq 0) {
         $script:Services = @(
             [pscustomobject]@{ name = "Overleaf"; enabled = $true; localPort = 8080; openUrl = "http://127.0.0.1:8080/project"; healthPath = "/project"; healthKind = "httpStatus" },
-            [pscustomobject]@{ name = "GPU Dashboard"; enabled = $true; localPort = 8765; openUrl = "http://127.0.0.1:8765/"; healthPath = "/api/health"; healthKind = "jsonOk" }
+            [pscustomobject]@{ name = "GPU Dashboard"; enabled = $true; localPort = 8765; openUrl = "http://127.0.0.1:8765/"; healthPath = "/api/health"; healthKind = "jsonOk" },
+            [pscustomobject]@{ name = "Investment News"; enabled = $true; localPort = 8793; openUrl = "http://127.0.0.1:8793/"; healthPath = "/"; healthKind = "httpStatus" }
         )
     }
 
@@ -373,10 +406,47 @@ Invoke-VerificationCheck "专用 SSH 私钥" {
     Assert-ExactPrivateKeyAcl $expandedIdentity
     if (-not $script:SshKeygenPath) { throw "缺少 ssh-keygen.exe，无法检查私钥。" }
     $keyText = (& $script:SshKeygenPath -y -P '""' -f $expandedIdentity 2>&1 | Out-String)
-    if ($LASTEXITCODE -ne 0 -or -not (ConvertTo-NormalizedEd25519Key $keyText)) {
+    $script:ClientFingerprint = Get-Sha256PublicKeyFingerprint $keyText
+    if ($LASTEXITCODE -ne 0 -or -not $script:ClientFingerprint) {
         throw "私钥不是可无交互使用的 Ed25519 密钥。"
     }
     Write-Host "  私钥存在、类型正确且不需要口令（未显示密钥内容）。"
+}
+
+Invoke-VerificationCheck "转发授权记录" {
+    if (-not $script:Config) {
+        Add-VerificationWarning "配置不存在，无法核对 Linux 端口授权记录。"
+        return
+    }
+    $authorization = Get-JsonPropertyValue $script:Config "authorization"
+    if ($null -eq $authorization -or (Get-JsonPropertyValue $authorization "isKnown") -ne $true) {
+        throw "没有可信的 Linux 授权记录；请在新版 JK Bridge 中重新配对一次。"
+    }
+    $recordedFingerprint = [string](Get-JsonPropertyValue $authorization "clientKeyFingerprint")
+    if ($recordedFingerprint -ne $script:ClientFingerprint) {
+        throw "授权记录中的客户端指纹与当前专用私钥不一致；请重新配对。"
+    }
+
+    $desiredPorts = @(
+        $script:Services |
+            Where-Object { (Get-JsonPropertyValue $_ "enabled") -ne $false } |
+            ForEach-Object { [int](Get-JsonPropertyValue $_ "remotePort") } |
+            Sort-Object -Unique
+    )
+    $grantedPorts = @(
+        @(Get-JsonPropertyValue $authorization "remotePorts") |
+            ForEach-Object { [int]$_ } |
+            Sort-Object -Unique
+    )
+    $missingPorts = @($desiredPorts | Where-Object { $grantedPorts -notcontains $_ })
+    if ($missingPorts.Count -gt 0) {
+        throw "启用服务需要尚未授权的 Linux 端口：$($missingPorts -join ', ')。请重新配对。"
+    }
+    $extraPorts = @($grantedPorts | Where-Object { $desiredPorts -notcontains $_ })
+    if ($extraPorts.Count -gt 0) {
+        Add-VerificationWarning "Linux 仍保留未使用端口授权：$($extraPorts -join ', ')；建议重新配对收紧权限。"
+    }
+    Write-Host "  客户端指纹与端口授权记录一致：$($grantedPorts -join ', ')"
 }
 
 Invoke-VerificationCheck "固定 SSH 主机密钥" {
@@ -435,7 +505,7 @@ Invoke-VerificationCheck "本地端口" {
 }
 
 if ($TestServices) {
-    Invoke-VerificationCheck "本地服务 HTTP 健康" {
+    Invoke-VerificationCheck "本地服务健康" {
         if ($PortExpectation -ne "Listening") {
             Add-VerificationWarning "建议同时指定 -PortExpectation Listening。"
         }

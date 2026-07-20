@@ -1,6 +1,7 @@
 using System.Net;
 using System.Text.RegularExpressions;
 using JKBridge.Core.Models;
+using JKBridge.Core.Routing;
 using JKBridge.Core.Security;
 
 namespace JKBridge.Core.Configuration;
@@ -19,6 +20,10 @@ public static class ConfigValidator
 
     private static readonly Regex HostKeyAliasPattern = new(
         "^[A-Za-z0-9][A-Za-z0-9_.-]{0,127}$",
+        RegexOptions.CultureInvariant | RegexOptions.Compiled);
+
+    private static readonly Regex FingerprintPattern = new(
+        "^SHA256:[A-Za-z0-9+/]{43}$",
         RegexOptions.CultureInvariant | RegexOptions.Compiled);
 
     public static ConfigValidationResult Validate(AppConfig? config)
@@ -53,6 +58,7 @@ public static class ConfigValidator
             ValidateServer(config.Server, expectedSuffix, issues);
         }
         ValidateBehavior(config.Behavior, issues);
+        ValidateAuthorization(config.Authorization, issues);
         ValidateServices(config.Services, issues);
 
         return new(issues);
@@ -152,6 +158,71 @@ public static class ConfigValidator
         }
     }
 
+    private static void ValidateAuthorization(
+        ForwardAuthorizationGrant? authorization,
+        ICollection<ConfigValidationIssue> issues)
+    {
+        if (authorization is null)
+        {
+            issues.Add(new("authorization", "authorization.required", "Authorization state is required."));
+            return;
+        }
+
+        var fingerprint = authorization.ClientKeyFingerprint;
+        var remotePorts = authorization.RemotePorts;
+        if (fingerprint is null)
+        {
+            issues.Add(new(
+                "authorization.clientKeyFingerprint",
+                "authorization.invalidFingerprint",
+                "Authorization fingerprint cannot be null."));
+        }
+
+        if (remotePorts is null)
+        {
+            issues.Add(new(
+                "authorization.remotePorts",
+                "authorization.invalidPorts",
+                "Authorization ports cannot be null."));
+        }
+
+        if (fingerprint is null || remotePorts is null)
+        {
+            return;
+        }
+
+        if (!authorization.IsKnown)
+        {
+            if (fingerprint.Length > 0 || remotePorts.Count > 0)
+            {
+                issues.Add(new(
+                    "authorization",
+                    "authorization.unknownHasReceipt",
+                    "Unknown authorization state cannot contain a receipt."));
+            }
+
+            return;
+        }
+
+        if (!FingerprintPattern.IsMatch(fingerprint))
+        {
+            issues.Add(new(
+                "authorization.clientKeyFingerprint",
+                "authorization.invalidFingerprint",
+                "Authorization fingerprint must be a valid SHA256 fingerprint."));
+        }
+
+        if (remotePorts.Count is < 1 or > 32 ||
+            remotePorts.Any(port => port is < 1 or > 65535) ||
+            remotePorts.Distinct().Count() != remotePorts.Count)
+        {
+            issues.Add(new(
+                "authorization.remotePorts",
+                "authorization.invalidPorts",
+                "Authorization ports must contain 1–32 unique valid ports."));
+        }
+    }
+
     private static void ValidateServices(
         List<ServiceDefinition>? services,
         ICollection<ConfigValidationIssue> issues)
@@ -207,8 +278,15 @@ public static class ConfigValidator
             ValidateRequiredText(service.Name, $"{path}.name", 80, issues);
             ValidateOptionalText(service.Description, $"{path}.description", 160, issues);
             ValidateRequiredText(service.Icon, $"{path}.icon", 40, issues);
-            ValidatePort(service.LocalPort, $"{path}.localPort", issues);
-            ValidatePort(service.RemotePort, $"{path}.remotePort", issues);
+
+            var route = ServiceRouteDefinition.Evaluate(service);
+            foreach (var routeIssue in route.Issues)
+            {
+                issues.Add(new(
+                    $"{path}.{routeIssue.Field}",
+                    routeIssue.Code,
+                    routeIssue.Message));
+            }
 
             if (service.LocalPort is >= 1 and <= 65535 && !localPorts.Add(service.LocalPort))
             {
@@ -216,27 +294,6 @@ public static class ConfigValidator
                     $"{path}.localPort",
                     "service.duplicateLocalPort",
                     "Local ports must be unique."));
-            }
-
-            if (!string.Equals(
-                    service.RemoteHost,
-                    ServiceDefinition.LoopbackHost,
-                    StringComparison.Ordinal))
-            {
-                issues.Add(new(
-                    $"{path}.remoteHost",
-                    "service.remoteHostNotLoopback",
-                    "Remote host must be exactly 127.0.0.1."));
-            }
-
-            ValidateOpenUrl(service, path, issues);
-
-            if (!IsSafeHealthPath(service.HealthPath))
-            {
-                issues.Add(new(
-                    $"{path}.healthPath",
-                    "service.invalidHealthPath",
-                    "Health path must be a local absolute path beginning with a single slash."));
             }
 
             if (!Enum.IsDefined(service.HealthKind))
@@ -258,24 +315,6 @@ public static class ConfigValidator
         if (value is null || value.Length > maximumLength || ContainsControlCharacters(value))
         {
             issues.Add(new(path, "text.invalid", $"Text must be at most {maximumLength} characters and contain no control characters."));
-        }
-    }
-
-    private static void ValidateOpenUrl(
-        ServiceDefinition service,
-        string path,
-        ICollection<ConfigValidationIssue> issues)
-    {
-        if (!Uri.TryCreate(service.OpenUrl, UriKind.Absolute, out var uri) ||
-            (uri.Scheme != Uri.UriSchemeHttp && uri.Scheme != Uri.UriSchemeHttps) ||
-            !string.Equals(uri.Host, ServiceDefinition.LoopbackHost, StringComparison.Ordinal) ||
-            !string.IsNullOrEmpty(uri.UserInfo) ||
-            uri.Port != service.LocalPort)
-        {
-            issues.Add(new(
-                $"{path}.openUrl",
-                "service.invalidOpenUrl",
-                "Open URL must use HTTP(S) on 127.0.0.1 and the configured local port."));
         }
     }
 
@@ -303,15 +342,6 @@ public static class ConfigValidator
             issues.Add(new(path, "port.outOfRange", "Port must be between 1 and 65535."));
         }
     }
-
-    private static bool IsSafeHealthPath(string? path) =>
-        !string.IsNullOrWhiteSpace(path) &&
-        path.Length <= 2048 &&
-        path.StartsWith("/", StringComparison.Ordinal) &&
-        !path.StartsWith("//", StringComparison.Ordinal) &&
-        !path.Contains('#') &&
-        !ContainsControlCharacters(path) &&
-        Uri.IsWellFormedUriString(path, UriKind.Relative);
 
     private static bool ContainsControlCharacters(string value) =>
         value.Any(character => char.IsControl(character));

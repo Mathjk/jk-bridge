@@ -168,13 +168,15 @@ public sealed class ConfigStore : IDisposable
                     _serializerOptions,
                     cancellationToken)
                 .ConfigureAwait(false);
-            var wasMigrated = config?.SchemaVersion == 1;
+            var sourceSchema = config?.SchemaVersion;
+            var wasMigrated = sourceSchema is 1 or 2;
             if (wasMigrated)
             {
                 config = config! with
                 {
                     SchemaVersion = AppConfig.CurrentSchemaVersion,
-                    SetupCompleted = true,
+                    SetupCompleted = sourceSchema == 1 || config.SetupCompleted,
+                    Authorization = new ForwardAuthorizationGrant(),
                 };
             }
 

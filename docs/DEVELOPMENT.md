@@ -136,7 +136,7 @@ Use [WINDOWS_ACCEPTANCE.md](WINDOWS_ACCEPTANCE.md) on a clean or representative 
 
 - first-run unconfigured setup;
 - one-shot pairing and helper exit;
-- two simultaneous forwards;
+- all three default forwards in one SSH process;
 - tray hide/show/exit;
 - optional startup after login;
 - sleep/resume and Tailscale recovery;

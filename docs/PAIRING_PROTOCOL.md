@@ -30,7 +30,7 @@ Content-Type: application/json
 {
   "protocolVersion": 1,
   "clientPublicKey": "ssh-ed25519 <base64>",
-  "remotePorts": [80, 8765]
+  "remotePorts": [80, 8765, 8793]
 }
 ```
 
@@ -49,11 +49,13 @@ The body is limited to 64 KiB. There must be 1–32 integer ports, each `1..6553
   "hostPublicKey": "ssh-ed25519 <base64>",
   "displayName": "linux-box",
   "clientKeyFingerprint": "SHA256:<base64>",
-  "permitPorts": [80, 8765]
+  "permitPorts": [80, 8765, 8793]
 }
 ```
 
 The client requires protocol V1, an exact endpoint IP match, a valid normalized MagicDNS name and suffix, a valid Ed25519 host public key, a safe SSH username/port, its own client-key fingerprint, and an exact match between requested and returned ports. The response is limited to 64 KiB.
+
+After all checks pass, schema V3 stores an authorization receipt containing `clientKeyFingerprint` and the exact `permitPorts` response. This receipt is local state, not a change to protocol V1. Before future SSH startup, enabled service routes are compared with it. An unknown legacy receipt or any missing destination port requires a new pairing request; unused extra ports produce a least-privilege recommendation.
 
 ## Transport controls
 

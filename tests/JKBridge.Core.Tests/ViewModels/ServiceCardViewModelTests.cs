@@ -1,4 +1,5 @@
 using JKBridge.App.ViewModels;
+using JKBridge.Core.Models;
 
 namespace JKBridge.Core.Tests.ViewModels;
 
@@ -35,14 +36,41 @@ public sealed class ServiceCardViewModelTests
         Assert.False(state.IsEnabled);
     }
 
+    [Fact]
+    public void TryCreateState_MapsSelectedTcpHealthMode()
+    {
+        var viewModel = Create();
+        viewModel.HealthModeIndex = 0;
+
+        var valid = viewModel.TryCreateState(out var state, out _);
+
+        Assert.True(valid);
+        Assert.Equal(HealthCheckKind.TcpConnect, state!.HealthKind);
+    }
+
+    [Fact]
+    public void ApplyRuntimeState_DoesNotOverwriteUnsavedHealthModeDraft()
+    {
+        var viewModel = Create();
+        viewModel.HealthModeIndex = 0;
+
+        viewModel.ApplyRuntimeState(CreateState(HealthCheckKind.JsonOk));
+
+        Assert.Equal(0, viewModel.HealthModeIndex);
+    }
+
     private static ServiceCardViewModel Create() => new(
-        new ServiceUiState(
-            "service", "WEB", "Service", "Description", "http://127.0.0.1:8080/",
-            8080, 80, "等待隧道", "尚未检查", true, false, false),
+        CreateState(HealthCheckKind.HttpStatus),
         _ => Task.CompletedTask,
         _ => Task.CompletedTask,
         _ => Task.CompletedTask,
         (_, _) => Task.CompletedTask,
         _ => Task.CompletedTask,
         _ => Task.CompletedTask);
+
+    private static ServiceUiState CreateState(HealthCheckKind healthKind) =>
+        new(
+            "service", "WEB", "Service", "Description", "http://127.0.0.1:8080/",
+            8080, 80, "等待隧道", "尚未检查", true, false, false, false,
+            healthKind);
 }

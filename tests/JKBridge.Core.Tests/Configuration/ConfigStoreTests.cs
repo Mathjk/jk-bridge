@@ -140,6 +140,27 @@ public sealed class ConfigStoreTests
         Assert.Equal(TestConfigs.LinuxHost, result.Config.Server.Host);
     }
 
+    [Fact]
+    public async Task LoadWithResultAsync_MigratesVersionTwoWithUnknownAuthorization()
+    {
+        using var directory = new TemporaryDirectory();
+        using var store = new ConfigStore(directory.File("config.json"));
+        var legacy = TestConfigs.CreateConfigured() with
+        {
+            SchemaVersion = 2,
+            Authorization = new ForwardAuthorizationGrant(),
+        };
+        Directory.CreateDirectory(directory.Path);
+        await File.WriteAllTextAsync(store.ConfigPath, JsonSerializer.Serialize(legacy));
+
+        var result = await store.LoadWithResultAsync();
+
+        Assert.True(result.WasMigrated);
+        Assert.Equal(3, result.Config.SchemaVersion);
+        Assert.False(result.Config.Authorization.IsKnown);
+        Assert.Empty(result.Config.Authorization.RemotePorts);
+    }
+
     private static AppConfig WithDisplayName(string displayName)
     {
         var defaults = AppConfig.CreateDefault();

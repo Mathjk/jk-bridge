@@ -22,6 +22,7 @@
                         <NativeMenuItemSeparator />
                         <NativeMenuItem Header="打开 Overleaf" Click="OpenOverleafMenuItem_OnClick" />
                         <NativeMenuItem Header="打开 GPU Dashboard" Click="OpenGpuMenuItem_OnClick" />
+                        <NativeMenuItem Header="打开 Investment News" Click="OpenInvestmentNewsMenuItem_OnClick" />
                         <NativeMenuItemSeparator />
                         <NativeMenuItem Header="诊断" Click="DiagnosticsMenuItem_OnClick" />
                         <NativeMenuItem Header="设置" Click="SettingsMenuItem_OnClick" />

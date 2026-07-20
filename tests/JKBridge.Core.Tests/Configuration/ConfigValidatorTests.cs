@@ -19,7 +19,7 @@ public sealed class ConfigValidatorTests
         Assert.Empty(config.Server.Host);
         Assert.Empty(config.Server.User);
         Assert.Empty(config.Server.PinnedHostKey);
-        Assert.Equal(["overleaf", "gpu-dashboard"], config.Services.Select(service => service.Id));
+        Assert.Equal(["overleaf", "gpu-dashboard", "investment-news"], config.Services.Select(service => service.Id));
         Assert.All(config.Services, service => Assert.Equal("127.0.0.1", service.RemoteHost));
     }
 
@@ -32,7 +32,7 @@ public sealed class ConfigValidatorTests
         first.Services.Clear();
 
         Assert.Empty(first.Services);
-        Assert.Equal(2, second.Services.Count);
+        Assert.Equal(3, second.Services.Count);
     }
 
     [Fact]
@@ -123,6 +123,63 @@ public sealed class ConfigValidatorTests
         var result = ConfigValidator.Validate(config);
 
         AssertIssue(result, "service.remoteHostNotLoopback", "services[0].remoteHost");
+    }
+
+    [Fact]
+    public void Validate_RejectsInvalidKnownAuthorizationReceipt()
+    {
+        var config = AppConfig.CreateDefault() with
+        {
+            Authorization = new ForwardAuthorizationGrant
+            {
+                IsKnown = true,
+                ClientKeyFingerprint = "not-a-fingerprint",
+                RemotePorts = [0, 80, 80],
+            },
+        };
+
+        var result = ConfigValidator.Validate(config);
+
+        AssertIssue(result, "authorization.invalidFingerprint", "authorization.clientKeyFingerprint");
+        AssertIssue(result, "authorization.invalidPorts", "authorization.remotePorts");
+    }
+
+    [Fact]
+    public void Validate_RejectsNullAuthorizationReceiptFieldsWithoutThrowing()
+    {
+        var config = AppConfig.CreateDefault() with
+        {
+            Authorization = new ForwardAuthorizationGrant
+            {
+                IsKnown = true,
+                ClientKeyFingerprint = null!,
+                RemotePorts = null!,
+            },
+        };
+
+        var result = ConfigValidator.Validate(config);
+
+        AssertIssue(result, "authorization.invalidFingerprint", "authorization.clientKeyFingerprint");
+        AssertIssue(result, "authorization.invalidPorts", "authorization.remotePorts");
+    }
+
+    [Fact]
+    public void Validate_RejectsNullUnknownAuthorizationFieldsWithoutThrowing()
+    {
+        var config = AppConfig.CreateDefault() with
+        {
+            Authorization = new ForwardAuthorizationGrant
+            {
+                IsKnown = false,
+                ClientKeyFingerprint = null!,
+                RemotePorts = null!,
+            },
+        };
+
+        var result = ConfigValidator.Validate(config);
+
+        AssertIssue(result, "authorization.invalidFingerprint", "authorization.clientKeyFingerprint");
+        AssertIssue(result, "authorization.invalidPorts", "authorization.remotePorts");
     }
 
     [Theory]

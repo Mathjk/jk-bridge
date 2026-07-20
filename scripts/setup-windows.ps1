@@ -257,7 +257,7 @@ function New-DefaultConfig {
     param([string]$PortableIdentityPath, [string]$NormalizedPinnedHostKey)
 
     return [ordered]@{
-        schemaVersion = 2
+        schemaVersion = 3
         setupCompleted = $true
         expectedTailnetDnsSuffix = (Normalize-DnsName $ExpectedTailnetSuffix)
         server = [ordered]@{
@@ -290,6 +290,13 @@ function New-DefaultConfig {
                 localPort = 8765; remoteHost = "127.0.0.1"; remotePort = 8765
                 openUrl = "http://127.0.0.1:8765/"
                 healthPath = "/api/health"; healthKind = "jsonOk"
+            },
+            [ordered]@{
+                id = "investment-news"; name = "Investment News"; description = "A股产业链资讯与 AI 每日要点"; icon = "Newspaper"
+                enabled = $true; favorite = $true
+                localPort = 8793; remoteHost = "127.0.0.1"; remotePort = 8793
+                openUrl = "http://127.0.0.1:8793/"
+                healthPath = "/"; healthKind = "httpStatus"
             }
         )
     }
@@ -299,7 +306,8 @@ function Save-JKBridgeConfig {
     param(
         [string]$Path,
         [string]$PortableIdentityPath,
-        [string]$NormalizedPinnedHostKey
+        [string]$NormalizedPinnedHostKey,
+        [string]$ClientFingerprint
     )
 
     $directory = Split-Path -Parent $Path
@@ -316,7 +324,7 @@ function Save-JKBridgeConfig {
             throw "现有配置内容为空，脚本不会覆盖它：$Path"
         }
         $existingSchema = Get-JsonPropertyValue $config "schemaVersion"
-        if ($null -ne $existingSchema -and [int]$existingSchema -notin @(1, 2)) {
+        if ($null -ne $existingSchema -and [int]$existingSchema -notin @(1, 2, 3)) {
             throw "现有配置 schemaVersion=$existingSchema，不支持由此脚本改写。"
         }
         $behavior = Get-JsonPropertyValue $config "behavior"
@@ -334,7 +342,7 @@ function Save-JKBridgeConfig {
             Set-JsonPropertyValue $config "server" $server
         }
 
-        Set-JsonPropertyValue $config "schemaVersion" 2
+        Set-JsonPropertyValue $config "schemaVersion" 3
         Set-JsonPropertyValue $config "setupCompleted" $true
         Set-JsonPropertyValue $config "expectedTailnetDnsSuffix" (Normalize-DnsName $ExpectedTailnetSuffix)
         Set-JsonPropertyValue $server "displayName" "Linux workstation"
@@ -347,6 +355,26 @@ function Save-JKBridgeConfig {
     } else {
         $config = New-DefaultConfig $PortableIdentityPath $NormalizedPinnedHostKey
     }
+
+    $authorizedPorts = @(
+        @(Get-JsonPropertyValue $config "services") |
+            Where-Object { (Get-JsonPropertyValue $_ "enabled") -ne $false } |
+            ForEach-Object { [int](Get-JsonPropertyValue $_ "remotePort") } |
+            Sort-Object -Unique
+    )
+    if ($authorizedPorts.Count -lt 1 -or $authorizedPorts.Count -gt 32) {
+        throw "启用服务必须产生 1–32 个远端授权端口。"
+    }
+    foreach ($authorizedPort in $authorizedPorts) {
+        if ($authorizedPort -lt 1 -or $authorizedPort -gt 65535) {
+            throw "服务包含无效远端端口：$authorizedPort"
+        }
+    }
+    Set-JsonPropertyValue $config "authorization" ([pscustomobject][ordered]@{
+        isKnown = $true
+        clientKeyFingerprint = $ClientFingerprint
+        remotePorts = $authorizedPorts
+    })
 
     $json = $config | ConvertTo-Json -Depth 20
     $temporaryPath = Join-Path $directory (".{0}.{1}.tmp" -f ([IO.Path]::GetFileName($Path)), [Guid]::NewGuid().ToString("N"))
@@ -365,6 +393,8 @@ function Save-JKBridgeConfig {
             Remove-Item -LiteralPath $temporaryPath -Force
         }
     }
+
+    return $authorizedPorts
 }
 
 if (-not $env:USERPROFILE) {
@@ -372,6 +402,9 @@ if (-not $env:USERPROFILE) {
 }
 if (-not $env:LOCALAPPDATA) {
     throw "LOCALAPPDATA 未设置；此脚本需要在 Windows 用户会话中运行。"
+}
+if ($WriteConfig -and $AllowAnyLoopbackPort) {
+    throw "schema v3 只记录精确端口授权；-WriteConfig 不能与 -AllowAnyLoopbackPort 同时使用。"
 }
 
 $ServerHost = Normalize-DnsName $ServerHost
@@ -484,16 +517,23 @@ Assert-PathIsNotReparsePoint ($IdentityFile + ".pub") -IncludeExistingParents
 [IO.File]::WriteAllText($IdentityFile + ".pub", $publicKeyLine + [Environment]::NewLine, (New-Object Text.UTF8Encoding($false)))
 
 $fingerprintText = (& $sshKeygen -lf ($IdentityFile + ".pub") -E sha256 2>&1 | Out-String).Trim()
-if ($LASTEXITCODE -eq 0 -and $fingerprintText) {
+$clientFingerprint = $null
+if ($LASTEXITCODE -eq 0 -and
+    $fingerprintText -match '(SHA256:[A-Za-z0-9+/]{43})(?:\s|$)') {
+    $clientFingerprint = $Matches[1]
     Write-Host "客户端公钥指纹：$fingerprintText" -ForegroundColor Green
 } else {
     Write-Warning "未能显示客户端公钥指纹；迁移旧授权前请在 Windows 手工运行 ssh-keygen -lf `"$IdentityFile.pub`" -E sha256。"
 }
+if ($WriteConfig -and -not $clientFingerprint) {
+    throw "无法取得 schema v3 所需的客户端 SHA256 指纹；配置未写入。"
+}
 
 $portableIdentityPath = ConvertTo-PortableIdentityPath $IdentityFile
+$authorizedPorts = @(80, 8765, 8793)
 if ($WriteConfig) {
     Write-Step "原子更新 JK Bridge 配置"
-    Save-JKBridgeConfig $ConfigPath $portableIdentityPath $normalizedPinnedHostKey
+    $authorizedPorts = @(Save-JKBridgeConfig $ConfigPath $portableIdentityPath $normalizedPinnedHostKey $clientFingerprint)
     Write-Host "已写入：$ConfigPath" -ForegroundColor Green
     Write-Host "若原配置存在，替换时会保留：$ConfigPath.bak"
 } else {
@@ -503,7 +543,7 @@ if ($WriteConfig) {
 $permitOpenOptions = if ($AllowAnyLoopbackPort) {
     'permitopen="127.0.0.1:*"'
 } else {
-    'permitopen="127.0.0.1:80",permitopen="127.0.0.1:8765"'
+    (@($authorizedPorts | ForEach-Object { 'permitopen="127.0.0.1:{0}"' -f $_ }) -join ',')
 }
 $authorizedKeyLine = 'restrict,port-forwarding,command="/usr/bin/false",from="100.64.0.0/10,fd7a:115c:a1e0::/48",' + $permitOpenOptions + ' ' + $clientPublicKey + ' JK Bridge dedicated tunnel key'
 
@@ -517,7 +557,7 @@ Write-Host "Linux 权限应为：chmod 700 ~/.ssh && chmod 600 ~/.ssh/authorized
 if ($AllowAnyLoopbackPort) {
     Write-Warning "已显式启用任意 Linux IPv4 回环端口。此密钥可访问 127.0.0.1 上的所有 TCP 服务；仅在确有动态新增服务需求时使用。"
 } else {
-    Write-Host "默认仅允许 Linux 127.0.0.1:80 与 127.0.0.1:8765。新增服务时请人工增加精确 permitopen，或明确使用 -AllowAnyLoopbackPort。"
+    Write-Host "仅允许配置中已启用的 Linux 回环端口：$($authorizedPorts -join '、')。新增远端端口后需要重新配对或重新运行本恢复流程。"
 }
 
 Write-Step "Linux SSH 主机密钥的独立核验"

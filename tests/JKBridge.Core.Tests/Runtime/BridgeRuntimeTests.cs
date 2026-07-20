@@ -10,6 +10,19 @@ namespace JKBridge.Core.Tests.Runtime;
 public sealed class BridgeRuntimeTests
 {
     [Fact]
+    public void ServiceSnapshot_HealthFailureKeepsBrowserLaunchAvailableWhenForwardExists()
+    {
+        var snapshot = new ServiceSnapshot(
+            "self-signed",
+            "Self-signed HTTPS",
+            ServicePhase.RemoteUnavailable,
+            Detail: "certificate error");
+
+        Assert.True(snapshot.CanOpen);
+        Assert.False((snapshot with { Phase = ServicePhase.ForwardDenied }).CanOpen);
+    }
+
+    [Fact]
     public async Task StartAsync_StartsOneProcessForAllForwards_AndPublishesHealth()
     {
         await using var fixture = RuntimeFixture.Create();
@@ -23,15 +36,15 @@ public sealed class BridgeRuntimeTests
         Assert.Equal(1, fixture.ProcessFactory.StartCount);
         var spec = Assert.IsType<SshLaunchSpec>(fixture.ProcessFactory.LastSpec);
         Assert.Equal(TestConfigs.LinuxHost, spec.TargetHost);
-        Assert.Equal([8080, 8765], spec.LocalPorts);
-        Assert.Equal(2, spec.Arguments.Count(argument => argument == "-L"));
+        Assert.Equal([8080, 8765, 8793], spec.LocalPorts);
+        Assert.Equal(3, spec.Arguments.Count(argument => argument == "-L"));
         var configIndex = Array.IndexOf(spec.Arguments.ToArray(), "-F");
         Assert.True(configIndex >= 0);
         Assert.Equal("none", spec.Arguments[configIndex + 1]);
         Assert.Contains("PermitLocalCommand=no", spec.Arguments);
         Assert.Contains("ProxyCommand=none", spec.Arguments);
         Assert.NotNull(snapshot.SshProcessId);
-        Assert.Equal(2, snapshot.Services.Count);
+        Assert.Equal(3, snapshot.Services.Count);
 
         await fixture.Runtime.StopAsync();
         Assert.Equal(TunnelPhase.Stopped, fixture.Runtime.Snapshot.Phase);
@@ -66,6 +79,46 @@ public sealed class BridgeRuntimeTests
             item => item.Phase == TunnelPhase.PortConflict);
 
         Assert.Contains("8765", snapshot.Message);
+        Assert.Equal(0, fixture.ProcessFactory.StartCount);
+        Assert.False(fixture.KnownHosts.Called);
+    }
+
+    [Fact]
+    public async Task StartAsync_MissingForwardGrantRequiresPairingBeforeStartingSsh()
+    {
+        await using var fixture = RuntimeFixture.Create();
+        var config = fixture.Config with
+        {
+            Authorization = new ForwardAuthorizationGrant
+            {
+                IsKnown = true,
+                ClientKeyFingerprint = "SHA256:" + new string('A', 43),
+                RemotePorts = [80, 8765],
+            },
+        };
+
+        await fixture.Runtime.StartAsync(config);
+        var snapshot = await WaitForSnapshotAsync(
+            fixture.Runtime,
+            item => item.Phase == TunnelPhase.NeedsPairing);
+
+        Assert.Contains("8793", snapshot.Message, StringComparison.Ordinal);
+        Assert.Equal(0, fixture.ProcessFactory.StartCount);
+        Assert.False(fixture.KnownHosts.Called);
+    }
+
+    [Fact]
+    public async Task StartAsync_UnknownLegacyForwardGrantRequiresOneTimePairing()
+    {
+        await using var fixture = RuntimeFixture.Create();
+        var config = fixture.Config with { Authorization = new ForwardAuthorizationGrant() };
+
+        await fixture.Runtime.StartAsync(config);
+        var snapshot = await WaitForSnapshotAsync(
+            fixture.Runtime,
+            item => item.Phase == TunnelPhase.NeedsPairing);
+
+        Assert.Contains("authorization receipt", snapshot.Message, StringComparison.OrdinalIgnoreCase);
         Assert.Equal(0, fixture.ProcessFactory.StartCount);
         Assert.False(fixture.KnownHosts.Called);
     }

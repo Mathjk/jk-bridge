@@ -126,6 +126,9 @@ public partial class App : Application
     private void OpenGpuMenuItem_OnClick(object? sender, EventArgs eventArgs) =>
         _ = _controller?.OpenServiceAsync("gpu-dashboard", "http://127.0.0.1:8765/");
 
+    private void OpenInvestmentNewsMenuItem_OnClick(object? sender, EventArgs eventArgs) =>
+        _ = _controller?.OpenServiceAsync("investment-news", "http://127.0.0.1:8793/");
+
     private void DiagnosticsMenuItem_OnClick(object? sender, EventArgs eventArgs) =>
         ShowPage(AppPage.Diagnostics);
 

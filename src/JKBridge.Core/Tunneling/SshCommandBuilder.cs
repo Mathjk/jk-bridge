@@ -1,6 +1,7 @@
 using System.Net;
 using JKBridge.Core.Configuration;
 using JKBridge.Core.Models;
+using JKBridge.Core.Routing;
 
 namespace JKBridge.Core.Tunneling;
 
@@ -86,7 +87,7 @@ public sealed class SshCommandBuilder
     }
 
     private static string CreateForwardArgument(ServiceDefinition service) =>
-        $"127.0.0.1:{service.LocalPort}:{service.RemoteHost}:{service.RemotePort}";
+        ServiceRouteDefinition.Evaluate(service).Route!.SshForwardArgument;
 
     private static string ValidateTargetHost(string? targetHost)
     {

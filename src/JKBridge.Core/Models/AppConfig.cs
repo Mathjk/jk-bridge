@@ -2,7 +2,7 @@ namespace JKBridge.Core.Models;
 
 public sealed record AppConfig
 {
-    public const int CurrentSchemaVersion = 2;
+    public const int CurrentSchemaVersion = 3;
 
     public int SchemaVersion { get; init; } = CurrentSchemaVersion;
 
@@ -13,6 +13,8 @@ public sealed record AppConfig
     public ServerProfile Server { get; init; } = new();
 
     public BehaviorSettings Behavior { get; init; } = new();
+
+    public ForwardAuthorizationGrant Authorization { get; init; } = new();
 
     public List<ServiceDefinition> Services { get; init; } = CreateDefaultServices();
 
@@ -50,6 +52,21 @@ public sealed record AppConfig
             HealthPath = "/api/health",
             HealthKind = HealthCheckKind.JsonOk,
         },
+        new()
+        {
+            Id = "investment-news",
+            Name = "Investment News",
+            Description = "A股产业链资讯与 AI 每日要点",
+            Icon = "Newspaper",
+            Enabled = true,
+            Favorite = true,
+            LocalPort = 8793,
+            RemoteHost = ServiceDefinition.LoopbackHost,
+            RemotePort = 8793,
+            OpenUrl = "http://127.0.0.1:8793/",
+            HealthPath = "/",
+            HealthKind = HealthCheckKind.HttpStatus,
+        },
     ];
 }
 
@@ -81,6 +98,15 @@ public sealed record BehaviorSettings
     public bool StartWithWindows { get; init; }
 
     public ThemePreference Theme { get; init; } = ThemePreference.System;
+}
+
+public sealed record ForwardAuthorizationGrant
+{
+    public bool IsKnown { get; init; }
+
+    public string ClientKeyFingerprint { get; init; } = string.Empty;
+
+    public List<int> RemotePorts { get; init; } = [];
 }
 
 public sealed record ServiceDefinition
@@ -123,4 +149,5 @@ public enum HealthCheckKind
 {
     HttpStatus,
     JsonOk,
+    TcpConnect,
 }

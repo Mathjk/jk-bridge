@@ -21,7 +21,7 @@ Linux one-shot helper -> Windows one-click pairing -> restricted SSH authorizati
 
 After pairing, normal use is `start app -> automatic preflight -> connect -> open service`. A Windows reboot needs no credential entry.
 
-## V2 scope
+## V2.1 scope
 
 ### Automated setup
 
@@ -33,7 +33,7 @@ After pairing, normal use is `start app -> automatic preflight -> connect -> ope
 - Windows generates or safely reuses a dedicated Ed25519 key and applies an exact current-user/SYSTEM DACL.
 - Linux atomically installs or updates one managed, command-disabled, Tailscale-source, exact-`permitopen` authorization.
 - Windows pins the returned host public key and persists the MagicDNS identity, never the pairing token or Tailscale IP.
-- Existing schema V1 configurations migrate without forcing re-pairing.
+- Schema V1/V2 configurations preserve their device and service settings, then require one re-pair to establish a trustworthy V3 authorization record.
 
 ### Connection and services
 
@@ -42,9 +42,12 @@ After pairing, normal use is `start app -> automatic preflight -> connect -> ope
 - Run one hidden, public-key-only `ssh.exe` process containing all enabled `-L` forwards.
 - Bind every Windows listener and Linux destination to `127.0.0.1`.
 - Reconnect transient failures with bounded backoff, but stop for host-key, authentication, invalid-config, or port-conflict errors.
-- Ship editable Overleaf and GPU Dashboard examples.
+- Ship editable Overleaf, GPU Dashboard, and Investment News examples.
 - Add, edit, enable, disable, and remove future HTTP/HTTPS loopback services.
-- Probe services independently; one failed web app does not restart a healthy SSH transport.
+- Derive SSH forwarding, browser opening, health probing, and Linux authorization from one validated loopback route definition.
+- Record the paired client fingerprint and exact Linux destination ports; block before SSH when an enabled route lacks a known grant.
+- Probe services independently with TCP connect, HTTP status, or JSON `ok=true`; one failed app does not restart a healthy SSH transport.
+- Keep health results advisory for browser launch once the SSH forward exists; forwarding denial remains blocking.
 
 ### Windows experience
 
@@ -52,6 +55,7 @@ After pairing, normal use is `start app -> automatic preflight -> connect -> ope
 - Four-stage pairing progress: network, identity key, Linux authorization, secure connection.
 - Native tray menu, close-to-tray, single instance, optional current-user startup, and sleep/resume handling.
 - Chinese-first UI with readable technical diagnostics.
+- Health-mode selection in the service editor, including TCP mode for self-signed HTTPS.
 - System, light, and dark appearance modes.
 
 ### Persistence and diagnostics
@@ -103,18 +107,20 @@ JK Bridge
 ## Product state
 
 ```text
-Unconfigured -> Pairing -> Configured -> Preflight -> Starting -> Connected
-                    |                        |                       |
-                    +-> Safe failure        +-> Needs action       +-> Degraded
+Unconfigured -> Pairing -> Configured -> Authorization check -> Preflight -> Starting -> Connected
+                    |                |              |                              |
+                    +-> Safe failure +-> Re-pair    +-> Needs action               +-> Degraded
 Connected -> Reconnecting -> Preflight
 Any running state -> Stopping -> Stopped
 ```
 
 ## Data objects
 
-- `AppConfig`: schema version, setup completion, expected tailnet, server, behavior, services.
+- `AppConfig`: schema version, setup completion, expected tailnet, server, behavior, authorization receipt, services.
 - `ServerProfile`: display name, MagicDNS host, SSH user/port, identity path, pinned Ed25519 host key.
 - `ServiceDefinition`: name, local port, Linux loopback port, browser URL, health mode, enabled state.
+- `ServiceRoute`: the single validated SSH forward, browser URI, health URI, and authorization target derived from a service.
+- `ForwardAuthorizationGrant`: whether the receipt is known, paired client fingerprint, and exact granted Linux ports.
 - `PairingCode`: Tailscale IPv4 endpoint, ephemeral port, version, 256-bit token.
 - `PairingRequest/Response`: protocol version, client public key, exact ports, server identity and host public key.
 - `TunnelSnapshot`, `ServiceSnapshot`, `DiagnosticEvent`: runtime and sanitized presentation state.
@@ -125,6 +131,8 @@ Any running state -> Stopping -> Stopped
 - HTTP pairing has no TLS certificate. It runs only inside Tailscale's encrypted network, requires a high-entropy short-lived token, binds only to the Tailscale interface, and immediately pins SSH for all persistent transport.
 - A tailnet peer with a stolen pairing code could race the intended client. The code is treated as a temporary secret, expires quickly, and the Linux console shows the paired client fingerprint.
 - Adding a new remote service requires re-pairing when its port is not already authorized. This is intentional least privilege.
+- Legacy configurations cannot prove their historic Linux whitelist, so V3 requires one explicit re-pair instead of guessing.
+- A self-signed HTTPS certificate may fail strict HTTP health. TCP mode checks only forward reachability, and browser launch remains available so the user can make the certificate decision there.
 - One SSH process means forwarding changes briefly reconnect all services; this avoids ControlMaster complexity and hidden sessions.
 
 ## Release requirements
