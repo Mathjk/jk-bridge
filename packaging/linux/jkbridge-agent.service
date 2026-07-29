@@ -18,16 +18,14 @@ UMask=0077
 # Linux capabilities are required. Tailscale peer identity is checked via the
 # local tailscaled socket for every uncached peer.
 NoNewPrivileges=true
-CapabilityBoundingSet=
+# User services already start without Linux capabilities. Do not add root-level
+# sandbox directives that implicitly change the capability bounding set: a
+# constrained user manager rejects that transition with 218/CAPABILITIES.
 AmbientCapabilities=
-PrivateDevices=true
 PrivateTmp=true
-ProtectClock=true
 ProtectControlGroups=true
 ProtectHome=read-only
 ProtectHostname=true
-ProtectKernelLogs=true
-ProtectKernelModules=true
 ProtectKernelTunables=true
 ProtectProc=invisible
 ProtectSystem=strict

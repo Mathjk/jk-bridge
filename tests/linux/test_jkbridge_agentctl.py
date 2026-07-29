@@ -10,6 +10,7 @@ from pathlib import Path
 ROOT = Path(__file__).resolve().parents[2]
 CONTROLLER = ROOT / "packaging" / "linux" / "jkbridge-agentctl"
 SOURCE_DIR = ROOT / "scripts"
+USER_UNIT = ROOT / "packaging" / "linux" / "jkbridge-agent.service"
 TEST_KEY = (
     "ssh-ed25519 "
     "AAAAC3NzaC1lZDI1NTE5AAAAII5PDcg58G9EbEkF2WSaZfPg2gmYobklFKxJt19PREep"
@@ -75,6 +76,21 @@ class AgentControllerFixture:
 
 
 class AgentControllerTests(unittest.TestCase):
+    def test_user_unit_avoids_root_only_capability_transitions(self):
+        unit = USER_UNIT.read_text(encoding="utf-8")
+
+        incompatible_directives = (
+            "CapabilityBoundingSet=",
+            "PrivateDevices=",
+            "ProtectClock=",
+            "ProtectKernelLogs=",
+            "ProtectKernelModules=",
+        )
+        for directive in incompatible_directives:
+            with self.subTest(directive=directive):
+                self.assertNotIn(f"\n{directive}", unit)
+        self.assertIn("\nNoNewPrivileges=true", unit)
+
     def test_dry_run_checks_prerequisites_without_writing_or_enabling(self):
         with tempfile.TemporaryDirectory() as temporary:
             fixture = AgentControllerFixture(Path(temporary))
