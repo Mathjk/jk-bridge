@@ -10,6 +10,8 @@ param(
 
     [string]$IsccPath,
 
+    [string]$ChineseMessagesFile,
+
     [switch]$SkipPublish,
 
     [string]$SignToolName,
@@ -85,6 +87,16 @@ if ([string]::IsNullOrWhiteSpace($IsccPath) -or
 
 Write-Host "Inno Setup compiler: $IsccPath"
 
+if ([string]::IsNullOrWhiteSpace($ChineseMessagesFile)) {
+    $ChineseMessagesFile = Join-Path `
+        (Split-Path -Parent $IsccPath) `
+        'Languages\ChineseSimplified.isl'
+}
+if (-not (Test-Path -LiteralPath $ChineseMessagesFile -PathType Leaf)) {
+    throw 'The Inno Setup Simplified Chinese messages file was not found. Install it or pass -ChineseMessagesFile.'
+}
+Write-Host "Simplified Chinese messages: $ChineseMessagesFile"
+
 New-Item -ItemType Directory -Path $payloadDirectory -Force | Out-Null
 New-Item -ItemType Directory -Path $outputDirectory -Force | Out-Null
 
@@ -114,7 +126,8 @@ if (-not (Test-Path -LiteralPath $payloadExecutable -PathType Leaf)) {
 $isccArguments = @(
     "/DMyAppVersion=$Version",
     "/DPayloadDir=$payloadDirectory",
-    "/DOutputDir=$outputDirectory"
+    "/DOutputDir=$outputDirectory",
+    "/DChineseMessagesFile=$ChineseMessagesFile"
 )
 
 if (-not [string]::IsNullOrWhiteSpace($SignToolName)) {

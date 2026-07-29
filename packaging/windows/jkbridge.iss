@@ -18,6 +18,10 @@
   #define OutputDir "output"
 #endif
 
+#ifndef ChineseMessagesFile
+  #define ChineseMessagesFile "compiler:Languages\ChineseSimplified.isl"
+#endif
+
 #define MyAppName "JK Bridge"
 #define MyAppPublisher "JK Bridge contributors"
 #define MyAppExeName "JKBridge.exe"
@@ -66,7 +70,7 @@ SignedUninstaller=no
 
 [Languages]
 Name: "english"; MessagesFile: "compiler:Default.isl"
-Name: "chinesesimp"; MessagesFile: "compiler:Languages\ChineseSimplified.isl"
+Name: "chinesesimp"; MessagesFile: "{#ChineseMessagesFile}"
 
 [Tasks]
 Name: "desktopicon"; Description: "{cm:TaskDesktopIcon}"; GroupDescription: "{cm:AdditionalIcons}"; Flags: unchecked

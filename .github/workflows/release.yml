@@ -80,12 +80,20 @@ jobs:
       - name: Install Inno Setup compiler
         shell: pwsh
         run: choco install innosetup --yes --no-progress
+      - name: Fetch pinned Inno Setup Simplified Chinese messages
+        uses: actions/checkout@v7
+        with:
+          repository: jrsoftware/issrc
+          ref: cfdf48923178df4b4f040e038b423aa555a61ffc
+          path: .inno-setup-source
+          sparse-checkout: Files/Languages/Unofficial/ChineseSimplified.isl
+          sparse-checkout-cone-mode: false
       - name: Build with warnings as errors
         shell: pwsh
         run: dotnet build JKBridge.slnx -c Release --nologo -warnaserror
       - name: Compile installer without signing credentials
         shell: pwsh
-        run: .\scripts\build-installer.ps1
+        run: .\scripts\build-installer.ps1 -ChineseMessagesFile "$env:GITHUB_WORKSPACE\.inno-setup-source\Files\Languages\Unofficial\ChineseSimplified.isl"
       - uses: actions/upload-artifact@v7
         with:
           name: JKBridge-Setup-win-x64-unsigned
