@@ -8,8 +8,10 @@ This guide takes a new Windows 11 x64 client and a Linux host from an empty envi
 > These steps install the released **v2.1.0** portable ZIP with one-shot Linux
 > pairing. The repository's unreleased 2.2.0/vNext installer, Service Profile,
 > Windows Agent client, Linux Agent package assets, and simple route editor are development
-> work. The repository has a hardened user unit and manual packaging guide, but
-> no stable Agent artifact or live-accepted install/upgrade/rollback workflow.
+> work. The repository has a hardened user unit and manual packaging guide. One
+> deployed pair has exercised install/start/restart and first-admin enrollment,
+> but there is no stable Agent artifact or complete clean-machine
+> upgrade/rollback/uninstall workflow.
 > Do not use an unreleased Agent screen as a substitute for the one-shot steps
 > below. Any locally built artifact marked `2.2.0` is for development
 > acceptance, not a stable Release.
@@ -30,8 +32,8 @@ The email addresses used to sign in to Tailscale do not have to be identical. Bo
 
 | Capability | v2.1.0 Release | Current unreleased 2.2.0/vNext repository state |
 |---|---|---|
-| Windows delivery | Verified portable ZIP | Inno Setup source skeleton; not a published or accepted installer |
-| Linux setup | One-shot helper started in a terminal for each new device | No-AI Agent, user-unit assets, controlled loopback-relay helper, packaging guide, and Windows client exist in source; live systemd lifecycle acceptance is pending |
+| Windows delivery | Verified portable ZIP | CI-built unsigned Inno Setup installer and preview publishing pipeline; not a stable or clean-machine-accepted installer |
+| Linux setup | One-shot helper started in a terminal for each new device | No-AI Agent, user-unit assets, controlled loopback-relay helper, packaging guide, and Windows client exist in source; one deployed start/restart/enrollment passed, while the complete clean-machine lifecycle remains pending |
 | Service editing | Explicit local port, remote port, loopback URL, and health fields | Simple URL generation and advanced editor are under development |
 | Service transfer | Re-enter services on the new Windows computer | Native non-secret export and preview/confirm import UI exists in vNext source; not released or clean-Windows accepted |
 | Recovery | Run the one-shot helper and re-pair | The same one-shot flow remains the planned fallback |
@@ -331,8 +333,9 @@ handle that source as sensitive, and prefer a Service Profile when possible.
 
 The vNext source also contains the Agent and relay scripts, a hardened per-user
 systemd unit, an environment example, package checks, and a manual packaging
-guide. Those assets have not completed a live installation, restart, upgrade,
-rollback, and clean-machine acceptance cycle, so they are not stable
+guide. One deployed pair has completed installation, restart, discovery, and
+first-admin enrollment, but the assets have not completed login persistence,
+upgrade, rollback, uninstall, and clean-machine acceptance, so they are not stable
 installation instructions. A bounded discovery engine is present and tested:
 on explicit invocation it checks only known online Tailscale peers on the fixed
 Agent port and validates their node and tailnet identity. The vNext Setup page
@@ -370,6 +373,10 @@ The first administrator cannot be created by this button. It must use the
 administrator code printed by Linux Agent bootstrap, or a new administrator
 recovery code issued locally on Linux. An ordinary device cannot generate
 codes, list peers, revoke peers, or manage relays.
+
+For administrator replacement, lost-device recovery, revocation boundaries,
+and the rule that administrator roles are not transferred in place, follow the
+[vNext Agent multi-device operations guide](AGENT_OPERATIONS.md).
 
 ### vNext development reference: controlled Linux relay
 

@@ -22,8 +22,10 @@ be mistaken for stable v2.1.0; no v2.2.0 Release has been published.
 - Added administrator-generated, transient 10-minute one-use enrollment codes for adding ordinary devices from the Windows Setup page; the first administrator still requires Linux bootstrap/recovery.
 - Added administrator-only controlled relay APIs and Windows UI for read-only plan/probe, explicit-confirmation apply, read-only delete planning, and confirmed deletion. Managed TCP relays use the sibling `jkbridge_relay.py`, `socat`, per-user systemd units, Linux loopback listeners, catalog-bound plan tokens, and exact catalog-derived device grants.
 - Added a bounded, read-only Windows Agent discovery engine and Setup integration that inspect only known online Tailscale peers on port `45871`, verify stable-node, MagicDNS, tailnet, protocol, and Agent-version claims, and require an explicit **Use selected address** action before the existing enrollment flow.
-- Added hardened per-user Linux systemd/environment packaging assets, an operator packaging guide, and a package contract check; these sources still require live lifecycle acceptance before release.
+- Added hardened per-user Linux systemd/environment packaging assets, an operator packaging guide, and a package contract check; one deployed pair has now exercised install/bootstrap/start/restart/status and first-admin enrollment, while the complete clean-machine lifecycle remains a release gate.
 - Added an Inno Setup installer skeleton and Windows build script with prerequisite detection, optional UAC-confirmed OpenSSH Client installation, Tailscale official-download handoff, per-user startup choice, and detached SHA-256 output.
+- Added a tagged-release aggregation job so preview tags publish both the portable ZIP and unsigned installer with detached hashes while remaining GitHub prereleases.
+- Added privacy-safe field-acceptance evidence and bilingual multi-device/administrator operating guidance.
 - Added vNext Agent protocol and threat-model drafts plus security black-box test scaffolding.
 
 ### Changed
@@ -42,7 +44,7 @@ be mistaken for stable v2.1.0; no v2.2.0 Release has been published.
 - The latest stable release remains v2.1.0. The v2.2.0 development version
   label is an explicit pre-release boundary, not evidence of a stable artifact.
 - The development Linux Agent, packaging assets, Windows enrollment/management client, and Service Profile UI exist, but none is part of the published v2.1.0 Release.
-- Linux systemd packaging still needs live install/restart/upgrade/rollback/uninstall acceptance; Windows Agent/Profile paths still need end-to-end clean-machine, independent-revocation, fallback, and security acceptance.
+- Linux systemd packaging has completed one deployed install/bootstrap/start/restart/status run, but still needs clean-machine login persistence plus supported upgrade/rollback/uninstall acceptance; Windows Agent/Profile paths still need disposable clean-machine, independent-revocation, fallback, and security acceptance.
 - Agent discovery engine/controller/UI source integration exists, but still needs disposable clean-Windows acceptance; discovery only selects an endpoint and never replaces the one-time code or explicit enrollment action.
 - Administrator device-code and relay-management UI/API paths are implemented in source, but still need Linux live-lifecycle and disposable clean-Windows end-to-end acceptance before release.
 - Manual catalog sync uses authenticated `GET /v1/me` plus `/v1/services`; only administrators receive the complete device list and revoke capability.

@@ -36,7 +36,8 @@
 > 包含一些 **尚未发布的 2.2.0（vNext）开发脚手架**：更简单的路由编辑器、
 > 非秘密服务档案、Windows 安装器和可选的无 AI Linux Agent；但它们尚未组成可发布的端到端
 > Agent 流程。本地构建时标为 `2.2.0` 的 EXE、ZIP 或安装器仍只是开发/验收
-> 产物，不是稳定 Release。除非小节明确标注 vNext/2.2.0 开发内容，下文都描述
+> 产物（包括明确标注的 Preview），不是稳定 Release。除非小节明确标注
+> vNext/2.2.0 开发内容，下文都描述
 > v2.1.0。
 
 ## 为什么需要 JK Bridge？
@@ -194,9 +195,10 @@ API、Codex 或云端运行时。SSH 仍是受限的数据通道；每台 Window
 - 已有可在 Windows 构建的 Inno Setup 安装器脚手架，但它还不是稳定 Release
   资产，也没有完成干净电脑验收和代码签名；
 - 源码中已有开发版 Linux Agent、加固的用户级 unit/环境文件、打包检查和已
-  配套的回环中继助手，以及已接线的 Windows 登记/管理客户端，但 systemd
-  生命周期尚未经过实机验收，也没有稳定 Agent 发布或完整的互操作与独立撤销
-  验收结论；
+  配套的回环中继助手，以及已接线的 Windows 登记/管理客户端。一组已部署设备
+  已完成非 root 安装/初始化/启动/重启/状态检查、明确发现 Agent、首台管理员
+  登记、服务清单同步、精确 SSH 授权与建链；完整的干净机器生命周期、第二台
+  设备撤销和稳定发布验收仍待完成；
 - 任意已登记的 vNext 设备都可以通过认证 `/v1/me` 与 `/v1/services` 手动
   同步自己的服务选择；管理员还可以查看全部设备，并在明确确认后撤销所选的
   非当前设备，也可以在 Windows 管理界面生成 10 分钟有效、仅用一次、只能
@@ -213,8 +215,9 @@ API、Codex 或云端运行时。SSH 仍是受限的数据通道；每台 Window
 创建、更新或删除。应用当前计划时，Agent 使用同包的 `jkbridge_relay.py`、
 `/usr/bin/socat` 和用户级 systemd unit，只在 Linux
 `127.0.0.1:<relayPort>` 监听，并以事务方式更新服务清单与精确 `permitopen`
-授权。它只转发一个明确主机与端口，不是 SOCKS 或通用代理。该能力已在源码实现
-并通过自动测试，但仍需 Linux 实机生命周期和干净 Windows 验收。
+授权。它只转发一个明确主机与端口，不是 SOCKS 或通用代理。首轮现场登记期间，
+既有的人工回环中继保持在线；但 Windows 端管理的创建/更新/删除和干净机器验收
+仍待完成。
 
 上述发布门槛完成前，每台新 Windows 仍使用一次性助手配对。不要在电脑之间
 复制私钥、授权回执或整个 `config.json`。vNext Service Profile 界面只迁移
@@ -278,6 +281,8 @@ API、Codex 或云端运行时。SSH 仍是受限的数据通道；每台 Window
 | [安全设计](docs/SECURITY.md) | 系统管理员和审查者 |
 | [配对协议](docs/PAIRING_PROTOCOL.md) | 开发者和协议审查者 |
 | [Agent 协议草案](docs/AGENT_PROTOCOL.md) · [威胁模型](docs/AGENT_THREAT_MODEL.md) | vNext 开发与安全审查；不是稳定版安装说明 |
+| [Agent 多设备与管理员操作](docs/AGENT_OPERATIONS.zh-CN.md) · [English](docs/AGENT_OPERATIONS.md) | 添加、更换或撤销 vNext 设备的管理员 |
+| [vNext 实机验收记录](docs/FIELD_ACCEPTANCE.md) | 区分现场证据与正式发布门槛的维护者 |
 | [开发指南](docs/DEVELOPMENT.md) | 编译、测试和发布项目的贡献者 |
 | [Windows 验收清单](docs/WINDOWS_ACCEPTANCE.md) | 发布测试人员 |
 

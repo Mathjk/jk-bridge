@@ -37,8 +37,9 @@
 > (vNext) development scaffolding** for a simpler route editor, non-secret
 > service profiles, a Windows installer, and an optional no-AI Linux Agent. Those vNext pieces are
 > not a released end-to-end Agent workflow. A locally built EXE, ZIP, or
-> installer carrying `2.2.0` is a development/acceptance artifact, not a stable
-> Release. Unless a section explicitly says vNext/2.2.0 development, the
+> installer carrying `2.2.0`, including any explicitly marked Preview, is a
+> development/acceptance artifact rather than a stable Release. Unless a
+> section explicitly says vNext/2.2.0 development, the
 > instructions below describe v2.1.0.
 
 ## Why JK Bridge?
@@ -205,9 +206,11 @@ That flow is **not complete or released yet**:
   code signing;
 - a development Linux Agent, hardened user-unit/environment packaging assets,
   package checks, a sibling loopback-relay helper, and a wired Windows
-  enrollment/management client exist in the source tree, but the systemd
-  lifecycle has not been live-accepted and no stable Agent release or completed
-  interoperability/revocation sign-off exists;
+  enrollment/management client exist in the source tree. One deployed pair has
+  completed non-root install/bootstrap/start/restart/status, explicit Agent
+  discovery, first-admin enrollment, catalog synchronization, exact SSH grants,
+  and connection. The complete clean-machine lifecycle, second-device
+  revocation, and stable-release sign-off remain open;
 - any enrolled vNext device can manually synchronize its service selection
   through authenticated `/v1/me` plus `/v1/services`; an administrator can also
   list all devices and revoke a selected non-current device after explicit
@@ -230,8 +233,9 @@ before create/update/delete. Applying a current plan uses the packaged sibling
 `jkbridge_relay.py`, `/usr/bin/socat`, and per-user systemd units to expose only
 `127.0.0.1:<relayPort>` on Linux; it then updates the catalog and exact
 `permitopen` grants transactionally. This is a controlled TCP relay for one
-explicit host and port, not a SOCKS/general proxy. It is implemented and tested
-in source but still needs live Linux lifecycle and clean-Windows acceptance.
+explicit host and port, not a SOCKS/general proxy. Existing operator-created
+loopback relays remained active during the first field enrollment, but live
+Windows-managed create/update/delete and clean-machine acceptance remain open.
 
 Until those release gates are complete, use the one-shot helper for every new
 Windows computer. Do not copy a private key, authorization receipt, or whole
@@ -299,6 +303,8 @@ Read the full [security design](docs/SECURITY.md) and [pairing protocol](docs/PA
 | [Security design](docs/SECURITY.md) | Administrators and reviewers |
 | [Pairing protocol](docs/PAIRING_PROTOCOL.md) | Implementers and protocol reviewers |
 | [Agent protocol draft](docs/AGENT_PROTOCOL.md) · [threat model](docs/AGENT_THREAT_MODEL.md) | vNext implementers and security reviewers; not stable installation instructions |
+| [Agent multi-device operations](docs/AGENT_OPERATIONS.md) · [中文](docs/AGENT_OPERATIONS.zh-CN.md) | vNext administrators adding, replacing, or revoking devices |
+| [vNext field acceptance record](docs/FIELD_ACCEPTANCE.md) | Maintainers tracking real-machine evidence separately from release gates |
 | [Development guide](docs/DEVELOPMENT.md) | Contributors building and releasing the project |
 | [Windows acceptance checklist](docs/WINDOWS_ACCEPTANCE.md) | Release testers |
 

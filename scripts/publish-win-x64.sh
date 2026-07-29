@@ -105,6 +105,9 @@ install -m 0644 "$ROOT/docs/DEVELOPMENT.md" "$DELIVERY/docs/DEVELOPMENT.md"
 install -m 0644 "$ROOT/docs/ARCHITECTURE.md" "$DELIVERY/docs/ARCHITECTURE.md"
 install -m 0644 "$ROOT/docs/AGENT_PROTOCOL.md" "$DELIVERY/docs/AGENT_PROTOCOL.md"
 install -m 0644 "$ROOT/docs/AGENT_THREAT_MODEL.md" "$DELIVERY/docs/AGENT_THREAT_MODEL.md"
+install -m 0644 "$ROOT/docs/AGENT_OPERATIONS.md" "$DELIVERY/docs/AGENT_OPERATIONS.md"
+install -m 0644 "$ROOT/docs/AGENT_OPERATIONS.zh-CN.md" "$DELIVERY/docs/AGENT_OPERATIONS.zh-CN.md"
+install -m 0644 "$ROOT/docs/FIELD_ACCEPTANCE.md" "$DELIVERY/docs/FIELD_ACCEPTANCE.md"
 install -m 0644 "$ROOT/docs/PAIRING_PROTOCOL.md" "$DELIVERY/docs/PAIRING_PROTOCOL.md"
 install -m 0644 "$ROOT/docs/PRODUCT_SPEC.md" "$DELIVERY/docs/PRODUCT_SPEC.md"
 install -m 0644 "$ROOT/docs/SECURITY.md" "$DELIVERY/docs/SECURITY.md"
@@ -122,7 +125,9 @@ PAYLOAD_FILES=(
   docs/INSTALLATION.md docs/INSTALLATION.zh-CN.md
   docs/TROUBLESHOOTING.md docs/TROUBLESHOOTING.zh-CN.md
   docs/DEVELOPMENT.md docs/ARCHITECTURE.md
-  docs/AGENT_PROTOCOL.md docs/AGENT_THREAT_MODEL.md docs/PAIRING_PROTOCOL.md
+  docs/AGENT_PROTOCOL.md docs/AGENT_THREAT_MODEL.md
+  docs/AGENT_OPERATIONS.md docs/AGENT_OPERATIONS.zh-CN.md
+  docs/FIELD_ACCEPTANCE.md docs/PAIRING_PROTOCOL.md
   docs/PRODUCT_SPEC.md docs/SECURITY.md docs/WINDOWS_ACCEPTANCE.md
   docs/images/app-icon.svg docs/images/device-setup.png
 )

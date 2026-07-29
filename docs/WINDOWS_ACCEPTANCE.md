@@ -116,9 +116,12 @@ any unchecked live gate below as passed:
 - A bounded read-only Agent discovery engine, controller integration, and Setup
   candidate/selection controls exist. A single result is only preselected;
   **Use selected address** remains explicit, and discovery never enrolls.
-- Linux package assets and automated package checks exist, but there is no
-  completed real-user systemd lifecycle run. The installer and all vNext
-  Windows flows still require disposable clean-Windows acceptance.
+- Linux package assets and automated package checks exist. One deployed pair
+  has completed install/bootstrap/start/restart/status plus explicit discovery,
+  first-admin enrollment, catalog sync, exact grants, and SSH connection. This
+  privacy-safe evidence is recorded in [FIELD_ACCEPTANCE.md](FIELD_ACCEPTANCE.md),
+  but the installer and all vNext Windows flows still require the disposable
+  clean-Windows matrix below.
 
 ### Clean Windows installer
 

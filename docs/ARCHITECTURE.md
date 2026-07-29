@@ -30,7 +30,7 @@
 | Persistence | Atomic JSON config, backup recovery, rotating redacted logs |
 | Tests | Unit/integration tests for config, protocol, runtime, view model, Linux file mutation, and packaging |
 | vNext configuration | Schema V4 adds non-secret Agent registration/catalog state while preserving V3 routes and receipts |
-| vNext Linux management | Development non-root Agent/API over Tailscale plus `jkbridge-agentctl` install/start/stop/status/fallback source; no upgrade/uninstall command or live lifecycle acceptance yet; V1 helper remains fallback |
+| vNext Linux management | Development non-root Agent/API over Tailscale plus `jkbridge-agentctl` install/start/stop/status/fallback source; one deployed install/bootstrap/start/restart/status and first-admin enrollment completed, but no supported upgrade/uninstall command or complete clean-machine lifecycle yet; V1 helper remains fallback |
 | vNext device identity | One dedicated Ed25519 identity and independently revocable authorization per Windows device |
 | vNext service migration | Native JSON export/import UI; bounded non-secret profile, read-only diff, explicit confirmation, atomic save |
 | vNext explicit relay | One exact DNS/IPv4 TCP target behind one Linux `127.0.0.1` `socat` user unit; read-only plan/probe before confirmed apply/delete |
@@ -312,8 +312,10 @@ not passed live acceptance, and there is no explicit upgrade/rollback/uninstall
 command yet. The relay source requires the companion file beside
 `jkbridge_agent.py`, executable
 `/usr/bin/socat`, a working systemd user instance, and write access to the
-reviewed per-user unit directory. The presence of these source/package files is
-not evidence that this lifecycle has passed real-machine acceptance.
+reviewed per-user unit directory. One deployed pair has exercised
+install/bootstrap/start/restart/status and first-admin enrollment; see the
+[field acceptance record](FIELD_ACCEPTANCE.md). That evidence does not close
+the remaining clean-machine, upgrade, rollback, or uninstall gates.
 
 Every Windows device generates its own Ed25519 key. The Agent stores the public
 key, fingerprint, device metadata, and authorization state, never the private

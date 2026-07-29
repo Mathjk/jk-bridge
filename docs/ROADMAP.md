@@ -96,6 +96,12 @@ clean-machine end-to-end enrollment and independent-revocation acceptance, and
 stable Release assets. The frozen development contract is in
 [AGENT_PROTOCOL.md](AGENT_PROTOCOL.md).
 
+One deployed pair has completed non-root Agent install/bootstrap/start/restart/
+status, explicit Windows discovery, first-admin enrollment, seven-service
+catalog synchronization, exact managed SSH authorization, and connection. This
+is recorded in [FIELD_ACCEPTANCE.md](FIELD_ACCEPTANCE.md); it narrows the field
+risk but does not replace the clean-machine or multi-device exit criteria.
+
 ## vNext phase D — Windows no-terminal enrollment and sync (implemented source; acceptance pending)
 
 - Detect Tailscale and Windows OpenSSH prerequisites in the first-run UI.
@@ -158,6 +164,10 @@ currently deployed explicit relays without address or port changes.
 - Test enrollment and revocation with a second clean Windows device.
 - Ship installer/portable artifacts, hashes, protocol compatibility tests, and rollback instructions.
 - Stop or remove legacy management only after an observation period and explicit approval.
+
+The first deployed Windows-to-Agent migration and catalog synchronization are
+complete. Second-device enrollment/revocation, supported lifecycle operations,
+and remote adoption of existing relay units remain open.
 
 ## Later candidates
 
