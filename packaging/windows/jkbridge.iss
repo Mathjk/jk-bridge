@@ -2,6 +2,10 @@
 ; Build through scripts/build-installer.ps1 so the payload and output paths are
 ; supplied explicitly. The default paths are useful for local IDE inspection.
 
+#if Ver < EncodeVer(6, 3, 0)
+  #error Inno Setup 6.3 or later is required to compile this installer
+#endif
+
 #ifndef MyAppVersion
   #define MyAppVersion "2.2.0"
 #endif

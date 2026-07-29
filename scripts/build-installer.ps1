@@ -83,11 +83,7 @@ if ([string]::IsNullOrWhiteSpace($IsccPath) -or
     throw 'Inno Setup 6.3+ compiler (ISCC.exe) was not found. Install it or pass -IsccPath.'
 }
 
-$isccVersion = [System.Diagnostics.FileVersionInfo]::GetVersionInfo($IsccPath)
-if ($isccVersion.FileMajorPart -lt 6 -or
-    ($isccVersion.FileMajorPart -eq 6 -and $isccVersion.FileMinorPart -lt 3)) {
-    throw "Inno Setup 6.3 or later is required; found '$($isccVersion.FileVersion)'."
-}
+Write-Host "Inno Setup compiler: $IsccPath"
 
 New-Item -ItemType Directory -Path $payloadDirectory -Force | Out-Null
 New-Item -ItemType Directory -Path $outputDirectory -Force | Out-Null
