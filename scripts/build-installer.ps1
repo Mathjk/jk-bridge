@@ -59,21 +59,22 @@ if ($null -eq $dotnetCommand) {
 }
 
 if ([string]::IsNullOrWhiteSpace($IsccPath)) {
-    $isccCommand = Get-Command 'ISCC.exe' -ErrorAction SilentlyContinue
-    if ($null -ne $isccCommand) {
-        $IsccPath = $isccCommand.Source
+    $isccCandidates = @()
+    if (-not [string]::IsNullOrWhiteSpace(${env:ProgramFiles(x86)})) {
+        $isccCandidates += Join-Path ${env:ProgramFiles(x86)} 'Inno Setup 6\ISCC.exe'
     }
-    else {
-        $isccCandidates = @()
-        if (-not [string]::IsNullOrWhiteSpace(${env:ProgramFiles(x86)})) {
-            $isccCandidates += Join-Path ${env:ProgramFiles(x86)} 'Inno Setup 6\ISCC.exe'
+    if (-not [string]::IsNullOrWhiteSpace($env:ProgramFiles)) {
+        $isccCandidates += Join-Path $env:ProgramFiles 'Inno Setup 6\ISCC.exe'
+    }
+    $IsccPath = $isccCandidates |
+        Where-Object { Test-Path -LiteralPath $_ -PathType Leaf } |
+        Select-Object -First 1
+
+    if ([string]::IsNullOrWhiteSpace($IsccPath)) {
+        $isccCommand = Get-Command 'ISCC.exe' -ErrorAction SilentlyContinue
+        if ($null -ne $isccCommand) {
+            $IsccPath = $isccCommand.Source
         }
-        if (-not [string]::IsNullOrWhiteSpace($env:ProgramFiles)) {
-            $isccCandidates += Join-Path $env:ProgramFiles 'Inno Setup 6\ISCC.exe'
-        }
-        $IsccPath = $isccCandidates |
-            Where-Object { Test-Path -LiteralPath $_ -PathType Leaf } |
-            Select-Object -First 1
     }
 }
 
