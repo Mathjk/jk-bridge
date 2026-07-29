@@ -203,11 +203,9 @@ begin
   OpenSshInstalled := IsOpenSshInstalled;
 
   TailscaleStatusLabel.Caption := FmtMessage(
-    CustomMessage('TailscaleStatus'),
-    [StatusText(TailscaleInstalled)]);
+    CustomMessage('TailscaleStatus'), [StatusText(TailscaleInstalled)]);
   OpenSshStatusLabel.Caption := FmtMessage(
-    CustomMessage('OpenSshStatus'),
-    [StatusText(OpenSshInstalled)]);
+    CustomMessage('OpenSshStatus'), [StatusText(OpenSshInstalled)]);
 
   TailscaleDownloadCheckBox.Visible := not TailscaleInstalled;
   if TailscaleInstalled then
