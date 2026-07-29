@@ -1,9 +1,9 @@
 # JK Bridge Agent Threat Model
 
 Status: implementation-aligned audit for the vNext **personal-tailnet preview**
-(2026-07-29)  
+(2026-07-29)
 Applies to: `jkbridge-agent`, its Windows client, the service manifest, and
-Agent-managed OpenSSH authorization and loopback relays  
+Agent-managed OpenSSH authorization and loopback relays
 Does not replace: the one-shot pairing guarantees in `SECURITY.md`
 
 This document deliberately separates two claims:
