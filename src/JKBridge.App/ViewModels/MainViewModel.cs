@@ -105,7 +105,8 @@ public partial class MainViewModel : ViewModelBase
     [ObservableProperty] private string _settingsFeedback = "设置保存在当前 Windows 用户的应用数据目录。";
     [ObservableProperty] private bool _isUpdateChecking;
     [ObservableProperty] private bool _hasUpdateReleaseInfo;
-    [ObservableProperty] private string _updateCheckFeedback = "仅在你点击后查询 JK Bridge 官方 GitHub Releases；不会下载或安装任何内容。";
+    [ObservableProperty] private bool _hasUpdateInstaller;
+    [ObservableProperty] private string _updateCheckFeedback = "仅在你点击后查询 JK Bridge 官方 GitHub Releases；确认后可下载、校验并启动覆盖安装。";
     [ObservableProperty] private string _updateReleaseUrl = string.Empty;
     [ObservableProperty] private string _serviceFeedback = "远端主机固定为 127.0.0.1，不会暴露给局域网。";
 
@@ -215,6 +216,7 @@ public partial class MainViewModel : ViewModelBase
     public bool HasNoIssue => !HasIssue;
     public bool CanExportDiagnosticBundle => !IsDiagnosticBundleBusy;
     public bool CanCheckForUpdates => !IsUpdateChecking;
+    public bool CanInstallUpdate => HasUpdateInstaller && !IsUpdateChecking;
     public bool CanStartPairing =>
         !IsPairing && !IsAgentEnrolling && !IsAgentDiscovering && !IsAgentManaging && !IsServiceProfileBusy;
     public bool CanStartAgentEnrollment =>
@@ -275,8 +277,13 @@ public partial class MainViewModel : ViewModelBase
     partial void OnHasIssueChanged(bool value) => OnPropertyChanged(nameof(HasNoIssue));
     partial void OnIsDiagnosticBundleBusyChanged(bool value) =>
         OnPropertyChanged(nameof(CanExportDiagnosticBundle));
-    partial void OnIsUpdateCheckingChanged(bool value) =>
+    partial void OnIsUpdateCheckingChanged(bool value)
+    {
         OnPropertyChanged(nameof(CanCheckForUpdates));
+        OnPropertyChanged(nameof(CanInstallUpdate));
+    }
+    partial void OnHasUpdateInstallerChanged(bool value) =>
+        OnPropertyChanged(nameof(CanInstallUpdate));
     partial void OnIsPairingChanged(bool value)
     {
         OnPropertyChanged(nameof(CanStartPairing));
@@ -506,6 +513,10 @@ public partial class MainViewModel : ViewModelBase
     [RelayCommand]
     private Task CheckForUpdatesAsync() =>
         CanCheckForUpdates ? _actions.CheckForUpdatesAsync() : Task.CompletedTask;
+
+    [RelayCommand]
+    private Task InstallCheckedReleaseAsync() =>
+        CanInstallUpdate ? _actions.InstallCheckedReleaseAsync() : Task.CompletedTask;
 
     [RelayCommand]
     private async Task PairDeviceAsync()

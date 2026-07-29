@@ -46,6 +46,19 @@ Do not post raw pairing codes, `config.json`, private keys, Tailscale JSON, or `
 
 The executable is currently unsigned, so SmartScreen may show an unknown publisher. A verified Release hash confirms file integrity but does not suppress SmartScreen.
 
+## The Settings overlay-install action is unavailable or fails
+
+- Preview 1 has no direct-update control. Manually download the official
+  Preview 2 installer and `.sha256`, verify them, and overlay-install once.
+- Run **Check official Release** first. **Download and overlay install** appears
+  only when the selected Release has the exact EXE and `.sha256` pair.
+- A checksum mismatch, untrusted redirect, or timeout fails closed and never
+  starts setup. Retry after checking GitHub connectivity, or manually use the
+  official Release page displayed in Settings.
+- Setup remains an interactive wizard and may ask to close the running JK
+  Bridge process. Reopen the app after setup; configuration and device
+  credentials should remain intact.
+
 ## Tailscale is missing, signed out, or cannot find Linux
 
 Run `tailscale status` on both devices. Confirm:
@@ -159,6 +172,14 @@ notes, screenshots, or command history. The first administrator still requires
 an administrator code printed by Linux bootstrap/recovery. An ordinary device
 sees only its own record and cannot generate codes, list/revoke peers, or manage
 relays; the Windows UI refuses self-revocation.
+
+Preview 1 also has a display bug: the Linux Agent canonicalizes a Tailscale
+login to lower case while Windows may preserve casing such as `Mathjk@github`.
+That can falsely report a current-device identity mismatch and hide the admin
+role and enrollment-code controls. Preview 2 compares only this account-name
+field without case sensitivity while continuing to require the exact device ID,
+Tailscale node ID, and SSH public-key fingerprint. Overlay-install Preview 2;
+the administrator device does not need to be revoked or enrolled again.
 
 Revocation prevents future Agent requests and new SSH authentication for that
 device. It cannot terminate a tunnel that is already connected; disconnect the

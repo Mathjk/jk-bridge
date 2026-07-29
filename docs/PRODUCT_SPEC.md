@@ -272,7 +272,7 @@ JK Bridge
     ├── Startup/reconnect/tray behavior
     ├── Appearance
     ├── Paths and version
-    └── Manual official Release check
+    └── Manual official Release check and verified overlay install
 ```
 
 The vNext source adds a simple/advanced service editor and explicit Agent
@@ -281,7 +281,8 @@ administrator device list/revoke and ordinary-device code controls, managed
 explicit-relay plan/probe/confirm/delete, and native Service Profile
 export/import with preview and confirmation. Explicit Agent discovery,
 same-stable-node endpoint rebind, direct catalog preview/confirm/write, device
-rename, diagnostic export, and manual Release checking are also wired in source.
+rename, diagnostic export, and manual Release checking plus explicit verified
+overlay installation are also wired in source.
 Background sync, old-device approval, supported Linux lifecycle, explicit
 upgrade/uninstall, and clean Windows 11 acceptance remain pending.
 
@@ -313,7 +314,7 @@ with stable Tailscale node/login fields. The Linux server and Windows enrollment
 client exist. The Windows source also contains explicit manual sync,
 administrator catalog write/list/rename/revoke and ordinary-device code
 generation, discovery/rebind, managed relay planning/application, diagnostic
-export/manual Release check, and native non-secret Service Profile transfer;
+export/manual Release check and verified overlay install, and native non-secret Service Profile transfer;
 supported installation and complete clean-machine interoperability acceptance
 remain pending. Relay plan tokens and enrollment codes are transient secrets, never
 catalog, manifest, config, or Service Profile objects.

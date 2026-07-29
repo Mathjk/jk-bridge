@@ -370,12 +370,19 @@ upgrade/rollback/uninstall 命令，也不等于完成真实 systemd user 验收
 证明恶意，也不能替代哈希核验。正式广泛分发前应完成干净机验收，并增加受
 保护的代码签名证书和时间戳。
 
-设置页的“手动检查官方 Release”仅在用户点击后访问固定的
-`api.github.com/repos/Mathjk/jk-bridge/releases/latest`，禁用代理、重定向、
-Cookie 和环境凭据，限制超时/响应头/正文大小，拒绝 draft、prerelease、非法
-SemVer 及不精确匹配官方 `github.com/Mathjk/jk-bridge/releases/tag/<tag>` 的
-页面地址。它只显示信息，不自动检查、下载或执行安装程序；开发构建号高于当前
-正式版也不意味着 `v2.2.0 development` 已成为稳定 Release。
+设置页的 Release 检查仅在用户点击后访问固定的官方 GitHub API。稳定构建使用
+`api.github.com/repos/Mathjk/jk-bridge/releases/latest`；带 prerelease 版本标识的
+Preview 构建使用固定、最多 20 条的 Releases 列表，因此不会误降级到更旧稳定版。
+元数据请求禁用代理、自动重定向、Cookie 和环境凭据，并限制超时、响应头与正文。
+程序拒绝 draft、非法 SemVer、不精确匹配官方 Release 页面或安装器下载路径的内容。
+
+只有用户再次点击“下载并覆盖安装”，且同一 Release 同时存在精确命名的 Windows
+安装器与 `.sha256` 时才会下载。下载最多接受一次从精确 `github.com` 资产地址到
+`release-assets.githubusercontent.com` 的 HTTPS 跳转，限制安装器为 256 MiB，
+在受管更新目录逐块计算 SHA-256，并用固定时间比较核验；不匹配或失败会删除该次
+暂存目录且不启动任何程序。校验通过后只把确切 EXE 路径交给 Windows 普通安装
+向导，不附加静默或提权参数。该流程不会后台检查、后台下载或绕过 SmartScreen、
+UAC；开发构建存在也不意味着 `v2.2.0` 已成为稳定 Release。
 
 ## 参考
 
