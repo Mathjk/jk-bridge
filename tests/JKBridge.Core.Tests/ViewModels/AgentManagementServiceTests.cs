@@ -34,6 +34,21 @@ public sealed class AgentManagementServiceTests
     }
 
     [Fact]
+    public async Task GetState_AcceptsTailscaleLoginThatDiffersOnlyByCase()
+    {
+        var client = new FakeProtocolClient { CurrentTailscaleLogin = "mathjk@github" };
+        var service = CreateService(
+            client,
+            new FakeCredentialStore(Credential(1)),
+            localTailscaleLogin: "Mathjk@github");
+
+        var state = await service.GetStateAsync(CreateRequest());
+
+        Assert.Equal("admin", state.CurrentDeviceRole);
+        Assert.Equal(1, client.DeviceListCalls);
+    }
+
+    [Fact]
     public async Task NonAdmin_GetStateUsesSelfReceiptWithoutRequestingAdminDeviceList()
     {
         var client = new FakeProtocolClient { CurrentRole = "device" };
@@ -268,10 +283,11 @@ public sealed class AgentManagementServiceTests
     private static AgentManagementService CreateService(
         FakeProtocolClient client,
         FakeCredentialStore credentials,
-        string trustedLinuxNodeId = LinuxNodeId) => new(
+        string trustedLinuxNodeId = LinuxNodeId,
+        string localTailscaleLogin = "owner@example.com") => new(
         new FakeProtocolClientFactory(client),
         credentials,
-        new FakeTrustVerifier(trustedLinuxNodeId));
+        new FakeTrustVerifier(trustedLinuxNodeId, localTailscaleLogin));
 
     private static AgentManagementRequest CreateRequest() => new(
         new AgentRegistration
@@ -320,7 +336,9 @@ public sealed class AgentManagementServiceTests
             .Replace('+', '-')
             .Replace('/', '_'));
 
-    private sealed class FakeTrustVerifier(string linuxNodeId) : IAgentTrustVerifier
+    private sealed class FakeTrustVerifier(
+        string linuxNodeId,
+        string localTailscaleLogin) : IAgentTrustVerifier
     {
         public Task<AgentTrustedEndpoint> VerifyEndpointAsync(
             AgentEndpoint endpoint,
@@ -343,7 +361,7 @@ public sealed class AgentManagementServiceTests
                 new TailscaleTailnet("example", TestConfigs.TailnetSuffix, true),
                 self,
                 [peer],
-                "owner@example.com");
+                localTailscaleLogin);
             return Task.FromResult(new AgentTrustedEndpoint(status, peer));
         }
 
@@ -387,6 +405,7 @@ public sealed class AgentManagementServiceTests
     private sealed class FakeProtocolClient : IAgentProtocolClient
     {
         public string CurrentRole { get; init; } = "admin";
+        public string CurrentTailscaleLogin { get; init; } = "owner@example.com";
         public int CurrentDeviceCalls { get; private set; }
         public int DeviceListCalls { get; private set; }
         public int RevokeCalls { get; private set; }
@@ -592,7 +611,7 @@ public sealed class AgentManagementServiceTests
         {
         }
 
-        private static AgentDeviceInfo Device(
+        private AgentDeviceInfo Device(
             string id,
             string label,
             string nodeId,
@@ -604,7 +623,7 @@ public sealed class AgentManagementServiceTests
             Fingerprint,
             role,
             nodeId,
-            "owner@example.com",
+            CurrentTailscaleLogin,
             services,
             ports,
             DateTimeOffset.Parse("2026-07-28T12:00:00Z"),

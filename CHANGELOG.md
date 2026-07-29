@@ -2,12 +2,12 @@
 
 All notable changes are documented here. The project follows semantic versioning after the first public release.
 
-## Unreleased — v2.2.0 development
+## Unreleased — v2.2.0 / Preview 2 development
 
 This section records source currently under development. It does not change the
-contents or support boundary of the published v2.1.0 Release. Development App
-and installer builds identify themselves as `v2.2.0 development` so they cannot
-be mistaken for stable v2.1.0; no v2.2.0 Release has been published.
+contents or support boundary of the published v2.1.0 stable Release. Preview 1
+is published only for development acceptance; Preview 2 builds identify
+themselves as `2.2.0-preview.2` and remain prereleases rather than stable v2.2.0.
 
 ### Added
 
@@ -26,17 +26,20 @@ be mistaken for stable v2.1.0; no v2.2.0 Release has been published.
 - Added an Inno Setup installer skeleton and Windows build script with prerequisite detection, optional UAC-confirmed OpenSSH Client installation, Tailscale official-download handoff, per-user startup choice, and detached SHA-256 output.
 - Added a tagged-release aggregation job so preview tags publish both the portable ZIP and unsigned installer with detached hashes while remaining GitHub prereleases.
 - Added privacy-safe field-acceptance evidence and bilingual multi-device/administrator operating guidance.
+- Added an explicit Settings workflow that selects the appropriate stable or Preview GitHub channel, validates an exact official installer/checksum asset pair, downloads only on user action, verifies SHA-256, and starts the normal per-user overlay installer without silent flags.
 - Added vNext Agent protocol and threat-model drafts plus security black-box test scaffolding.
 
 ### Changed
 
 - Clarified in user documentation that the browser always uses the Windows `localPort`, which may differ from the Linux `remotePort`; local URL/path edits do not broaden Linux authorization.
 - Documented independent per-device identities, safe non-secret migration, Agent-independent SSH tunneling, and the one-shot pairing fallback.
+- Tailscale login identity comparison now treats account-name casing consistently with the Linux Agent, preventing a valid administrator from being hidden when Windows reports `LoginName` with different letter casing.
 
 ### Security
 
 - Generated and custom browser URLs remain exact HTTP(S) loopback targets; service profiles reject unknown or secret-bearing fields and never import authorization state.
 - Agent client requests reject proxies, redirects, non-Tailscale endpoints, oversized or unknown responses, peer-identity mismatches, and port/catalog inconsistencies.
+- Release installation accepts only exact `Mathjk/jk-bridge` asset URLs, one approved GitHub release-asset CDN redirect, a bounded installer, and a matching detached SHA-256; failed downloads are not launched and their staging directory is removed.
 - Device credentials are designed for OS-protected storage and independent revocation; private keys, enrollment codes, and reusable credentials remain outside `config.json` and Service Profiles.
 
 ### Development status

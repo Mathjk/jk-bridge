@@ -226,7 +226,10 @@ public sealed class AgentManagementService : IAgentManagementService
             string.IsNullOrWhiteSpace(localNodeId) ||
             !string.Equals(currentDevice.TailscaleNodeId, localNodeId, StringComparison.Ordinal) ||
             string.IsNullOrWhiteSpace(localLogin) ||
-            !string.Equals(currentDevice.TailscaleLogin, localLogin, StringComparison.Ordinal) ||
+            !string.Equals(
+                currentDevice.TailscaleLogin,
+                localLogin,
+                StringComparison.OrdinalIgnoreCase) ||
             !request.Authorization.IsKnown ||
             !string.Equals(
                 currentDevice.ClientKeyFingerprint,

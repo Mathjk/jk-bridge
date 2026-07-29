@@ -218,10 +218,23 @@ The last line must be `True`. Extract the ZIP to a stable folder such as one und
 The executable is currently unsigned. A SmartScreen warning is therefore possible. The checksum proves that the download matches the published Release asset; it does not replace normal trust in the repository and release process.
 
 The repository contains a vNext Inno Setup definition and build script, but the
-stable v2.1.0 instructions use the ZIP. Do not treat an installer built by an
-unrelated third party as an official Release. The future installer may detect
+stable v2.1.0 instructions use the ZIP. Explicitly labelled Preview installers
+are development-acceptance artifacts. Do not treat an installer built by an
+unrelated third party as an official Release. The installer can detect
 Tailscale, open its official download page, and offer a UAC-confirmed OpenSSH
 Client installation; it cannot sign in to Tailscale for you.
+
+Starting with Preview 2, an installed build can use **Settings → Version check
+→ Check official Release**, followed by **Download and overlay install**.
+Preview builds remain on the Preview channel; stable builds use the stable
+channel. JK Bridge accepts only a matching installer and `.sha256` pair from the
+same official Release, verifies the download, and then starts the normal setup
+wizard. It does not check in the background, install silently, or bypass
+SmartScreen. Configuration, device credentials, and SSH keys live outside the
+installation directory and are retained by a normal same-user overlay install.
+Preview 1 does not yet contain this control, so the Preview 1 → Preview 2
+transition requires one final manual Preview 2 installer download; later builds
+can use the Settings action.
 
 ## 5. Copy and run the Linux helper
 

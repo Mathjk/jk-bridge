@@ -470,11 +470,14 @@ separately role-gated. See
   format/app version, anonymous tunnel/service phases, and at most 200 bounded,
   redacted recent events. It never serializes the config or runtime snapshot,
   rejects reparse-point destinations, and writes by durable atomic replacement.
-- The Settings page checks for updates only on user action. It reads bounded
-  non-draft/non-prerelease metadata from the fixed official GitHub repository,
-  rejects redirects and non-official release-page URLs, and never downloads or
-  starts an installer.
+- The Settings page checks for updates only on user action. Stable builds use
+  the fixed latest-release endpoint; prerelease builds use a bounded official
+  release list and retain their Preview channel. A second explicit action can
+  download an exact official installer/checksum pair, accept only GitHub's
+  release-asset CDN redirect, stream a bounded EXE into the managed update
+  directory, verify SHA-256, and start the normal installer without silent
+  flags. It never performs a background check, download, or installation.
 
 ## Publishing
 
-The release script runs privacy checks, Python tests, .NET Release tests, and self-contained Windows publish before producing a staging directory. One payload array is the source of truth for both `SHA256SUMS` and ZIP creation. The vNext staging package also carries the development Agent and relay companion scripts, Linux user-unit/environment/controller assets, and their manual review notes. A package-contract check proves those assets are present, executable, colocatable, and non-secret; it does not install `socat`, add the missing upgrade/uninstall workflow, or replace clean-machine Agent/relay acceptance. A detached SHA-256 file covers the ZIP. The manual in-app Release query is informational only and does not promote the `v2.2.0 development` tree to stable.
+The release script runs privacy checks, Python tests, .NET Release tests, and self-contained Windows publish before producing a staging directory. One payload array is the source of truth for both `SHA256SUMS` and ZIP creation. The vNext staging package also carries the development Agent and relay companion scripts, Linux user-unit/environment/controller assets, and their manual review notes. A package-contract check proves those assets are present, executable, colocatable, and non-secret; it does not install `socat`, add the missing upgrade/uninstall workflow, or replace clean-machine Agent/relay acceptance. Detached SHA-256 files cover the ZIP and installer. The explicit in-app overlay-install workflow does not promote the `v2.2.0` Preview line to stable.

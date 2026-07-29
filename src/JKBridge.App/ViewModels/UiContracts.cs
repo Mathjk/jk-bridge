@@ -126,6 +126,7 @@ public interface IBridgeUiActions
     Task OpenLogFolderAsync();
     Task ExportDiagnosticBundleAsync() => Task.CompletedTask;
     Task CheckForUpdatesAsync() => Task.CompletedTask;
+    Task InstallCheckedReleaseAsync() => Task.CompletedTask;
     Task SaveSettingsAsync(SettingsDraft settings);
     Task PairDeviceAsync(PairingDraft pairing);
 

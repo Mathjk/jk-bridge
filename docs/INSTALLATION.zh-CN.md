@@ -213,9 +213,17 @@ $actual -eq $expected
 当前 EXE 尚未签名，因此可能出现 SmartScreen 提示。哈希只能证明下载文件与发布资产一致，不能代替对仓库和发布流程本身的正常信任判断。
 
 仓库中已有 vNext Inno Setup 定义和构建脚本，但稳定版 v2.1.0 仍按 ZIP
-方式安装。不要把无关第三方构建的安装器当作官方 Release。未来安装器可以检测
-Tailscale、打开官方下载页，并在用户确认 UAC 后安装 OpenSSH Client；它不能
-替你登录 Tailscale。
+方式安装。明确标注的 Preview 安装器只用于开发验收。不要把无关第三方构建的
+安装器当作官方 Release。安装器可以检测 Tailscale、打开官方下载页，并在用户
+确认 UAC 后安装 OpenSSH Client；它不能替你登录 Tailscale。
+
+从 Preview 2 开始，安装版可在“设置 → 版本检查”中先点“手动检查官方
+Release”，再点“下载并覆盖安装”。Preview 构建会继续检查 Preview 通道，稳定
+构建只检查稳定通道。程序只接受同一官方 Release 中成对的安装器与 `.sha256`，
+下载后核验一致才启动普通安装向导；不会后台检查、静默安装或绕过 SmartScreen。
+配置、设备凭据和 SSH 密钥保存在安装目录之外，正常同用户覆盖安装会保留它们。
+Preview 1 本身还没有此入口，因此从 Preview 1 升到 Preview 2 需要最后一次按本节
+手工下载 Preview 2 安装器并覆盖安装；之后可使用设置页入口。
 
 ## 5. 复制并运行 Linux 脚本
 

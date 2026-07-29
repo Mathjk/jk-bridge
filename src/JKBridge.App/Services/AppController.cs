@@ -1,4 +1,5 @@
 using System.Diagnostics;
+using System.Reflection;
 using System.Security.Cryptography;
 using System.Text;
 using Avalonia;
@@ -45,6 +46,8 @@ public sealed class AppController : IBridgeUiActions, IAsyncDisposable
     private readonly DiagnosticBundleService _diagnosticBundleService;
     private readonly IReleaseUpdateChecker _releaseUpdateChecker;
     private readonly bool _ownsReleaseUpdateChecker;
+    private readonly Action<string> _installerLauncher;
+    private readonly string _updateDirectory;
     private readonly StartupRegistration _startupRegistration;
     private readonly Func<Window?> _getWindow;
     private readonly Action<Action> _dispatchUi;
@@ -54,6 +57,7 @@ public sealed class AppController : IBridgeUiActions, IAsyncDisposable
     private ServiceProfileImportPreview? _serviceProfileImportPreview;
     private PendingAgentRelayPlan? _pendingAgentRelayPlan;
     private AgentCatalogUpdatePreview? _pendingAgentCatalogUpdate;
+    private ReleaseInstallerAsset? _pendingReleaseInstaller;
     private DateTimeOffset _agentEnrollmentCodeExpiresAt;
     private int _resumeAfterSleep;
     private CancellationTokenSource? _pairingCancellation;
@@ -88,7 +92,8 @@ public sealed class AppController : IBridgeUiActions, IAsyncDisposable
         IAgentDiscoveryService? agentDiscoveryService = null,
         Action<Action>? dispatchUi = null,
         DiagnosticBundleService? diagnosticBundleService = null,
-        IReleaseUpdateChecker? releaseUpdateChecker = null)
+        IReleaseUpdateChecker? releaseUpdateChecker = null,
+        Action<string>? installerLauncher = null)
     {
         _configStore = configStore ?? throw new ArgumentNullException(nameof(configStore));
         _logger = logger ?? throw new ArgumentNullException(nameof(logger));
@@ -115,6 +120,10 @@ public sealed class AppController : IBridgeUiActions, IAsyncDisposable
             new AvaloniaDiagnosticBundlePathPicker(_getWindow));
         _releaseUpdateChecker = releaseUpdateChecker ?? new GitHubReleaseUpdateService();
         _ownsReleaseUpdateChecker = releaseUpdateChecker is null;
+        _installerLauncher = installerLauncher ?? LaunchInstaller;
+        _updateDirectory = Path.Combine(
+            Path.GetDirectoryName(_logDirectory) ?? _logDirectory,
+            "Updates");
         ViewModel = new MainViewModel(this);
 
         _runtime.SnapshotChanged += RuntimeOnSnapshotChanged;
@@ -2511,10 +2520,12 @@ public sealed class AppController : IBridgeUiActions, IAsyncDisposable
         {
             ViewModel.IsUpdateChecking = true;
             ViewModel.HasUpdateReleaseInfo = false;
+            ViewModel.HasUpdateInstaller = false;
             ViewModel.UpdateReleaseUrl = string.Empty;
             ViewModel.UpdateCheckFeedback =
-                "正在只读查询 JK Bridge 官方 GitHub Releases…";
+                "正在查询 JK Bridge 官方 GitHub Releases…";
         });
+        _pendingReleaseInstaller = null;
 
         try
         {
@@ -2524,11 +2535,17 @@ public sealed class AppController : IBridgeUiActions, IAsyncDisposable
             RunOnUi(() =>
             {
                 ViewModel.HasUpdateReleaseInfo = true;
+                ViewModel.HasUpdateInstaller = result.Installer is not null;
                 ViewModel.UpdateReleaseUrl = result.ReleasePage.AbsoluteUri;
-                ViewModel.UpdateCheckFeedback = result.UpdateAvailable
-                    ? $"发现新版本 {result.LatestVersion}（当前 {result.CurrentVersion}）。JK Bridge 不会自动下载或安装，请仅使用下方官方 Release 地址。"
-                    : $"没有发现比当前构建号 {result.CurrentVersion} 更新的正式 Release；当前构建可能是未发布开发版。官方最新正式版：{result.LatestVersion}。";
+                ViewModel.UpdateCheckFeedback = result.Installer is not null
+                    ? result.UpdateAvailable
+                        ? $"发现新版本 {result.LatestVersion}（当前 {result.CurrentVersion}）。可点击下方按钮下载、核验 SHA-256 并启动覆盖安装。"
+                        : $"当前版本为 {result.CurrentVersion}；可重新下载官方 {result.LatestVersion} 安装器并覆盖安装。"
+                    : result.UpdateAvailable
+                        ? $"发现新版本 {result.LatestVersion}（当前 {result.CurrentVersion}），但该 Release 没有成对的 Windows 安装器和 SHA-256；请使用下方官方地址。"
+                        : $"没有发现比当前构建号 {result.CurrentVersion} 更新的正式 Release；当前构建可能是未发布开发版。官方最新正式版：{result.LatestVersion}。";
             });
+            _pendingReleaseInstaller = result.Installer;
             await SafeLogAsync(
                     DiagnosticSeverity.Information,
                     "Updates",
@@ -2563,6 +2580,97 @@ public sealed class AppController : IBridgeUiActions, IAsyncDisposable
             Interlocked.Exchange(ref _releaseUpdateActive, 0);
             RunOnUi(() => ViewModel.IsUpdateChecking = false);
         }
+    }
+
+    public async Task InstallCheckedReleaseAsync()
+    {
+        var installer = _pendingReleaseInstaller;
+        if (installer is null || Interlocked.CompareExchange(ref _releaseUpdateActive, 1, 0) != 0)
+        {
+            return;
+        }
+
+        var cancellation = new CancellationTokenSource(TimeSpan.FromMinutes(10));
+        Interlocked.Exchange(ref _releaseUpdateCancellation, cancellation)?.Dispose();
+        RunOnUi(() =>
+        {
+            ViewModel.IsUpdateChecking = true;
+            ViewModel.UpdateCheckFeedback =
+                $"正在下载官方 {installer.Version} 安装器并核验 SHA-256…";
+        });
+
+        try
+        {
+            var download = await _releaseUpdateChecker
+                .DownloadInstallerAsync(installer, _updateDirectory, cancellation.Token)
+                .ConfigureAwait(false);
+            var installerPath = ValidateDownloadedInstallerPath(download.InstallerPath);
+            _installerLauncher(installerPath);
+            RunOnUi(() => ViewModel.UpdateCheckFeedback =
+                $"SHA-256 校验通过，安装器已启动。请在 Windows 安装向导中确认覆盖安装；当前安装包尚未代码签名，SmartScreen 提示属预期。校验值：{download.Sha256}");
+            await SafeLogAsync(
+                    DiagnosticSeverity.Information,
+                    "Updates",
+                    "A verified official installer was explicitly launched.",
+                    $"Release: {installer.Version}; SHA-256: {download.Sha256}")
+                .ConfigureAwait(false);
+        }
+        catch (OperationCanceledException) when (cancellation.IsCancellationRequested)
+        {
+            RunOnUi(() => ViewModel.UpdateCheckFeedback =
+                "安装器下载已取消或超时；没有启动任何安装程序。");
+        }
+        catch (Exception exception) when (
+            exception is ReleaseUpdateException or IOException or UnauthorizedAccessException or
+                InvalidOperationException or System.ComponentModel.Win32Exception)
+        {
+            await SafeLogAsync(
+                    DiagnosticSeverity.Warning,
+                    "Updates",
+                    "The explicit installer download or launch failed safely.",
+                    exception.GetType().FullName)
+                .ConfigureAwait(false);
+            RunOnUi(() => ViewModel.UpdateCheckFeedback =
+                "无法完成官方安装器下载、SHA-256 校验或启动；没有执行覆盖安装。可改用上方官方 Release 地址手动下载。");
+        }
+        finally
+        {
+            if (ReferenceEquals(
+                    Interlocked.CompareExchange(ref _releaseUpdateCancellation, null, cancellation),
+                    cancellation))
+            {
+                cancellation.Dispose();
+            }
+
+            Interlocked.Exchange(ref _releaseUpdateActive, 0);
+            RunOnUi(() => ViewModel.IsUpdateChecking = false);
+        }
+    }
+
+    private string ValidateDownloadedInstallerPath(string path)
+    {
+        var fullPath = Path.GetFullPath(path);
+        var root = Path.GetFullPath(_updateDirectory)
+            .TrimEnd(Path.DirectorySeparatorChar, Path.AltDirectorySeparatorChar) +
+            Path.DirectorySeparatorChar;
+        if (!fullPath.StartsWith(root, StringComparison.OrdinalIgnoreCase) ||
+            !string.Equals(Path.GetExtension(fullPath), ".exe", StringComparison.OrdinalIgnoreCase) ||
+            !File.Exists(fullPath))
+        {
+            throw new ReleaseUpdateException(
+                "The verified installer was not staged in the managed update directory.");
+        }
+
+        return fullPath;
+    }
+
+    private static void LaunchInstaller(string installerPath)
+    {
+        Process.Start(new ProcessStartInfo(installerPath)
+        {
+            UseShellExecute = true,
+            WorkingDirectory = Path.GetDirectoryName(installerPath),
+        });
     }
 
     public Task OpenLogFolderAsync()
@@ -2641,6 +2749,7 @@ public sealed class AppController : IBridgeUiActions, IAsyncDisposable
         _agentEnrollmentCodeExpiresAt = default;
         _pendingAgentRelayPlan = null;
         _pendingAgentCatalogUpdate = null;
+        _pendingReleaseInstaller = null;
         _serviceProfileImportPreview = null;
         var serviceProfileCancellation = Interlocked.Exchange(ref _serviceProfileCancellation, null);
         serviceProfileCancellation?.Cancel();
@@ -2675,7 +2784,17 @@ public sealed class AppController : IBridgeUiActions, IAsyncDisposable
 
     private static string GetApplicationVersion()
     {
-        var version = typeof(AppController).Assembly.GetName().Version;
+        var assembly = typeof(AppController).Assembly;
+        var informationalVersion = assembly
+            .GetCustomAttribute<AssemblyInformationalVersionAttribute>()?
+            .InformationalVersion
+            .Split('+', 2)[0];
+        if (!string.IsNullOrWhiteSpace(informationalVersion))
+        {
+            return informationalVersion;
+        }
+
+        var version = assembly.GetName().Version;
         return version is null
             ? "2.2.0"
             : $"{version.Major}.{version.Minor}.{Math.Max(0, version.Build)}";

@@ -136,6 +136,15 @@ any unchecked live gate below as passed:
 - [ ] Portable ZIP and installer can coexist for release testing without sharing a running instance or overwriting an unrelated directory.
 - [ ] Code-signed installer, EXE, and uninstaller verify with an accepted timestamp before the installer is promoted from development artifact to stable Release asset.
 
+### In-app Release update
+
+- [ ] A stable build queries only the fixed latest stable endpoint; a Preview build queries the bounded official list, selects the highest published SemVer, and does not downgrade to an older stable release.
+- [ ] The install action appears only when one Release contains the exact Windows installer and matching `.sha256` asset URLs under `Mathjk/jk-bridge`.
+- [ ] Explicit download accepts only the exact GitHub asset URL and one HTTPS redirect to `release-assets.githubusercontent.com`, streams no more than 256 MiB, and launches only after SHA-256 matches.
+- [ ] Mismatched hashes, malformed checksum names, foreign redirects, oversized content, cancellation, and timeout leave no staged EXE and never start a process.
+- [ ] Overlay-install Preview 2 over Preview 1 while JK Bridge is running; confirm setup closes/replaces the app cleanly and preserves configuration, Credential Manager entries, SSH keys, startup preference, and Agent administrator identity.
+- [ ] No update check, download, setup process, UAC prompt, or browser action occurs without the corresponding explicit user action; no silent installer flags are supplied.
+
 ### Simple route editor, templates, and port conflicts
 
 - [ ] Simple mode clearly labels **Windows access port** and **Linux service port** and previews `Windows 127.0.0.1:<local> -> Linux 127.0.0.1:<remote>`.

@@ -4,9 +4,10 @@
 > approved direction that remains in development and may move between releases
 > after security, migration, and Windows acceptance testing.
 >
-> **Version boundary:** v2.1.0 is the latest stable release. The current App and
-> installer source report `v2.2.0 development`; v2.2.0 has not been released,
-> and the implemented vNext source below is not thereby stable or supported.
+> **Version boundary:** v2.1.0 is the latest stable release. Preview builds on
+> the current line report a prerelease version such as `2.2.0-preview.2`;
+> neither a Preview asset nor the implemented vNext source is thereby stable or
+> supported as v2.2.0.
 
 ## V2.0 — portable public release (released)
 
@@ -28,8 +29,9 @@
 - Complete clean-machine Windows acceptance on supported Windows 11 builds.
 - Authenticode code signing and timestamping.
 - Optional installer while retaining the portable ZIP.
-- Manual fixed-official-Release checking without background download or silent
-  installation (implemented source; acceptance pending).
+- Manual fixed-official-Release checking plus an explicit, SHA-256-verified
+  installer download/overlay-install action, without background download or
+  silent installation (implemented source; acceptance pending).
 - Allow-listed, redacted diagnostic ZIP export that excludes keys, device
   credentials, identities, service details, and pairing codes (implemented
   source; acceptance pending).
