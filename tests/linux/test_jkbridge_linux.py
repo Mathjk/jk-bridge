@@ -86,6 +86,72 @@ class LinuxHelperTests(unittest.TestCase):
                 (ssh_dir / "authorized_keys").read_text(encoding="utf-8"),
             )
 
+    def test_install_safely_converts_exact_agent_entry_for_one_shot_fallback(self):
+        with tempfile.TemporaryDirectory() as temporary:
+            home = Path(temporary)
+            ssh_dir = home / ".ssh"
+            ssh_dir.mkdir(mode=0o700)
+            normalized, fingerprint = jkbridge_linux.normalize_ed25519_key(TEST_KEY)
+            agent_line = (
+                jkbridge_linux.RESTRICTED_OPTIONS_PREFIX
+                + 'permitopen="127.0.0.1:80",permitopen="127.0.0.1:8081" '
+                + normalized
+                + " JK Bridge agent "
+                + "a" * 32
+                + " "
+                + fingerprint
+            )
+            authorized = ssh_dir / "authorized_keys"
+            authorized.write_text("# unrelated\n" + agent_line + "\n", encoding="utf-8")
+
+            result = jkbridge_linux.install_authorized_key(home, TEST_KEY, [80, 8877])
+
+            text = authorized.read_text(encoding="utf-8")
+            self.assertTrue(result["changed"])
+            self.assertTrue(Path(result["backup"]).is_file())
+            self.assertEqual(1, text.count(TEST_KEY))
+            self.assertIn("# unrelated\n", text)
+            self.assertIn("JK Bridge managed " + fingerprint, text)
+            self.assertNotIn("JK Bridge agent", text)
+            self.assertIn('permitopen="127.0.0.1:80"', text)
+            self.assertIn('permitopen="127.0.0.1:8877"', text)
+            self.assertNotIn('permitopen="127.0.0.1:8081"', text)
+
+    def test_install_refuses_fake_or_wildcard_agent_entry_without_changes(self):
+        normalized, fingerprint = jkbridge_linux.normalize_ed25519_key(TEST_KEY)
+        unsafe_lines = (
+            normalized
+            + " JK Bridge agent "
+            + "a" * 32
+            + " "
+            + fingerprint,
+            jkbridge_linux.RESTRICTED_OPTIONS_PREFIX
+            + 'permitopen="127.0.0.1:*" '
+            + normalized
+            + " JK Bridge agent "
+            + "a" * 32
+            + " "
+            + fingerprint,
+            jkbridge_linux.RESTRICTED_OPTIONS_PREFIX
+            + 'permitopen="127.0.0.1:80" '
+            + normalized
+            + " JK Bridge agent malformed "
+            + fingerprint,
+        )
+        for unsafe in unsafe_lines:
+            with self.subTest(unsafe=unsafe):
+                with tempfile.TemporaryDirectory() as temporary:
+                    home = Path(temporary)
+                    ssh_dir = home / ".ssh"
+                    ssh_dir.mkdir(mode=0o700)
+                    authorized = ssh_dir / "authorized_keys"
+                    authorized.write_text(unsafe + "\n", encoding="utf-8")
+
+                    with self.assertRaises(jkbridge_linux.PairingError):
+                        jkbridge_linux.install_authorized_key(home, TEST_KEY, [80])
+
+                    self.assertEqual(unsafe + "\n", authorized.read_text(encoding="utf-8"))
+
     def test_install_migrates_exact_v1_restricted_entry(self):
         with tempfile.TemporaryDirectory() as temporary:
             home = Path(temporary)

@@ -18,10 +18,18 @@
                                    Classes="page-subtitle" Margin="0,4,0,0" />
                     </StackPanel>
                     <StackPanel Grid.Column="1" Orientation="Horizontal" Spacing="8" VerticalAlignment="Center">
+                        <Button Content="导出安全诊断包" Classes="secondary"
+                                Command="{Binding ExportDiagnosticBundleCommand}"
+                                IsEnabled="{Binding CanExportDiagnosticBundle}" />
                         <Button Content="复制摘要" Classes="secondary" Command="{Binding CopyDiagnosticSummaryCommand}" />
                         <Button Content="重新检查" Classes="primary" Command="{Binding RunDiagnosticsCommand}" />
                     </StackPanel>
                 </Grid>
+
+                <Border Classes="issue-banner info" Margin="0,0,0,16">
+                    <TextBlock Text="{Binding DiagnosticBundleFeedback}" Classes="body"
+                               TextWrapping="Wrap" />
+                </Border>
 
                 <Grid ColumnDefinitions="*,12,*" RowDefinitions="Auto,12,Auto" Margin="0,0,0,22">
                     <Border Grid.Row="0" Grid.Column="0" Classes="card">

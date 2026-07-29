@@ -4,6 +4,14 @@
 
 Work from the outside in: operating-system prerequisites, Tailscale reachability, pairing, SSH tunnel, then the Linux web service. JK Bridge can connect successfully even when one target web app is down, so keep tunnel failures and service-health failures separate.
 
+> [!NOTE]
+> Stable v2.1.0 uses only the portable Windows app and the one-shot Linux
+> helper. Agent controls, Service Profile support, and installer sources found
+> in an unreleased 2.2.0/vNext development build are not proof that a Linux
+> Agent or supported end-to-end enrollment workflow has shipped. A local
+> artifact marked `2.2.0` is a development/acceptance build, not a stable
+> Release.
+
 ## Collect a safe baseline
 
 On Windows, from the extracted JK Bridge folder:
@@ -109,6 +117,85 @@ Run that before connecting. After JK Bridge reports connected, use:
 
 The temporary server binds only the Linux Tailscale IPv4, not the LAN or public interfaces.
 
+## Agent enrollment is unavailable or does not complete
+
+The stable v2.1.0 Release has no Agent enrollment. The vNext source tree now has
+a development Linux Agent, per-user systemd packaging assets, package checks,
+and a wired Windows enrollment client. These assets have not completed live
+install/upgrade/rollback or clean-Windows acceptance and are not a stable Agent
+Release. If that development path is incomplete or fails, use **one-shot
+pairing** instead:
+
+```bash
+python3 ~/jkbridge-linux.py pair
+```
+
+An Agent endpoint must never be replaced with a public URL, LAN wildcard bind,
+Tailscale Funnel, SOCKS proxy, exit node, or subnet route. Do not weaken
+`authorized_keys` to bypass Agent management. The Agent is a deterministic local
+program with no AI or model API dependency; Agent downtime should affect
+management only, not an already authorized SSH tunnel.
+
+The vNext Setup page now has an explicit **Discover Agent** action backed by a
+bounded, read-only discovery engine. It does not scan a subnet or enroll a
+device: it inspects only known online Tailscale peers on port `45871` and
+requires matching node, MagicDNS, tailnet, protocol, and Agent-version claims.
+A single result is only preselected; multiple results require a choice. In both
+cases select **Use selected address** before entering the expiring one-use code
+and explicitly enrolling. If no verified result appears, confirm both devices
+are on the intended tailnet and that the Agent is listening on its Tailscale
+IPv4 port, then retry or manually enter that exact endpoint. This wired flow
+still lacks clean-Windows acceptance.
+
+Any enrolled device can manually synchronize its own service selection using
+the authenticated `GET /v1/me` receipt and `/v1/services` catalog. An
+administrator can additionally refresh the complete device list, revoke a
+selected non-current device after explicit confirmation, and generate a
+10-minute, one-use code for one new ordinary device. If **Generate new device
+code** is unavailable or rejected, first synchronize Agent state and verify that
+the current device is still an administrator. If the target says the code is
+expired or already used, generate a new one; do not save codes in configuration,
+notes, screenshots, or command history. The first administrator still requires
+an administrator code printed by Linux bootstrap/recovery. An ordinary device
+sees only its own record and cannot generate codes, list/revoke peers, or manage
+relays; the Windows UI refuses self-revocation.
+
+Revocation prevents future Agent requests and new SSH authentication for that
+device. It cannot terminate a tunnel that is already connected; disconnect the
+revoked Windows device or end its SSH session separately if immediate cutoff is
+required.
+
+## A Linux relay plan is blocked or apply is unavailable
+
+The vNext **Advanced: Linux reachable target** workflow is implemented in source
+but is not part of stable v2.1.0 and has not completed live Linux or clean
+Windows acceptance. **Generate plan and probe** is read-only. It must succeed
+before the separate confirmation checkbox and apply button become available.
+
+Check the plan preview for the specific cause:
+
+- the Linux package must place `jkbridge_relay.py` beside
+  `jkbridge_agent.py`;
+- `/usr/bin/socat` and a working per-user systemd session are required;
+- the chosen Linux relay port must be free on loopback, and the exact target
+  DNS/IPv4 address and TCP port must be reachable from Linux;
+- the target must be one host and port, not a URL, wildcard, CIDR, IPv6,
+  broadcast/multicast address, UDP endpoint, SOCKS proxy, Funnel, exit node, or
+  subnet route;
+- a conflicting or unrecognized `jkbridge-relay-<id>.service` is deliberately
+  blocked rather than overwritten or deleted.
+
+Any field edit or Linux/catalog/device change invalidates the previous plan.
+Generate and inspect a fresh plan instead of retrying an old token. If an apply
+times out or returns an uncertain result, synchronize the Agent catalog and
+inspect the per-user unit locally before planning again; do not blindly repeat
+the mutation. Managed units listen only on Linux `127.0.0.1`. Never work around
+a failure with `0.0.0.0` or a broad `permitopen` grant.
+
+For HTTPS, the relay is transparent TCP. A successful TCP probe does not prove
+that a certificate, SNI, cookie domain, redirect, or application host check will
+accept a Windows URL whose host is `127.0.0.1`.
+
 ## “Re-pair required” after upgrading
 
 Schema V3 in v2.1 compares the currently enabled Linux destination ports with the exact ports returned by the last pair. V1/V2 did not store that receipt, so an upgraded profile must pair once. Device and service settings are preserved; start `pair` on Linux and keep the existing dedicated identity path in Windows.
@@ -159,6 +246,20 @@ Get-Process -Id <OwningProcess>
 
 Close the known application or assign JK Bridge a different Windows local port. Each enabled service needs a unique local port, and the listener must remain on `127.0.0.1`.
 
+The new browser address must use the replacement **Windows** port. For example,
+if Windows `8080` was occupied and you deliberately choose `18080` while Linux
+still listens on `80`, use:
+
+```text
+http://127.0.0.1:18080/project -> Linux 127.0.0.1:80
+```
+
+Changing only `8080` to `18080` and updating the loopback browser URL does not
+require Linux reauthorization. Do not change the Linux remote port merely to
+solve a Windows collision. A vNext simple editor is intended to regenerate this
+URL and suggest a free port, but it must not silently change a stable address;
+v2.1.0 users should update and verify the explicit URL themselves.
+
 ## Tunnel connects, but one page does not load
 
 Test the exact destination on Linux:
@@ -205,6 +306,33 @@ python3 ~/jkbridge-linux.py remove --fingerprint 'SHA256:...'
 ```
 
 For a full Windows reset, exit JK Bridge, revoke the Linux key first, disable startup, then remove `%LOCALAPPDATA%\JKBridge` and the dedicated identity shown in Device setup. Never delete an identity unless you have confirmed it is dedicated to JK Bridge.
+
+## Copying configuration or importing services did not authorize a new computer
+
+Do not migrate a whole `config.json` or a private key to another Windows
+computer. The authorization receipt belongs to the old key, and sharing one
+private key prevents independent device revocation. Pair the new computer with
+its own key, then revoke the old fingerprint only after successful validation.
+
+The vNext app has a native Service Profile file picker: export writes the
+service-only allow-list, while import first performs a read-only validation and
+change preview. Applying the preview requires a separate explicit confirmation.
+This source implementation is not part of v2.1.0 and still requires clean-
+Windows acceptance.
+
+The 2.2.0 development importer can also read an exact v2.1/schema-v3
+`config.json` as a legacy input when no Service Profile export is available. It
+validates the old document but projects only Services into the preview; the old
+server, tailnet, behavior, private-key path, authorization receipt, and device
+state are discarded. Do not overwrite the new computer's config with the old
+file, and continue treating that legacy source as sensitive.
+
+A profile intentionally contains no private key, pairing token, device
+credential, server identity, or authorization receipt. Importing service
+definitions therefore never authorizes Linux. If the preview lists a new Linux
+remote port, complete a verified Agent synchronization when available or use
+one-shot pairing. Canceling the picker or refusing confirmation makes no change;
+if services changed after preview, select and preview the file again.
 
 ## Still blocked?
 

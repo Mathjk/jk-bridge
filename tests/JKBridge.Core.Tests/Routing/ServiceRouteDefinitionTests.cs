@@ -127,6 +127,55 @@ public sealed class ServiceRouteDefinitionTests
         Assert.Equal("/api/status", path);
     }
 
+    [Theory]
+    [InlineData("http", 8080, "/project", "http://127.0.0.1:8080/project")]
+    [InlineData("HTTP", 8081, "/", "http://127.0.0.1:8081/")]
+    [InlineData("https", 19002, "/api/status?full=true&name=a%20b#/login", "https://127.0.0.1:19002/api/status?full=true&name=a%20b#/login")]
+    public void ServiceOpenUrl_BuildsStrictLoopbackUrlWithoutLosingRouteParts(
+        string scheme,
+        int localPort,
+        string launchPath,
+        string expected)
+    {
+        var openUrl = ServiceOpenUrl.Build(scheme, localPort, launchPath);
+
+        Assert.Equal(expected, openUrl);
+        Assert.True(ServiceOpenUrl.TryParse(openUrl, localPort, out var parts));
+        Assert.Equal(scheme.ToLowerInvariant(), parts!.Scheme);
+        Assert.Equal(localPort, parts.LocalPort);
+        Assert.Equal(launchPath, parts.LaunchPath);
+    }
+
+    [Theory]
+    [InlineData("ftp", 8080, "/")]
+    [InlineData("http", 0, "/")]
+    [InlineData("http", 8080, "project")]
+    [InlineData("http", 8080, "//example.com/path")]
+    [InlineData("http", 8080, "/bad\\path")]
+    [InlineData("http", 8080, "/bad\npath")]
+    [InlineData("http", 8080, "/bad path")]
+    public void ServiceOpenUrl_TryBuildRejectsUnsafeInput(
+        string scheme,
+        int localPort,
+        string launchPath)
+    {
+        Assert.False(ServiceOpenUrl.TryBuild(scheme, localPort, launchPath, out var openUrl));
+        Assert.Empty(openUrl);
+    }
+
+    [Theory]
+    [InlineData("http://localhost:8080/")]
+    [InlineData("http://127.0.0.1:8081/")]
+    [InlineData("http://user@127.0.0.1:8080/")]
+    [InlineData("file:///tmp/file")]
+    [InlineData("http://127.0.0.1:8080\\@example.com/")]
+    public void ServiceOpenUrl_TryParseRejectsAnythingOutsideExactListener(
+        string openUrl)
+    {
+        Assert.False(ServiceOpenUrl.TryParse(openUrl, 8080, out var parts));
+        Assert.Null(parts);
+    }
+
     [Fact]
     public void Evaluate_ReportsEveryIndependentRouteProblemInOnePass()
     {

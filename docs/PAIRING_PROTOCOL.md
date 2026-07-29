@@ -2,6 +2,13 @@
 
 This document describes the local one-shot setup protocol between the Linux helper and Windows application. It is not used for normal tunnel traffic.
 
+> **Status:** This is the released stable v2.1.0 protocol. The current App and
+> installer development source identify as v2.2.0, which is not released. The
+> optional persistent Linux
+> Agent and its multi-device management contract are a separate vNext design in
+> [AGENT_PROTOCOL.md](AGENT_PROTOCOL.md). No Agent endpoint described there is
+> released or implied by Pairing Protocol V1.
+
 ## Pairing code
 
 ```text
@@ -57,6 +64,37 @@ The client requires protocol V1, an exact endpoint IP match, a valid normalized 
 
 After all checks pass, schema V3 stores an authorization receipt containing `clientKeyFingerprint` and the exact `permitPorts` response. This receipt is local state, not a change to protocol V1. Before future SSH startup, enabled service routes are compared with it. An unknown legacy receipt or any missing destination port requires a new pairing request; unused extra ports produce a least-privilege recommendation.
 
+The in-development schema V4 migration does not require a change to this wire
+response. A vNext client using the one-shot fallback may convert the same
+verified response into its V4 per-device authorization state. It must preserve
+all of these rules:
+
+- the returned fingerprint matches the private key held by this Windows device;
+- `permitPorts` exactly matches the requested Linux destination-port set;
+- the SSH host key and MagicDNS identity are validated and pinned as before;
+- migration or local service import never manufactures an authorization receipt;
+- another Windows device must pair with its own public key rather than reuse the
+  first device's private key or receipt.
+
+### Development Agent coexistence and strict fallback
+
+The unreleased `jkbridge-agentctl fallback` command stops only the Agent user
+service and prints the retained `jkbridge-linux.py pair` command. It keeps Agent
+state and credential verifiers, every SSH key, installed helper, environment,
+and unit. It does not terminate an already established Windows SSH session; the
+Windows tunnel must be stopped separately when immediate cutoff is required.
+
+When fallback pairs the same Windows public key, the helper converts an Agent
+line only if it is the sole matching entry and exactly matches the canonical
+command-disabled, Tailscale-source-restricted, loopback-only format, valid
+32-hex device ID, and key fingerprint. A personal, unrestricted, wildcard,
+duplicate, modified, malformed, or marker-only lookalike entry is refused. The
+replacement remains an exact V1 grant, so changing or expanding remote ports
+requires a fresh one-shot request. Agent transactions and the helper share
+`~/.ssh/.jkbridge.lock`; after restart, a later Agent transaction can recognize
+that exact same-key one-shot line and reconcile it back to the enrolled device's
+catalog-derived Agent line without adopting a broad key.
+
 ## Transport controls
 
 - The server binds only to the Linux Tailscale IPv4 interface.
@@ -76,3 +114,24 @@ The token prevents unrelated tailnet peers from pairing unless they learn the di
 ## Compatibility
 
 Unknown versions fail closed. Adding optional fields is allowed only when both implementations ignore them safely. Any change to required validation, endpoint path, authentication, or authorization semantics requires a new versioned path and protocol value.
+
+Pairing Protocol V1 and the development Agent API V1 have different lifetimes and
+responsibilities:
+
+| Capability | One-shot Pairing V1 | Development Agent API V1 |
+|---|---|---|
+| Availability | Released | Implemented source; installation/acceptance pending; not released |
+| Linux process | Starts for one success/timeout, then exits | Optional persistent Tailscale-only Python server |
+| Bootstrap | User copies a short-lived pairing code | User enters an expiring one-use Linux-issued `admin`/`device` code |
+| Device identity | One request installs one dedicated public key | Maintains multiple independently revocable device records |
+| Additional device | Run a new one-shot pairing for that device | Enrolled admin may issue one expiring, one-use ordinary-device code; admin recovery remains Linux-local |
+| Service ports | Complete request port set | Derived from a versioned Linux service manifest |
+| Explicit target | Operator separately prepares any Linux loopback relay, then pairs its exact port | Admin-only read-only plan/probe and state-bound confirmed managed-relay apply/delete |
+| Windows refresh | Re-run explicit one-shot pairing for a changed exact port set | Manual foreground sync reads the caller's own grant; administrators may also list/revoke devices |
+| Fallback role | Primary v2.1 setup; vNext recovery/portable mode | Convenience path after one-time Linux preparation |
+| Tunnel transport | Restricted OpenSSH | The same restricted OpenSSH data plane |
+
+An Agent-capable client must not silently reinterpret a V1 pairing code as an
+Agent enrollment credential. If Agent discovery, version negotiation,
+authentication, or service synchronization fails, the UI may offer explicit
+one-shot pairing; it must not fall back to a less restricted SSH entry.

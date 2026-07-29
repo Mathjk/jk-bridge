@@ -12,6 +12,7 @@ fi
 mapfile -t DOC_FILES < <(
   printf '%s\n' README.md README.zh-CN.md CONTRIBUTING.md SECURITY.md
   find docs -type f -name '*.md' -print | sort
+  find packaging -type f -name '*.md' -print 2>/dev/null | sort
 )
 
 failed=0

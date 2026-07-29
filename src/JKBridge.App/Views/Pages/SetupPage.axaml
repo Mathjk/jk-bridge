@@ -13,17 +13,99 @@
             <Grid Grid.Row="0" ColumnDefinitions="*,Auto">
                 <StackPanel>
                     <TextBlock Text="设备配置" Classes="page-title" />
-                    <TextBlock Text="通过 Tailscale 一次性配对，自动完成 Windows 密钥、Linux 授权和固定主机身份。"
+                    <TextBlock Text="优先使用可选 Linux Agent 完成无终端登记；Agent 不可用时保留一次性配对。"
                                Classes="page-subtitle" Margin="0,4,0,0" />
                 </StackPanel>
                 <Border Grid.Column="1" Classes="code-chip" VerticalAlignment="Center">
-                    <TextBlock Text="PAIRING · V1" Classes="technical-strong" />
+                    <TextBlock Text="AGENT · OPTIONAL" Classes="technical-strong" />
                 </Border>
             </Grid>
 
             <ScrollViewer Grid.Row="2" HorizontalScrollBarVisibility="Disabled">
                 <Grid ColumnDefinitions="1.15*,18,*" RowDefinitions="Auto,16,Auto">
                     <Border Grid.Row="0" Grid.Column="0" Classes="card" Padding="22">
+                        <StackPanel>
+                            <Grid ColumnDefinitions="Auto,*">
+                                <Border Width="38" Height="38" Classes="bridge-node info">
+                                    <TextBlock Text="A" Classes="technical-strong"
+                                               HorizontalAlignment="Center" VerticalAlignment="Center" />
+                                </Border>
+                                <StackPanel Grid.Column="1" Margin="12,0,0,0">
+                                    <TextBlock Text="通过 Linux Agent 添加此电脑" Classes="section-title" />
+                                    <TextBlock Text="每台 Windows 都会生成独立 SSH 身份；Agent 只会授予服务清单中的精确 Linux 回环端口。"
+                                               Classes="page-subtitle" TextWrapping="Wrap" />
+                                </StackPanel>
+                            </Grid>
+
+                            <TextBlock Text="Agent 地址" Classes="body-strong" Margin="0,18,0,6" />
+                            <TextBox Text="{Binding AgentEndpoint}" Classes="field technical"
+                                     PlaceholderText="http://100.64.x.x:45871"
+                                     AutomationProperties.Name="Linux Agent 地址" />
+                            <TextBlock Text="只接受 Linux 的 Tailscale IPv4 与明确端口；不要在地址中附加恢复码、查询参数或网页路径。"
+                                       Classes="caption" TextWrapping="Wrap" Margin="0,6,0,0" />
+                            <Grid ColumnDefinitions="Auto,10,*" Margin="0,10,0,0">
+                                <Button Grid.Column="0" Content="发现 Agent" Classes="secondary"
+                                        IsEnabled="{Binding CanDiscoverAgents}"
+                                        Command="{Binding DiscoverAgentsCommand}"
+                                        AutomationProperties.Name="只读发现当前 tailnet 的 Agent" />
+                                <TextBlock Grid.Column="2" Text="{Binding AgentDiscoveryFeedback}"
+                                           Classes="caption" TextWrapping="Wrap"
+                                           VerticalAlignment="Center" />
+                            </Grid>
+                            <Grid ColumnDefinitions="*,10,Auto" Margin="0,8,0,0">
+                                <ComboBox Grid.Column="0"
+                                          ItemsSource="{Binding AgentDiscoveryCandidates}"
+                                          SelectedItem="{Binding SelectedAgentDiscoveryCandidate}"
+                                          IsEnabled="{Binding CanDiscoverAgents}"
+                                          PlaceholderText="发现结果（多台时必须明确选择）"
+                                          AutomationProperties.Name="已发现的 Agent 候选">
+                                    <ComboBox.ItemTemplate>
+                                        <DataTemplate x:DataType="vm:AgentDiscoveryCandidateUiState">
+                                            <TextBlock Text="{Binding DisplayText}" />
+                                        </DataTemplate>
+                                    </ComboBox.ItemTemplate>
+                                </ComboBox>
+                                <Button Grid.Column="2" Content="使用所选地址" Classes="secondary"
+                                        IsEnabled="{Binding CanUseDiscoveredAgent}"
+                                        Command="{Binding UseDiscoveredAgentCommand}"
+                                        AutomationProperties.Name="明确使用所选 Agent 地址" />
+                            </Grid>
+                            <CheckBox Content="我确认只把已登记 Agent 重新绑定到所选地址；必须仍是同一 Tailscale 稳定节点和同一 SSH 服务器身份。"
+                                      IsChecked="{Binding AgentEndpointRebindConfirmed}"
+                                      IsVisible="{Binding IsAgentConfigured}"
+                                      IsEnabled="{Binding CanUseDiscoveredAgent}"
+                                      Margin="0,9,0,0" />
+                            <Button Content="确认重新绑定已登记 Agent 地址" Classes="secondary"
+                                    HorizontalAlignment="Stretch" Margin="0,8,0,0"
+                                    IsVisible="{Binding IsAgentConfigured}"
+                                    IsEnabled="{Binding CanRebindAgentEndpoint}"
+                                    Command="{Binding RebindAgentEndpointCommand}"
+                                    AutomationProperties.Name="确认重新绑定 Agent 地址" />
+                            <TextBlock Text="重新绑定只用于同一 Agent 的 Tailscale IP 变化；不会自动信任不同节点、重新登记设备或替换凭据。"
+                                       IsVisible="{Binding IsAgentConfigured}"
+                                       Classes="caption" TextWrapping="Wrap" Margin="0,5,0,0" />
+
+                            <TextBlock Text="此电脑名称" Classes="body-strong" Margin="0,14,0,6" />
+                            <TextBox Text="{Binding AgentDeviceLabel}" Classes="field"
+                                     AutomationProperties.Name="设备显示名称" />
+
+                            <TextBlock Text="一次性登记码" Classes="body-strong" Margin="0,14,0,6" />
+                            <TextBox Text="{Binding AgentRecoveryCode}" Classes="field technical"
+                                     PasswordChar="●" RevealPassword="False"
+                                     PlaceholderText="Linux 初始化/恢复码，或管理员 Windows 生成的设备添加码"
+                                     AutomationProperties.Name="一次性 Agent 登记码" />
+                            <TextBlock Text="登记码可来自 Linux 初始化/恢复流程，也可由已登记的管理员 Windows 生成；Windows 生成的设备添加码只能登记普通 device 角色，不能授予管理员权限。登记码只随本次请求发送，不写入网址或日志；JK Bridge 不会静默添加设备。"
+                                       Classes="caption" TextWrapping="Wrap" Margin="0,6,0,0" />
+
+                            <Button Content="使用 Agent 登记并连接" Classes="primary"
+                                    HorizontalAlignment="Stretch" Margin="0,20,0,0" MinHeight="44"
+                                    IsEnabled="{Binding CanStartAgentEnrollment}"
+                                    Command="{Binding EnrollWithAgentCommand}"
+                                    AutomationProperties.Name="使用 Agent 登记并连接" />
+                        </StackPanel>
+                    </Border>
+
+                    <Border Grid.Row="2" Grid.Column="0" Classes="card" Padding="22">
                         <StackPanel>
                             <Grid ColumnDefinitions="Auto,*">
                                 <Border Width="38" Height="38" Classes="bridge-node info">
@@ -80,7 +162,7 @@
                         </StackPanel>
                     </Border>
 
-                    <StackPanel Grid.Row="0" Grid.Column="2">
+                    <StackPanel Grid.Row="0" Grid.RowSpan="3" Grid.Column="2">
                         <Border Classes="card" Padding="20">
                             <StackPanel>
                                 <TextBlock Text="当前设备" Classes="section-title" />
@@ -88,6 +170,286 @@
                                            Margin="0,8,0,0" TextWrapping="Wrap" />
                                 <TextBlock Text="配对会替换 Windows 当前服务器配置；旧 Linux 授权不会被远程删除，可稍后用 Linux 脚本按指纹撤销。"
                                            Classes="caption" TextWrapping="Wrap" Margin="0,6,0,0" />
+                            </StackPanel>
+                        </Border>
+
+                        <Border Classes="card" Padding="20" Margin="0,16,0,0">
+                            <StackPanel>
+                                <TextBlock Text="Agent 登记进度" Classes="section-title" />
+                                <TextBlock Text="{Binding AgentEnrollmentFeedback}" Classes="page-subtitle"
+                                           TextWrapping="Wrap" Margin="0,3,0,16" />
+
+                                <Grid ColumnDefinitions="28,*,Auto" Margin="0,6">
+                                    <TextBlock Text="A1" Classes="technical-strong" VerticalAlignment="Center" />
+                                    <TextBlock Grid.Column="1" Text="验证 Agent 与 Tailnet" Classes="body-strong" />
+                                    <TextBlock Grid.Column="2" Text="{Binding AgentConnectionStatus}"
+                                               Classes="technical-strong" VerticalAlignment="Center" />
+                                </Grid>
+                                <Separator Classes="quiet" />
+                                <Grid ColumnDefinitions="28,*,Auto" Margin="0,6">
+                                    <TextBlock Text="A2" Classes="technical-strong" VerticalAlignment="Center" />
+                                    <TextBlock Grid.Column="1" Text="准备独立 SSH 密钥" Classes="body-strong" />
+                                    <TextBlock Grid.Column="2" Text="{Binding AgentKeyStatus}"
+                                               Classes="technical-strong" VerticalAlignment="Center" />
+                                </Grid>
+                                <Separator Classes="quiet" />
+                                <Grid ColumnDefinitions="28,*,Auto" Margin="0,6">
+                                    <TextBlock Text="A3" Classes="technical-strong" VerticalAlignment="Center" />
+                                    <TextBlock Grid.Column="1" Text="明确授权此设备" Classes="body-strong" />
+                                    <TextBlock Grid.Column="2" Text="{Binding AgentAuthorizationStatus}"
+                                               Classes="technical-strong" VerticalAlignment="Center" />
+                                </Grid>
+                                <Separator Classes="quiet" />
+                                <Grid ColumnDefinitions="28,*,Auto" Margin="0,6">
+                                    <TextBlock Text="A4" Classes="technical-strong" VerticalAlignment="Center" />
+                                    <TextBlock Grid.Column="1" Text="同步服务清单" Classes="body-strong" />
+                                    <TextBlock Grid.Column="2" Text="{Binding AgentCatalogStatus}"
+                                               Classes="technical-strong" VerticalAlignment="Center" />
+                                </Grid>
+                            </StackPanel>
+                        </Border>
+
+                        <Border Classes="card" Padding="20" Margin="0,16,0,0"
+                                IsVisible="{Binding IsAgentConfigured}">
+                            <StackPanel>
+                                <TextBlock Text="Agent 服务与设备管理" Classes="section-title" />
+                                <TextBlock Text="{Binding AgentManagementFeedback}" Classes="page-subtitle"
+                                           TextWrapping="Wrap" Margin="0,3,0,14" />
+
+                                <Grid ColumnDefinitions="*,10,*">
+                                    <Button Grid.Column="0" Content="同步服务清单" Classes="secondary"
+                                            IsEnabled="{Binding CanManageAgent}"
+                                            Command="{Binding SyncAgentCatalogCommand}"
+                                            AutomationProperties.Name="同步 Agent 服务清单" />
+                                    <Button Grid.Column="2" Content="刷新设备列表" Classes="secondary"
+                                            IsEnabled="{Binding CanManageAgent}"
+                                            Command="{Binding RefreshAgentDevicesCommand}"
+                                            AutomationProperties.Name="刷新 Agent 设备列表" />
+                                </Grid>
+                                <TextBlock Text="所有已登记设备都能同步自己的服务与精确授权，并保留相同服务的 Windows 本地端口。只有 Agent 管理员能查看完整设备列表和撤销其他设备；普通设备只显示自身。"
+                                           Classes="caption" TextWrapping="Wrap" Margin="0,8,0,0" />
+
+                                <Separator Classes="quiet" Margin="0,16,0,12" />
+                                <TextBlock Text="添加另一台 Windows" Classes="body-strong" />
+                                <TextBlock Text="仅管理员可生成。添加码有效 10 分钟、只能使用一次，且只能登记普通设备。"
+                                           Classes="caption" TextWrapping="Wrap" Margin="0,3,0,8" />
+                                <Button Content="生成新设备添加码" Classes="secondary"
+                                        HorizontalAlignment="Stretch"
+                                        IsEnabled="{Binding CanManageAgent}"
+                                        Command="{Binding GenerateAgentEnrollmentCodeCommand}"
+                                        AutomationProperties.Name="生成一次性 Agent 设备添加码" />
+                                <TextBlock Text="{Binding AgentEnrollmentCodeFeedback}" Classes="caption"
+                                           TextWrapping="Wrap" Margin="0,7,0,0" />
+                                <Grid ColumnDefinitions="*,10,Auto" Margin="0,8,0,0"
+                                      IsVisible="{Binding HasAgentEnrollmentCode}">
+                                    <TextBox Grid.Column="0" Text="{Binding AgentEnrollmentCode}"
+                                             IsReadOnly="True" Classes="field"
+                                             AutomationProperties.Name="一次性 Agent 设备添加码" />
+                                    <Button Grid.Column="2" Content="复制" Classes="secondary"
+                                            IsEnabled="{Binding CanCopyAgentEnrollmentCode}"
+                                            Command="{Binding CopyAgentEnrollmentCodeCommand}"
+                                            AutomationProperties.Name="复制一次性 Agent 设备添加码" />
+                                </Grid>
+                                <TextBlock Text="{Binding AgentEnrollmentCodeExpiry, StringFormat='到期时间：{0}'}"
+                                           IsVisible="{Binding HasAgentEnrollmentCode}"
+                                           Classes="caption" Margin="0,4,0,0" />
+
+                                <Separator Classes="quiet" Margin="0,16,0,12" />
+                                <TextBlock Text="将本机服务清单提交到 Linux" Classes="body-strong" />
+                                <TextBlock Text="服务编辑器先只保存 Windows 本机。Agent 管理员可在这里预览完整差异，确认后才更新 Linux 清单及各设备的精确端口授权。托管中继必须使用下方中继计划，不能借此绕过。"
+                                           Classes="caption" TextWrapping="Wrap" Margin="0,3,0,8" />
+                                <CheckBox Content="把清单中默认启用的服务授权给所有有效设备"
+                                          IsChecked="{Binding AgentCatalogApplyDefaultsToAllDevices}"
+                                          IsEnabled="{Binding CanManageAgent}" />
+                                <Button Content="只读预览 Linux 清单差异" Classes="secondary"
+                                        HorizontalAlignment="Stretch" Margin="0,9,0,0"
+                                        IsEnabled="{Binding CanManageAgent}"
+                                        Command="{Binding PreviewAgentCatalogUpdateCommand}"
+                                        AutomationProperties.Name="预览 Agent 服务清单更新" />
+                                <TextBlock Text="{Binding AgentCatalogUpdateFeedback}" Classes="caption"
+                                           TextWrapping="Wrap" Margin="0,7,0,0" />
+                                <Border Classes="log-surface" Margin="0,10,0,0"
+                                        IsVisible="{Binding HasAgentCatalogUpdatePreview}">
+                                    <TextBlock Text="{Binding AgentCatalogUpdateSummary}"
+                                               Classes="technical" TextWrapping="Wrap" />
+                                </Border>
+                                <CheckBox Content="我已核对新增、修改、删除、Linux 端口和受影响设备，确认提交以上服务清单。"
+                                          IsChecked="{Binding AgentCatalogUpdateConfirmed}"
+                                          IsVisible="{Binding HasAgentCatalogUpdatePreview}"
+                                          IsEnabled="{Binding CanManageAgent}" Margin="0,10,0,0" />
+                                <Button Content="确认提交到 Linux Agent" Classes="danger"
+                                        HorizontalAlignment="Stretch" Margin="0,9,0,0"
+                                        IsVisible="{Binding HasAgentCatalogUpdatePreview}"
+                                        IsEnabled="{Binding CanApplyAgentCatalogUpdate}"
+                                        Command="{Binding ApplyAgentCatalogUpdateCommand}"
+                                        AutomationProperties.Name="确认提交 Agent 服务清单" />
+
+                                <TextBlock Text="选择设备" Classes="body-strong" Margin="0,16,0,6" />
+                                <ComboBox ItemsSource="{Binding AgentDevices}"
+                                          SelectedItem="{Binding SelectedAgentDevice}"
+                                          IsEnabled="{Binding CanManageAgent}"
+                                          AutomationProperties.Name="Agent 设备列表">
+                                    <ComboBox.ItemTemplate>
+                                        <DataTemplate x:DataType="vm:AgentDeviceUiState">
+                                            <TextBlock Text="{Binding DisplayText}" />
+                                        </DataTemplate>
+                                    </ComboBox.ItemTemplate>
+                                </ComboBox>
+                                <TextBlock Text="{Binding SelectedAgentDevice.DeviceId, StringFormat='设备 ID：{0}'}"
+                                           Classes="caption" TextWrapping="Wrap" Margin="0,7,0,0" />
+                                <TextBlock Text="{Binding SelectedAgentDevice.TailscaleLogin, StringFormat='Tailnet 身份：{0}'}"
+                                           Classes="caption" TextWrapping="Wrap" />
+                                <TextBlock Text="{Binding SelectedAgentDevice.LastSeenText, StringFormat='Agent 最近记录：{0}（当前不等同实时活动）'}"
+                                           Classes="caption" TextWrapping="Wrap" />
+
+                                <Grid ColumnDefinitions="*,10,Auto" Margin="0,12,0,0">
+                                    <TextBox Grid.Column="0" Text="{Binding AgentRenameDeviceLabel}"
+                                             Classes="field" PlaceholderText="设备显示名称"
+                                             AutomationProperties.Name="新的 Agent 设备名称" />
+                                    <Button Grid.Column="2" Content="重命名" Classes="secondary"
+                                            IsEnabled="{Binding CanRenameAgentDevice}"
+                                            Command="{Binding RenameAgentDeviceCommand}"
+                                            AutomationProperties.Name="重命名所选 Agent 设备" />
+                                </Grid>
+                                <TextBlock Text="重命名只改变 Agent 中的显示标签，不改变角色、Tailnet 身份、SSH 密钥或端口授权。"
+                                           Classes="caption" TextWrapping="Wrap" Margin="0,5,0,0" />
+
+                                <CheckBox Content="我确认撤销所选设备。它以后不能管理 Agent 或建立新的 SSH 连接；已有 SSH 会话仍需在对应设备上断开。"
+                                          IsChecked="{Binding AgentRevokeConfirmed}"
+                                          IsEnabled="{Binding CanManageAgent}"
+                                          Margin="0,14,0,0" />
+                                <Button Content="撤销所选设备" Classes="danger"
+                                        HorizontalAlignment="Stretch" Margin="0,10,0,0"
+                                        IsEnabled="{Binding CanRevokeAgentDevice}"
+                                        Command="{Binding RevokeAgentDeviceCommand}"
+                                        AutomationProperties.Name="确认撤销 Agent 设备" />
+                                <TextBlock Text="当前 Windows 不能在这里撤销自身，以免意外失去最后一个管理入口。"
+                                           Classes="caption" TextWrapping="Wrap" Margin="0,7,0,0" />
+                            </StackPanel>
+                        </Border>
+
+                        <Border Classes="card" Padding="20" Margin="0,16,0,0"
+                                IsVisible="{Binding IsAgentConfigured}">
+                            <Expander Header="高级：Linux 可达目标" IsExpanded="False">
+                                <StackPanel Margin="0,14,0,0">
+                                    <TextBlock Text="把 Linux 能访问、但 Windows 不能直接访问的一个明确 TCP 目标，映射成新的 JK Bridge 服务。中继只监听 Linux 127.0.0.1；仅 Agent 管理员可操作。"
+                                               Classes="page-subtitle" TextWrapping="Wrap" />
+                                    <TextBlock Text="{Binding AgentRelayFeedback}" Classes="caption"
+                                               TextWrapping="Wrap" Margin="0,6,0,12" />
+
+                                    <Grid ColumnDefinitions="*,12,*" RowDefinitions="Auto,Auto,Auto,Auto,Auto">
+                                        <StackPanel Grid.Row="0" Grid.Column="0">
+                                            <TextBlock Text="服务 ID" Classes="field-label" />
+                                            <TextBox Text="{Binding AgentRelaySlug}" Classes="field"
+                                                     PlaceholderText="例如 campus-auth" />
+                                        </StackPanel>
+                                        <StackPanel Grid.Row="0" Grid.Column="2">
+                                            <TextBlock Text="显示名称" Classes="field-label" />
+                                            <TextBox Text="{Binding AgentRelayServiceName}" Classes="field"
+                                                     PlaceholderText="例如 Campus Auth" />
+                                        </StackPanel>
+                                        <StackPanel Grid.Row="1" Grid.Column="0" Margin="0,10,0,0">
+                                            <TextBlock Text="Linux 中继端口" Classes="field-label" />
+                                            <TextBox Text="{Binding AgentRelayLinuxPort}" Classes="field"
+                                                     PlaceholderText="例如 19000" />
+                                        </StackPanel>
+                                        <StackPanel Grid.Row="1" Grid.Column="2" Margin="0,10,0,0">
+                                            <TextBlock Text="Windows 本地端口" Classes="field-label" />
+                                            <TextBox Text="{Binding AgentRelayWindowsPort}" Classes="field"
+                                                     PlaceholderText="例如 19000" />
+                                        </StackPanel>
+                                        <StackPanel Grid.Row="2" Grid.Column="0" Margin="0,10,0,0">
+                                            <TextBlock Text="目标主机（DNS 或 IPv4）" Classes="field-label" />
+                                            <TextBox Text="{Binding AgentRelayTargetHost}" Classes="field"
+                                                     PlaceholderText="不能填写 URL、通配符或网段" />
+                                        </StackPanel>
+                                        <StackPanel Grid.Row="2" Grid.Column="2" Margin="0,10,0,0">
+                                            <TextBlock Text="目标端口" Classes="field-label" />
+                                            <TextBox Text="{Binding AgentRelayTargetPort}" Classes="field" />
+                                        </StackPanel>
+                                        <StackPanel Grid.Row="3" Grid.Column="0" Margin="0,10,0,0">
+                                            <TextBlock Text="打开路径" Classes="field-label" />
+                                            <TextBox Text="{Binding AgentRelayOpenPath}" Classes="field"
+                                                     PlaceholderText="必须以 / 开头" />
+                                        </StackPanel>
+                                        <StackPanel Grid.Row="3" Grid.Column="2" Margin="0,10,0,0">
+                                            <TextBlock Text="说明" Classes="field-label" />
+                                            <TextBox Text="{Binding AgentRelayDescription}" Classes="field"
+                                                     PlaceholderText="最多 160 个字符" />
+                                        </StackPanel>
+                                        <CheckBox Grid.Row="4" Grid.Column="0" Content="目标使用 HTTPS"
+                                                  IsChecked="{Binding AgentRelayUseHttps}" Margin="0,12,0,0" />
+                                        <CheckBox Grid.Row="4" Grid.Column="2"
+                                                  Content="把新服务授权给所有有效设备"
+                                                  IsChecked="{Binding AgentRelayGrantToAllDevices}" Margin="0,12,0,0" />
+                                    </Grid>
+
+                                    <Grid ColumnDefinitions="*,10,*" Margin="0,14,0,0">
+                                        <Button Grid.Column="0" Content="生成计划并探测" Classes="secondary"
+                                                IsEnabled="{Binding CanManageAgent}"
+                                                Command="{Binding PlanAgentRelayCommand}"
+                                                AutomationProperties.Name="只读规划并探测 Linux 中继" />
+                                        <Button Grid.Column="2" Content="生成删除计划" Classes="secondary"
+                                                IsEnabled="{Binding CanManageAgent}"
+                                                Command="{Binding PlanAgentRelayDeletionCommand}"
+                                                AutomationProperties.Name="只读规划删除 Linux 中继" />
+                                    </Grid>
+
+                                    <Border Classes="log-surface" Margin="0,14,0,0"
+                                            IsVisible="{Binding HasAgentRelayPreview}">
+                                        <TextBlock Text="{Binding AgentRelayPreviewSummary}"
+                                                   Classes="technical" TextWrapping="Wrap" />
+                                    </Border>
+                                    <CheckBox Content="我已核对规范化映射、目标探测、端口授权和受影响设备，确认执行以上计划。"
+                                              IsChecked="{Binding AgentRelayConfirmed}"
+                                              IsVisible="{Binding HasAgentRelayPreview}"
+                                              IsEnabled="{Binding CanManageAgent}"
+                                              Margin="0,12,0,0" />
+                                    <Button Content="确认应用以上计划" Classes="danger"
+                                            HorizontalAlignment="Stretch" Margin="0,10,0,0"
+                                            IsVisible="{Binding HasAgentRelayPreview}"
+                                            IsEnabled="{Binding CanApplyAgentRelayPlan}"
+                                            Command="{Binding ApplyAgentRelayPlanCommand}"
+                                            AutomationProperties.Name="确认应用 Agent 中继计划" />
+                                    <TextBlock Text="规划和探测不会修改 Linux。HTTPS 仍是透明 TCP 中继：若目标证书或站点依赖原始主机名、SNI、Cookie 或重定向，使用 127.0.0.1 打开时可能失败。此向导不是通用代理，也不接受 URI、通配符、网段、IPv6 或 UDP。"
+                                               Classes="caption" TextWrapping="Wrap" Margin="0,9,0,0" />
+                                </StackPanel>
+                            </Expander>
+                        </Border>
+
+                        <Border Classes="card" Padding="20" Margin="0,16,0,0">
+                            <StackPanel>
+                                <TextBlock Text="迁移服务配置" Classes="section-title" />
+                                <TextBlock Text="{Binding ServiceProfileFeedback}" Classes="page-subtitle"
+                                           TextWrapping="Wrap" Margin="0,3,0,14" />
+                                <Grid ColumnDefinitions="*,10,*">
+                                    <Button Grid.Column="0" Content="导出服务配置" Classes="secondary"
+                                            IsEnabled="{Binding CanTransferServiceProfile}"
+                                            Command="{Binding ExportServiceProfileCommand}"
+                                            AutomationProperties.Name="导出不含凭据的服务配置" />
+                                    <Button Grid.Column="2" Content="选择并预览导入" Classes="secondary"
+                                            IsEnabled="{Binding CanTransferServiceProfile}"
+                                            Command="{Binding PreviewServiceProfileImportCommand}"
+                                            AutomationProperties.Name="选择并预览服务配置导入" />
+                                </Grid>
+                                <Border Classes="log-surface" Margin="0,14,0,0"
+                                        IsVisible="{Binding HasServiceProfileImportPreview}">
+                                    <TextBlock Text="{Binding ServiceProfileImportSummary}"
+                                               Classes="technical" TextWrapping="Wrap" />
+                                </Border>
+                                <CheckBox Content="我已核对以上新增、修改、删除和 Linux 端口授权影响，确认只替换本机服务列表。"
+                                          IsChecked="{Binding ServiceProfileImportConfirmed}"
+                                          IsVisible="{Binding HasServiceProfileImportPreview}"
+                                          IsEnabled="{Binding CanTransferServiceProfile}"
+                                          Margin="0,12,0,0" />
+                                <Button Content="确认应用导入" Classes="danger"
+                                        HorizontalAlignment="Stretch" Margin="0,10,0,0"
+                                        IsVisible="{Binding HasServiceProfileImportPreview}"
+                                        IsEnabled="{Binding CanApplyServiceProfileImport}"
+                                        Command="{Binding ApplyServiceProfileImportCommand}"
+                                        AutomationProperties.Name="确认应用服务配置导入" />
+                                <TextBlock Text="导入文件不会改变 Linux 主机、SSH/Agent 身份或授权回执。若包含新 Linux 端口，导入后仍须 Agent 同步或重新配对。"
+                                           Classes="caption" TextWrapping="Wrap" Margin="0,8,0,0" />
                             </StackPanel>
                         </Border>
 
@@ -140,7 +502,7 @@
                         </Border>
 
                         <Border Classes="issue-banner warning" Margin="0,16,0,0">
-                            <TextBlock Text="安全边界：临时服务仅绑定 Linux 的 Tailscale 地址；请求使用 256 位一次性令牌；授权仅允许当前启用服务对应的 Linux 127.0.0.1 端口。"
+                            <TextBlock Text="安全边界：Agent 与临时配对服务都只绑定 Linux 的 Tailscale 地址；恢复码和配对令牌都只用于一次请求；授权仅允许服务清单对应的 Linux 127.0.0.1 端口。"
                                        Classes="body" TextWrapping="Wrap" />
                         </Border>
                     </StackPanel>

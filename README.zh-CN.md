@@ -30,6 +30,16 @@
   <img src="docs/images/device-setup.png" width="900" alt="JK Bridge 设备配置界面">
 </p>
 
+> [!NOTE]
+> 最新稳定版是 **v2.1.0**。它以便携 ZIP 发布，并使用一次性的
+> `jkbridge-linux.py`，不会安装或依赖长期运行的 Linux 后台程序。当前仓库还
+> 包含一些 **尚未发布的 2.2.0（vNext）开发脚手架**：更简单的路由编辑器、
+> 非秘密服务档案、Windows 安装器和可选的无 AI Linux Agent；但它们尚未组成可发布的端到端
+> Agent 流程。本地构建时标为 `2.2.0` 的 EXE、ZIP 或安装器仍只是开发/验收
+> 产物（包括明确标注的 Preview），不是稳定 Release。除非小节明确标注
+> vNext/2.2.0 开发内容，下文都描述
+> v2.1.0。
+
 ## 为什么需要 JK Bridge？
 
 Overleaf、GPU 监控、Jupyter 等自建网页只监听 Linux `127.0.0.1` 时更安全，但 Windows 电脑无法直接打开。JK Bridge 把它们转换成普通的 Windows 本机网址，同时保留两端的回环边界。
@@ -135,6 +145,26 @@ python3 ~/jkbridge-linux.py pair
 
 每个服务的 SSH 转发、浏览器地址、健康检查和 Linux 授权端口都由同一条回环路由生成。对于自签名 HTTPS，可在“服务”页选择“TCP 端口”健康检查；健康警告仍会显示，但只要 SSH 转发已经建立，就不会阻止浏览器打开。
 
+### 理解 Windows 端口和 Linux 端口
+
+两端端口不必相同。例如 JK Bridge 只在 Windows 回环端口 `8080` 上监听，
+然后把流量转发到 Linux 回环端口 `80`：
+
+```text
+浏览器打开 http://127.0.0.1:8080/project
+              Windows localPort 8080
+                       -> Linux remotePort 80
+```
+
+浏览器网址永远使用 **Windows 本地端口**。协议和路径可以按服务选择，例如
+`https` 与 `/login`，但主机仍必须严格是 `127.0.0.1`。JK Bridge 只做 TCP
+转发，不会改写网页应用返回的重定向，也不会让签发给其他域名的证书自动适用于
+`127.0.0.1`。
+
+在已发布的 v2.1.0 中，应在“服务”页一起核对本地端口、Linux 目标端口和
+回环网址。开发中的 vNext 编辑器可以根据“协议 + Windows 端口 + 打开路径”
+自动生成网址、预览完整映射，并把自定义回环网址保留为高级选项。
+
 ## 首次配置完成以后
 
 | 情况 | 需要做什么 |
@@ -148,6 +178,59 @@ python3 ~/jkbridge-linux.py pair
 | 从 v2.0.x 升级到 v2.1 | 启动新版后按提示重新配对一次，以建立可核验的端口授权记录 |
 
 重新配对只更新 `~/.ssh/authorized_keys` 中 JK Bridge 自己管理的那一行，并会先备份到 `~/.ssh/jkbridge-backups/`。
+
+## 尚未发布的 2.2.0/vNext 迁移与可选 Agent 状态
+
+未来预期的新设备流程是：Linux 一次性安装 Agent 后，在新电脑完成“登录
+Tailscale → 安装 JK Bridge → 添加此电脑 → 同步服务 → 连接”。可选的
+`jkbridge-agent` 应当是普通、确定性的 Linux 程序，完全不依赖 AI、模型
+API、Codex 或云端运行时。SSH 仍是受限的数据通道；每台 Windows 都有独立
+密钥，可以单独撤销而不影响其他电脑。
+
+这套流程目前 **尚未完成，也没有发布**：
+
+- 仓库已有简单/高级路由编辑器实现和测试，但属于 vNext，而不是 v2.1.0；
+- vNext 软件现在已有原生 Service Profile 导出，以及只读导入预览和明确确认
+  步骤；该界面没有随 v2.1.0 发布，也尚未完成干净 Windows 验收；
+- 已有可在 Windows 构建的 Inno Setup 安装器脚手架，但它还不是稳定 Release
+  资产，也没有完成干净电脑验收和代码签名；
+- 源码中已有开发版 Linux Agent、加固的用户级 unit/环境文件、打包检查和已
+  配套的回环中继助手，以及已接线的 Windows 登记/管理客户端。一组已部署设备
+  已完成非 root 安装/初始化/启动/重启/状态检查、明确发现 Agent、首台管理员
+  登记、服务清单同步、精确 SSH 授权与建链；完整的干净机器生命周期、第二台
+  设备撤销和稳定发布验收仍待完成；
+- 任意已登记的 vNext 设备都可以通过认证 `/v1/me` 与 `/v1/services` 手动
+  同步自己的服务选择；管理员还可以查看全部设备，并在明确确认后撤销所选的
+  非当前设备，也可以在 Windows 管理界面生成 10 分钟有效、仅用一次、只能
+  登记普通设备的添加码。第一台管理员设备仍使用 Linux 初始化/恢复时打印的码；
+- 源码已有有界、只读的 Agent 发现引擎：只检查 Tailscale 当前已知的在线 peer
+  的 `45871` 端口，并核对节点 ID、MagicDNS、tailnet、协议与 Agent 版本。
+  vNext Setup 页面现在只在用户明确点击“发现 Agent”后调用它。单个结果只会
+  预选而不会直接采用；多个结果必须手选，并且总要另外点击“使用所选地址”。
+  发现本身绝不会登记设备，仍须提供一次性代码并明确点击登记。该 GUI 尚未完成
+  干净 Windows 验收。
+
+当前 vNext 源码还实现了仅管理员可用的“Linux 可达目标”流程：先生成只读计划
+并从 Linux 探测目标，展示规范化映射和受影响授权，再要求单独勾选确认，才允许
+创建、更新或删除。应用当前计划时，Agent 使用同包的 `jkbridge_relay.py`、
+`/usr/bin/socat` 和用户级 systemd unit，只在 Linux
+`127.0.0.1:<relayPort>` 监听，并以事务方式更新服务清单与精确 `permitopen`
+授权。它只转发一个明确主机与端口，不是 SOCKS 或通用代理。首轮现场登记期间，
+既有的人工回环中继保持在线；但 Windows 端管理的创建/更新/删除和干净机器验收
+仍待完成。
+
+上述发布门槛完成前，每台新 Windows 仍使用一次性助手配对。不要在电脑之间
+复制私钥、授权回执或整个 `config.json`。vNext Service Profile 界面只迁移
+非秘密服务选择，导入本身绝不会取得 Linux 授权。作为迁移后备，2.2.0 开发版
+导入器也能严格验证一份 v2.1/schema v3 `config.json`，再只把其中 Services
+投影到同一预览；旧设备、服务器、密钥路径、tailnet、行为设置和授权字段全部
+丢弃。不要用旧文件覆盖新电脑配置；能导出非秘密 Service Profile 时仍应优先
+使用它。Agent 发布后，一次性配对也会
+继续作为明确的安装和恢复后备路径。
+
+安全合约和剩余发布问题记录在 [vNext Agent 协议草案](docs/AGENT_PROTOCOL.md)
+与 [Agent 威胁模型](docs/AGENT_THREAT_MODEL.md)中；它们是设计和审查文档，
+不是稳定版安装说明。
 
 ## 发布包里有什么？
 
@@ -197,6 +280,9 @@ python3 ~/jkbridge-linux.py pair
 | [系统架构](docs/ARCHITECTURE.md) | 维护者和安全审查者 |
 | [安全设计](docs/SECURITY.md) | 系统管理员和审查者 |
 | [配对协议](docs/PAIRING_PROTOCOL.md) | 开发者和协议审查者 |
+| [Agent 协议草案](docs/AGENT_PROTOCOL.md) · [威胁模型](docs/AGENT_THREAT_MODEL.md) | vNext 开发与安全审查；不是稳定版安装说明 |
+| [Agent 多设备与管理员操作](docs/AGENT_OPERATIONS.zh-CN.md) · [English](docs/AGENT_OPERATIONS.md) | 添加、更换或撤销 vNext 设备的管理员 |
+| [vNext 实机验收记录](docs/FIELD_ACCEPTANCE.md) | 区分现场证据与正式发布门槛的维护者 |
 | [开发指南](docs/DEVELOPMENT.md) | 编译、测试和发布项目的贡献者 |
 | [Windows 验收清单](docs/WINDOWS_ACCEPTANCE.md) | 发布测试人员 |
 

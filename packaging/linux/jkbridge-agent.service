@@ -1,0 +1,41 @@
+[Unit]
+Description=JK Bridge Tailscale-only enrollment agent
+Documentation=https://github.com/Mathjk/jk-bridge
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+Environment=JKBRIDGE_AGENT_PORT=45871
+EnvironmentFile=-%h/.config/jkbridge-agent/agent.env
+ExecStart=/usr/bin/python3 %h/.local/lib/jkbridge/jkbridge_agent.py --state-dir %h/.local/state/jkbridge-agent serve --port ${JKBRIDGE_AGENT_PORT}
+Restart=on-failure
+RestartSec=5s
+TimeoutStopSec=10s
+UMask=0077
+
+# The ordinary SSH user owns Agent state and its authorized_keys. No root or
+# Linux capabilities are required. Tailscale peer identity is checked via the
+# local tailscaled socket for every uncached peer.
+NoNewPrivileges=true
+# User services already start without Linux capabilities. Do not add root-level
+# sandbox directives that implicitly change the capability bounding set: a
+# constrained user manager rejects that transition with 218/CAPABILITIES.
+AmbientCapabilities=
+PrivateTmp=true
+ProtectControlGroups=true
+ProtectHome=read-only
+ProtectHostname=true
+ProtectKernelTunables=true
+ProtectProc=invisible
+ProtectSystem=strict
+RestrictAddressFamilies=AF_UNIX AF_INET
+RestrictNamespaces=true
+RestrictRealtime=true
+LockPersonality=true
+MemoryDenyWriteExecute=true
+SystemCallArchitectures=native
+ReadWritePaths=-%h/.local/state/jkbridge-agent -%h/.ssh -%h/.config/systemd/user
+
+[Install]
+WantedBy=default.target

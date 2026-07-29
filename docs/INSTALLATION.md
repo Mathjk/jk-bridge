@@ -4,6 +4,18 @@
 
 This guide takes a new Windows 11 x64 client and a Linux host from an empty environment to a working JK Bridge connection. System package installation is deliberately separate from one-click pairing: JK Bridge checks dependencies but never elevates itself or changes operating-system configuration.
 
+> [!IMPORTANT]
+> These steps install the released **v2.1.0** portable ZIP with one-shot Linux
+> pairing. The repository's unreleased 2.2.0/vNext installer, Service Profile,
+> Windows Agent client, Linux Agent package assets, and simple route editor are development
+> work. The repository has a hardened user unit and manual packaging guide. One
+> deployed pair has exercised install/start/restart and first-admin enrollment,
+> but there is no stable Agent artifact or complete clean-machine
+> upgrade/rollback/uninstall workflow.
+> Do not use an unreleased Agent screen as a substitute for the one-shot steps
+> below. Any locally built artifact marked `2.2.0` is for development
+> acceptance, not a stable Release.
+
 ## Before you begin
 
 You need:
@@ -15,6 +27,19 @@ You need:
 - at least one web service already reachable on Linux `127.0.0.1`.
 
 The email addresses used to sign in to Tailscale do not have to be identical. Both devices simply need to be members of the same tailnet and allowed by its policy.
+
+### Released and in-development workflows
+
+| Capability | v2.1.0 Release | Current unreleased 2.2.0/vNext repository state |
+|---|---|---|
+| Windows delivery | Verified portable ZIP | CI-built unsigned Inno Setup installer and preview publishing pipeline; not a stable or clean-machine-accepted installer |
+| Linux setup | One-shot helper started in a terminal for each new device | No-AI Agent, user-unit assets, controlled loopback-relay helper, packaging guide, and Windows client exist in source; one deployed start/restart/enrollment passed, while the complete clean-machine lifecycle remains pending |
+| Service editing | Explicit local port, remote port, loopback URL, and health fields | Simple URL generation and advanced editor are under development |
+| Service transfer | Re-enter services on the new Windows computer | Native non-secret export and preview/confirm import UI exists in vNext source; not released or clean-Windows accepted |
+| Recovery | Run the one-shot helper and re-pair | The same one-shot flow remains the planned fallback |
+
+An optional future Agent will be a deterministic program, not an AI feature. It
+will not need ChatGPT, Codex, a model API key, or cloud inference.
 
 ## 1. Prepare Windows 11
 
@@ -192,6 +217,12 @@ The last line must be `True`. Extract the ZIP to a stable folder such as one und
 
 The executable is currently unsigned. A SmartScreen warning is therefore possible. The checksum proves that the download matches the published Release asset; it does not replace normal trust in the repository and release process.
 
+The repository contains a vNext Inno Setup definition and build script, but the
+stable v2.1.0 instructions use the ZIP. Do not treat an installer built by an
+unrelated third party as an official Release. The future installer may detect
+Tailscale, open its official download page, and offer a UAC-confirmed OpenSSH
+Client installation; it cannot sign in to Tailscale for you.
+
 ## 5. Copy and run the Linux helper
 
 The extracted Windows package contains `jkbridge-linux.py`. Copy it to the ordinary Linux user's home directory by Tailscale file transfer, SCP, a shared folder, or removable media.
@@ -234,6 +265,29 @@ Open each service from the JK Bridge Overview. For deeper Windows checks, run Po
 
 If the tunnel is connected but a service health check fails, return to Linux and test the exact target with `curl`. See [Troubleshooting](TROUBLESHOOTING.md).
 
+### How Windows and Linux ports relate
+
+JK Bridge creates a Windows-local listener and asks SSH to connect that listener
+to one exact Linux-loopback destination:
+
+```text
+http://127.0.0.1:<Windows localPort>/<launch path>
+                       -> 127.0.0.1:<Linux remotePort>
+```
+
+For example, Windows `8080` can forward to Linux `80`. The browser must open
+`http://127.0.0.1:8080/...`, not port `80` and not the Linux Tailscale address.
+Changing only the Windows port, `http`/`https` choice, or launch path does not
+add a Linux destination. Adding or changing the Linux remote port requires a new
+exact grant through one-shot pairing today and through the optional Agent in the
+future.
+
+The launch path controls which page JK Bridge opens. It does not rewrite HTTP
+redirects returned by the application. A custom URL must remain an HTTP(S) URL
+on exact host `127.0.0.1` and use the configured Windows local port. TLS
+certificates and application hostname requirements may still need application
+or reverse-proxy configuration.
+
 ## 8. Configure daily startup
 
 In JK Bridge Settings, enable **Start with Windows** if desired. This registers the app only for the current Windows user. At the next login, JK Bridge waits for Tailscale and reconnects automatically.
@@ -241,6 +295,127 @@ In JK Bridge Settings, enable **Start with Windows** if desired. This registers 
 Without that option, simply start `JKBridge.exe` after a reboot. No pairing code, username, password, or IP address is normally required again.
 
 Keep the extracted directory in place: moving or deleting `JKBridge.exe` after enabling startup leaves the startup entry pointing to the old path.
+
+## Add or replace a Windows computer
+
+Released v2.1.0 treats every Windows computer as an independent device:
+
+1. Install and sign in to Tailscale on the new computer.
+2. Install Windows OpenSSH Client and extract the verified JK Bridge ZIP.
+3. Start `python3 ~/jkbridge-linux.py pair` on Linux.
+4. Pair the new Windows computer so it creates its own Ed25519 identity.
+5. Recreate the required service definitions and verify each local port.
+6. If this replaces an old computer, revoke the old fingerprint on Linux only
+   after the new connection passes acceptance.
+
+Do not copy the old computer's private key, authorization receipt, or complete
+`config.json`. A copied private key makes two computers indistinguishable and
+prevents independent revocation. A copied receipt only describes the old key's
+observed Linux authorization and cannot authorize a new key.
+
+The vNext Service Profile format and native file-picker workflow are deliberately non-secret: they may carry
+service names, Windows and Linux ports, launch URLs, and health choices, but not
+private keys, pairing tokens, device credentials, server identity, or
+authorization receipts. The vNext UI can export this allow-list, validate and
+preview an import without mutation, and apply it only after explicit
+confirmation. This workflow is implemented in source but not released or
+clean-Windows accepted. Import replaces only local service definitions; a new
+device must still enroll through the Agent or complete one-shot pairing.
+
+If the old computer can no longer export a Service Profile, the 2.2.0
+development import picker also accepts an exact v2.1/schema-v3 `config.json` as
+a legacy source. It validates the complete old shape, then projects only
+Services into the same read-only preview. Server identity, tailnet identity,
+behavior settings, private-key path, authorization receipt, and all other
+device-specific fields are discarded. This does **not** make whole-config copy a
+migration method: do not overwrite the target configuration with the old file,
+handle that source as sensitive, and prefer a Service Profile when possible.
+
+The vNext source also contains the Agent and relay scripts, a hardened per-user
+systemd unit, an environment example, package checks, and a manual packaging
+guide. One deployed pair has completed installation, restart, discovery, and
+first-admin enrollment, but the assets have not completed login persistence,
+upgrade, rollback, uninstall, and clean-machine acceptance, so they are not stable
+installation instructions. A bounded discovery engine is present and tested:
+on explicit invocation it checks only known online Tailscale peers on the fixed
+Agent port and validates their node and tailnet identity. The vNext Setup page
+is wired to invoke it only after **Discover Agent** is selected. One result is
+preselected but not copied into the endpoint field; multiple results require an
+explicit choice. In either case **Use selected address** is a separate action,
+and enrollment still requires a one-time code plus an explicit enrollment
+click. This GUI flow is implemented but not clean-Windows accepted.
+
+After enrollment, any vNext device can manually synchronize its own service
+selection through authenticated `/v1/me` and `/v1/services`. An administrator
+can additionally refresh the complete Agent device list and explicitly revoke a
+selected device other than the current computer. Revocation requires a
+confirmation checkbox, removes future SSH authentication for only that device,
+and cannot terminate an already established SSH session. An ordinary device
+receives only its own device receipt and cannot list or revoke other devices.
+
+### vNext development reference: add another Agent device
+
+This is implemented in source but is not a stable installation path yet:
+
+1. On an already enrolled administrator Windows computer, open **Device setup**,
+   synchronize/refresh Agent state, and select **Generate new device code**.
+2. The UI displays one ordinary-device code with a 10-minute expiry. It can be
+   consumed once. The code is not written to JK Bridge configuration or logs.
+3. Copy it directly to the target Windows computer. After copying, overwrite
+   the clipboard yourself; the operating system clipboard is not auto-cleared.
+4. On the target, select **Discover Agent**, review the sanitized name/MagicDNS
+   identity, select the intended candidate if more than one appears, and select
+   **Use selected address**. If none is found, enter the exact Linux Tailscale
+   IPv4 Agent endpoint manually. Then enter the code and a device label and
+   explicitly select **Enroll and connect**. Discovery alone never enrolls.
+
+The first administrator cannot be created by this button. It must use the
+administrator code printed by Linux Agent bootstrap, or a new administrator
+recovery code issued locally on Linux. An ordinary device cannot generate
+codes, list peers, revoke peers, or manage relays.
+
+For administrator replacement, lost-device recovery, revocation boundaries,
+and the rule that administrator roles are not transferred in place, follow the
+[vNext Agent multi-device operations guide](AGENT_OPERATIONS.md).
+
+### vNext development reference: controlled Linux relay
+
+The **Advanced: Linux reachable target** panel is for one exact TCP service that
+Linux can reach but Windows cannot. The two local ports remain independent:
+
+```text
+Windows http(s)://127.0.0.1:<Windows port>/<path>
+  -> SSH -> Linux 127.0.0.1:<relay port>
+  -> one exact <target DNS-or-IPv4>:<target port>
+```
+
+Only an Agent administrator can operate it. Enter a service ID, the Linux relay
+port, one DNS name or IPv4 target and port, the Windows local port, protocol,
+and launch path. Select **Generate plan and probe** first. Planning and probing
+are read-only: the preview reports normalized mapping, dependency, port and
+target reachability, catalog revision, exact added/removed `permitopen` ports,
+and affected device IDs. Review that preview, separately tick its confirmation,
+then apply. Deletion has the same read-only delete-plan and explicit-confirm
+boundary. Changing a field invalidates the prior plan, and a plan bound to stale
+Linux/catalog/device state must be regenerated.
+
+The Linux side requires the packaged sibling `jkbridge_relay.py`,
+`/usr/bin/socat`, and a working per-user systemd session. A managed relay unit is
+created under the user's systemd unit directory and listens only on
+`127.0.0.1`; create/update/delete is coordinated with the Agent catalog and
+exact per-device grants. The Agent refuses unmanaged/conflicting units and is
+not a general proxy: there is no wildcard, CIDR, URI target, UDP, SOCKS, Funnel,
+exit-node, or subnet-route mode. HTTPS is transparent TCP forwarding, so the
+target may still reject `127.0.0.1` because of certificate hostname, SNI,
+cookies, or redirects.
+
+Although this relay workflow and its automated tests exist in the current
+source tree, it still requires a real Linux install/lifecycle run and clean
+Windows GUI acceptance before it can be described as released.
+
+If the Agent is absent, stopped, incompatible, or deliberately disabled, use
+the one-shot helper. Existing restricted SSH tunnels do not depend on the Agent
+remaining online.
 
 ## Upgrade from v2.0.x to v2.1
 
