@@ -2,7 +2,7 @@ namespace JKBridge.Core.Models;
 
 public sealed record AppConfig
 {
-    public const int CurrentSchemaVersion = 3;
+    public const int CurrentSchemaVersion = 4;
 
     public int SchemaVersion { get; init; } = CurrentSchemaVersion;
 
@@ -15,6 +15,8 @@ public sealed record AppConfig
     public BehaviorSettings Behavior { get; init; } = new();
 
     public ForwardAuthorizationGrant Authorization { get; init; } = new();
+
+    public AgentRegistration Agent { get; init; } = new();
 
     public List<ServiceDefinition> Services { get; init; } = CreateDefaultServices();
 
@@ -107,6 +109,27 @@ public sealed record ForwardAuthorizationGrant
     public string ClientKeyFingerprint { get; init; } = string.Empty;
 
     public List<int> RemotePorts { get; init; } = [];
+}
+
+/// <summary>
+/// Non-secret reference to this Windows device's optional Linux Agent registration.
+/// The enrollment credential itself belongs in the operating-system credential store.
+/// </summary>
+public sealed record AgentRegistration
+{
+    public bool IsConfigured { get; init; }
+
+    public string Endpoint { get; init; } = string.Empty;
+
+    public string TailscaleNodeId { get; init; } = string.Empty;
+
+    public string DeviceId { get; init; } = string.Empty;
+
+    public string DeviceLabel { get; init; } = string.Empty;
+
+    public string CredentialReference { get; init; } = string.Empty;
+
+    public string CatalogRevision { get; init; } = string.Empty;
 }
 
 public sealed record ServiceDefinition

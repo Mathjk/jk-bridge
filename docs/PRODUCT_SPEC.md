@@ -1,5 +1,12 @@
 # JK Bridge Product Specification
 
+> **Status:** The V2.1 sections describe the released product. Sections marked
+> **vNext** describe approved work that is still in development;
+> they are not installation or API documentation for a shipping Agent.
+> The latest stable release is v2.1.0. Current App/installer builds identify as
+> `v2.2.0 development`, but v2.2.0 has not been released and that label does not
+> make any vNext feature supported.
+
 ## Product statement
 
 JK Bridge is a quiet Windows 11 desktop utility that pairs with one Linux workstation over Tailscale and opens selected Linux localhost web services through one supervised SSH tunnel, without requiring the user to maintain IP addresses, SSH commands, or authorization files.
@@ -20,6 +27,25 @@ Linux one-shot helper -> Windows one-click pairing -> restricted SSH authorizati
 ```
 
 After pairing, normal use is `start app -> automatic preflight -> connect -> open service`. A Windows reboot needs no credential entry.
+
+## vNext product direction — in development
+
+The approved vNext goal is to make a second or replacement Windows device usable
+without repeated terminal work after one-time Linux preparation:
+
+```text
+install and sign in to Tailscale
+-> install JK Bridge
+-> choose Add this computer
+-> enter a short-lived Linux-issued enrollment code
+-> synchronize services and connect
+```
+
+This requires an optional Linux Agent for durable device enrollment and service
+synchronization. The Agent is an ordinary deterministic program and has no AI,
+model API, Codex, or cloud-service dependency. Existing one-shot pairing remains
+available for portable use, recovery, and installations that do not want a
+persistent Agent.
 
 ## V2.1 scope
 
@@ -63,7 +89,140 @@ After pairing, normal use is `start app -> automatic preflight -> connect -> ope
 - Atomic JSON configuration writes and last-valid backup recovery.
 - Dedicated app-owned `known_hosts` derived only from the pinned configuration.
 - Rolling redacted logs and a copyable diagnostic summary.
+- An explicit native-save diagnostic ZIP containing only anonymous runtime
+  status and bounded redacted recent events; no config or raw snapshot dump.
+- A Settings action for a manual, read-only check of the fixed official GitHub
+  Release endpoint; no background check, download, or installation.
 - Explicit error categories for Tailscale, pairing expiry, peer identity, SSH authentication, host-key mismatch, forwarding denial, port conflicts, and remote HTTP health.
+
+## vNext in-development scope
+
+### Simple and advanced service editing
+
+- Simple mode asks for service name, Linux service port, Windows access port,
+  HTTP/HTTPS, launch path, and enabled state.
+- The Windows browser URL is generated as
+  `http(s)://127.0.0.1:<Windows access port>/<launch path>` and clearly labeled
+  as a Windows-local address.
+- The UI previews the complete mapping, for example
+  `Windows 127.0.0.1:8080 -> Linux 127.0.0.1:80`.
+- Changing a Windows local port or launch path does not request a new Linux
+  grant. Changing the Linux destination port does.
+- Local port conflicts are detected and a free alternative is suggested, but a
+  stable address is never silently changed.
+- Advanced mode exposes health details, a validated custom launch URL, current
+  authorization state, and an administrator-only explicit Agent-managed relay
+  target workflow.
+- Advanced mode does not provide wildcard binds, arbitrary port ranges, SOCKS,
+  shell access, exit-node behavior, or subnet routing.
+- Overleaf, Sub2API, generic HTTP, and generic HTTPS templates are preview-only
+  until the user confirms **Apply to draft**, and the draft still requires a
+  separate save. Simple health follows the browser path without query/fragment;
+  advanced mode can preserve an independent absolute `healthPath`. Generic
+  HTTPS defaults to TCP health for certificate-tolerant reachability.
+
+### Service profile and manifest
+
+- The source includes a native Service Profile export/import flow for non-secret
+  service definitions without private keys, pairing tokens, device credentials,
+  server identity, or authorization receipts.
+- Export uses the Windows file picker. Import is read-only until it has shown
+  additions, modifications, removals, and Linux-port authorization impact; a
+  separate explicit confirmation is required before atomic application.
+- Applying a profile preserves the device/server/Agent state and cannot grant a
+  new Linux port. The user must subsequently run Agent synchronization or
+  one-shot pairing when the preview identifies a new destination port.
+- With an Agent, a versioned Linux service manifest is the source of truth for
+  Linux loopback destinations and recommended Windows defaults.
+- Each Windows device may keep a local-port override, enabled/favorite state,
+  and launch preference without changing the Linux destination.
+- Manifest changes are diffed before destructive application; conflicts and
+  remote ports requiring authorization are explicit.
+- The first template set includes Overleaf, Sub2API, generic HTTP, and generic
+  HTTPS services.
+
+### Optional Linux Agent and devices
+
+- The source includes a Python Agent, relay companion, systemd user-unit, and a
+  non-root `jkbridge-agentctl` with preflight/install/start/stop/status/fallback.
+  It runs as the ordinary Linux SSH user and listens only on the detected Linux
+  Tailscale IPv4. Live lifecycle acceptance remains pending, and no explicit
+  upgrade/rollback/uninstall command exists yet.
+- Each Windows computer generates and keeps its own Ed25519 private key.
+- The Agent enrolls, labels, lists, renames, synchronizes, and independently revokes
+  device public identities.
+- Each device receives only command-disabled, source-restricted, exact
+  loopback `permitopen` entries for its enabled manifest services.
+- Agent API V1 enrollment uses an expiring, one-use Linux-issued code and binds
+  each credential to the stable Tailscale node ID and normalized login returned
+  by `tailscale whois`; source IP alone is insufficient identity.
+- An enrolled device can explicitly synchronize its own catalog and exact grant
+  without administrator list permission. This is a manual foreground action;
+  background synchronization is not implemented.
+- Explicit discovery checks only known online Tailscale peers on port `45871`,
+  validates stable-node/MagicDNS/tailnet/protocol/version claims, and requires a
+  separate **Use selected address** action before enrollment. A selected result
+  never consumes a code or enrolls by itself.
+- An existing registration can explicitly rebind only to a discovered endpoint
+  for the same pinned stable node after a second confirmation and complete
+  authenticated identity/grant/revision verification. Device ID, credential,
+  SSH key, and pinned server identity remain unchanged.
+- The Windows setup page provides an administrator-only sanitized device list
+  and explicit-confirmation revoke action. It prevents self-revocation in the
+  normal UI and reminds the user that an existing SSH session must be ended
+  separately.
+- Administrators can rename a device label without changing its role, key,
+  Tailscale identity, or exact grant. `lastSeenAt` is shown as a throttled recent
+  Agent record, not real-time presence.
+- Administrators can preview additions, modifications, removals, exact remote
+  ports, and affected devices, confirm separately, then submit the complete
+  catalog with its expected revision. Managed-relay services cannot be changed
+  through this generic write path.
+- An administrator can generate a transient 10-minute, one-use enrollment code
+  for one additional ordinary `device`, copy it to the new Windows installation,
+  and complete independent-key enrollment without returning to Linux. It never
+  creates another administrator; Linux-local recovery remains the admin path.
+- Stopping the development Agent disables Agent management but does not remove
+  unrelated SSH entries or break already running application services. A future
+  supported uninstall must preserve the same boundary.
+- The one-shot V1 helper remains a supported fallback.
+- Development fallback stops only the Agent and retains state, helpers, and SSH
+  entries. Same-key Agent-to-one-shot conversion requires one exact canonical
+  restricted entry; port expansion still requires a fresh pair, an existing SSH
+  session continues until Windows stops it, and a later Agent transaction can
+  reconcile only that exact one-shot entry.
+- The source includes an advanced administrator-only explicit relay flow. It
+  accepts one exact DNS/IPv4 TCP target, reserves one Linux loopback port,
+  generates and probes a read-only plan, reports exact grant/device effects,
+  and requires a state-bound plan token plus explicit confirmation before
+  create/update or delete.
+- Relay application creates only a recognized `jkbridge-relay-<slug>.service`
+  systemd user unit backed by `socat`, binds literal `127.0.0.1`, converges the
+  service catalog and per-device exact grants, and uses backup/rollback paths.
+  Arbitrary unit text, URI targets, IPv6, UDP, wildcards, CIDRs, general proxying,
+  and public listeners remain out of scope.
+- Strict adoption of one exact legacy Skill-created relay exists only as a
+  relay-manager plan/confirm/apply primitive. It is not exposed by Agent API V1
+  or the Windows UI and is not yet a normal migration feature.
+
+### Configuration V4
+
+- V3 configurations migrate without losing server identity, services, browser
+  URLs, local ports, behavior, health settings, or observed authorization.
+- The in-development V4 implementation adds non-secret Agent registration
+  metadata: endpoint, pinned Linux Tailscale node ID, device ID/label, opaque
+  credential-store reference, and catalog revision. It does not put the Agent
+  credential in `config.json` and does not make Agent deployment supported by
+  itself.
+- Existing custom URLs remain custom unless they can be proven equivalent to a
+  generated simple-mode URL.
+- A synchronized catalog uses stable service IDs and server-owned Linux
+  destinations, then materializes each device's Windows-local route and
+  preferences in its V4 configuration.
+- Migration never fabricates an Agent enrollment or granted port and never
+  stores private-key contents or reusable enrollment secrets in `config.json`.
+- V1/V2 profiles retain the existing safe requirement to establish a known
+  authorization before SSH starts.
 
 ## Non-goals
 
@@ -75,15 +234,25 @@ After pairing, normal use is `start app -> automatic preflight -> connect -> ope
 - SFTP/FileZilla management, multi-server synchronization, cloud accounts, or an extension marketplace.
 - Automatic software updates or signed installer delivery in V2.
 
+The following remain non-goals for vNext:
+
+- Depending on AI for pairing, synchronization, tunneling, health, or recovery.
+- Sharing or synchronizing one Windows SSH private key across devices.
+- Treating Tailscale membership or a `100.x` source address as sufficient
+  authorization for a management operation.
+- Public Agent exposure, Tailscale Funnel, LAN listeners, wildcard
+  `permitopen`, arbitrary website proxying, UDP, or whole-subnet access.
+- Silently logging into Tailscale or storing a Tailscale password.
+
 ## Page tree
 
 ```text
 JK Bridge
 ├── Device setup
-│   ├── Linux helper command
-│   ├── One-time pairing code
-│   ├── Dedicated identity path
-│   └── Pairing progress and security summary
+│   ├── Agent discovery/manual address and explicit enrollment
+│   ├── Same-node endpoint rebind and Agent device/catalog controls
+│   ├── Linux one-shot helper, pairing code, and dedicated identity path
+│   └── Pairing/enrollment progress and security summary
 ├── Overview
 │   ├── Dependency rail
 │   ├── Current issue/action
@@ -96,13 +265,25 @@ JK Bridge
 │   ├── Tailscale and peer identity
 │   ├── SSH trust and process
 │   ├── Local forwards and health
-│   └── Sanitized activity
+│   ├── Sanitized activity
+│   └── Explicit safe diagnostic ZIP export
 └── Settings
     ├── Paired Linux profile and re-pair action
     ├── Startup/reconnect/tray behavior
     ├── Appearance
-    └── Paths and version
+    ├── Paths and version
+    └── Manual official Release check
 ```
+
+The vNext source adds a simple/advanced service editor and explicit Agent
+enrollment to Device setup. It also includes manual Agent catalog sync,
+administrator device list/revoke and ordinary-device code controls, managed
+explicit-relay plan/probe/confirm/delete, and native Service Profile
+export/import with preview and confirmation. Explicit Agent discovery,
+same-stable-node endpoint rebind, direct catalog preview/confirm/write, device
+rename, diagnostic export, and manual Release checking are also wired in source.
+Background sync, old-device approval, supported Linux lifecycle, explicit
+upgrade/uninstall, and clean Windows 11 acceptance remain pending.
 
 ## Product state
 
@@ -125,6 +306,18 @@ Any running state -> Stopping -> Stopped
 - `PairingRequest/Response`: protocol version, client public key, exact ports, server identity and host public key.
 - `TunnelSnapshot`, `ServiceSnapshot`, `DiagnosticEvent`: runtime and sanitized presentation state.
 
+V4 adds `AgentRegistration` for a non-secret endpoint, pinned Linux Tailscale
+node ID, device identity, Windows credential-store reference, and catalog
+revision. Agent API V1 adds catalog service definitions and device summaries
+with stable Tailscale node/login fields. The Linux server and Windows enrollment
+client exist. The Windows source also contains explicit manual sync,
+administrator catalog write/list/rename/revoke and ordinary-device code
+generation, discovery/rebind, managed relay planning/application, diagnostic
+export/manual Release check, and native non-secret Service Profile transfer;
+supported installation and complete clean-machine interoperability acceptance
+remain pending. Relay plan tokens and enrollment codes are transient secrets, never
+catalog, manifest, config, or Service Profile objects.
+
 ## Risks and chosen controls
 
 - A passwordless client key enables unattended reconnect. Its permissions are constrained on Windows and its Linux authorization cannot execute commands or reach unlisted targets.
@@ -135,9 +328,42 @@ Any running state -> Stopping -> Stopped
 - A self-signed HTTPS certificate may fail strict HTTP health. TCP mode checks only forward reachability, and browser launch remains available so the user can make the certificate decision there.
 - One SSH process means forwarding changes briefly reconnect all services; this avoids ControlMaster complexity and hidden sessions.
 
+The development Agent adds these risks and boundaries:
+
+- A persistent management listener increases attack surface. It is optional,
+  Tailscale-only, non-root, rate/size/concurrency limited, and cannot execute
+  arbitrary commands or broaden a service beyond the manifest.
+- A compromised device credential affects one device. Per-device identities
+  and independent server-side revocation prevent that credential from becoming
+  a shared fleet identity.
+- A malicious or stale manifest could expand destination ports. Manifest
+  validation, revision checks, explicit diffs, exact `permitopen`, atomic
+  writes, and backups make expansion visible and recoverable.
+- Agent unavailability must degrade management rather than tunneling: existing
+  SSH grants continue, while enrollment and synchronization use a clear fallback
+  or wait state.
+- Endpoint drift cannot become server substitution: rebind requires the same
+  pinned stable node plus full authenticated identity/grant verification and
+  explicit confirmation.
+- A relay can become an SSRF or privilege-expansion mechanism if its target or
+  grant is broad. The implementation accepts one normalized DNS/IPv4 host and
+  port, uses a generated loopback-only unit, requires administrator role plus a
+  fresh state-bound plan and confirmation, and refuses unmanaged-unit overwrite.
+- Transparent HTTPS relays do not rewrite certificates, SNI, redirects, cookies,
+  or origins. The UI warns that TCP reachability does not prove the target web
+  application will work through a `127.0.0.1` browser URL.
+
 ## Release requirements
 
 - Repository contains no personal machine identity, runtime data, credentials, pairing tokens, or real public keys.
 - Public-release scanner, .NET tests, Python tests, and Release build pass.
 - Windows package contains the EXE, Linux helper, bilingual README/installation/troubleshooting guides, fallback diagnostics, contributor and security documents, README images, and checksums.
 - Windows-specific acceptance is completed before marking a GitHub Release stable.
+
+Before any vNext Agent feature is described as stable, the release additionally
+requires V3-to-V4 migration and rollback tests, multiple-device isolation and
+revocation tests, Agent-unavailable fallback tests, manifest/relay conflict and
+rollback tests, and proof that neither Windows nor Linux binds a managed service
+or relay to a wildcard address. Real systemd-user, `socat`, DNS/TLS, clean
+Windows/Linux and update/uninstall acceptance remain separate release gates
+from the implemented protocol and UI.

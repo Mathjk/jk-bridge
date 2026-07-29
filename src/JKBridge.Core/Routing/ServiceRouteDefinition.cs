@@ -41,11 +41,10 @@ public static class ServiceRouteDefinition
                 "Remote host must be exactly 127.0.0.1."));
         }
 
-        var openUriIsValid = Uri.TryCreate(service.OpenUrl, UriKind.Absolute, out var openUri) &&
-                             (openUri.Scheme == Uri.UriSchemeHttp || openUri.Scheme == Uri.UriSchemeHttps) &&
-                             string.Equals(openUri.Host, ServiceDefinition.LoopbackHost, StringComparison.Ordinal) &&
-                             string.IsNullOrEmpty(openUri.UserInfo) &&
-                             openUri.Port == service.LocalPort;
+        var openUriIsValid = ServiceOpenUrl.TryParse(
+            service.OpenUrl,
+            service.LocalPort,
+            out var openUrlParts);
         if (!openUriIsValid)
         {
             issues.Add(new(
@@ -68,14 +67,14 @@ public static class ServiceRouteDefinition
         }
 
         var healthUri = new UriBuilder(
-            openUri!.Scheme,
+            openUrlParts!.Scheme,
             ServiceDefinition.LoopbackHost,
             service.LocalPort,
             service.HealthPath).Uri;
         var route = new ServiceRoute(
             service.LocalPort,
             new ForwardTarget(service.RemoteHost, service.RemotePort),
-            openUri,
+            openUrlParts.Uri,
             healthUri);
         return new(route, issues);
     }

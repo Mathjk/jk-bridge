@@ -1,6 +1,7 @@
 using JKBridge.Core.Configuration;
 using JKBridge.Core.Models;
 using System.Text.Json;
+using System.Text.Json.Nodes;
 
 namespace JKBridge.Core.Tests.Configuration;
 
@@ -39,6 +40,36 @@ public sealed class ConfigStoreTests
         Assert.Equal("My Linux", loaded.Config.Server.DisplayName);
         Assert.Equal(ThemePreference.Dark, loaded.Config.Behavior.Theme);
         Assert.Contains("\"theme\": \"dark\"", json, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public async Task SaveAndLoad_RoundTripsOnlyTheAgentCredentialReference()
+    {
+        using var directory = new TemporaryDirectory();
+        using var store = new ConfigStore(directory.File("config.json"));
+        var expected = AppConfig.CreateDefault() with
+        {
+            Agent = new AgentRegistration
+            {
+                IsConfigured = true,
+                Endpoint = "http://100.73.7.51:45821/",
+                TailscaleNodeId = "nJKBridgeLinux123",
+                DeviceId = "device_A1b2c3d4",
+                DeviceLabel = "Office Windows",
+                CredentialReference = "agent-" + new string('a', 64),
+                CatalogRevision = "sha256:abcdef123456",
+            },
+        };
+
+        await store.SaveAsync(expected);
+        var loaded = await store.LoadAsync();
+        var json = await File.ReadAllTextAsync(store.ConfigPath);
+
+        Assert.Equal(expected.Agent, loaded.Agent);
+        Assert.Contains(expected.Agent.CredentialReference, json, StringComparison.Ordinal);
+        Assert.DoesNotContain("enrollmentToken", json, StringComparison.OrdinalIgnoreCase);
+        Assert.DoesNotContain("pairingToken", json, StringComparison.OrdinalIgnoreCase);
+        Assert.DoesNotContain("deviceCredential", json, StringComparison.OrdinalIgnoreCase);
     }
 
     [Fact]
@@ -156,9 +187,50 @@ public sealed class ConfigStoreTests
         var result = await store.LoadWithResultAsync();
 
         Assert.True(result.WasMigrated);
-        Assert.Equal(3, result.Config.SchemaVersion);
+        Assert.Equal(AppConfig.CurrentSchemaVersion, result.Config.SchemaVersion);
         Assert.False(result.Config.Authorization.IsKnown);
         Assert.Empty(result.Config.Authorization.RemotePorts);
+    }
+
+    [Fact]
+    public async Task LoadWithResultAsync_MigratesVersionThreeWithoutChangingRoutesOrReceipt()
+    {
+        using var directory = new TemporaryDirectory();
+        using var store = new ConfigStore(directory.File("config.json"));
+        var configured = TestConfigs.CreateConfigured();
+        var legacy = configured with
+        {
+            SchemaVersion = 3,
+            Services = configured.Services.Select(service => service with { }).ToList(),
+        };
+        legacy.Services[0] = legacy.Services[0] with
+        {
+            LocalPort = 18180,
+            OpenUrl = "http://127.0.0.1:18180/project?from=v3#/editor",
+        };
+        var json = JsonNode.Parse(JsonSerializer.Serialize(legacy))!.AsObject();
+        Assert.True(json.Remove("Agent"));
+        Directory.CreateDirectory(directory.Path);
+        await File.WriteAllTextAsync(store.ConfigPath, json.ToJsonString());
+
+        var result = await store.LoadWithResultAsync();
+
+        Assert.True(result.WasMigrated);
+        Assert.Equal(AppConfig.CurrentSchemaVersion, result.Config.SchemaVersion);
+        Assert.Equal(legacy.SetupCompleted, result.Config.SetupCompleted);
+        Assert.Equal(legacy.Server, result.Config.Server);
+        Assert.Equal(legacy.Authorization.IsKnown, result.Config.Authorization.IsKnown);
+        Assert.Equal(
+            legacy.Authorization.ClientKeyFingerprint,
+            result.Config.Authorization.ClientKeyFingerprint);
+        Assert.Equal(
+            legacy.Authorization.RemotePorts,
+            result.Config.Authorization.RemotePorts);
+        Assert.Equal(legacy.Services, result.Config.Services);
+        Assert.Equal(
+            "http://127.0.0.1:18180/project?from=v3#/editor",
+            result.Config.Services[0].OpenUrl);
+        Assert.False(result.Config.Agent.IsConfigured);
     }
 
     private static AppConfig WithDisplayName(string displayName)

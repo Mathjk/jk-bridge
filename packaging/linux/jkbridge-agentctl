@@ -1,0 +1,540 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+PROGRAM="jkbridge-agentctl"
+DRY_RUN=0
+ASSUME_YES=0
+AGENT_PORT=45871
+CODE_TTL=900
+SERVICES_FILE=""
+SOURCE_DIR=""
+HOST_KEY="/etc/ssh/ssh_host_ed25519_key.pub"
+TARGET_HOME="${JKBRIDGE_AGENTCTL_HOME:-${HOME:-}}"
+CURRENT_TMP=""
+
+usage() {
+  cat <<'EOF'
+Usage: jkbridge-agentctl [options] COMMAND
+
+Commands:
+  preflight  Check prerequisites without changing the computer
+  install    Install, bootstrap, and enable the ordinary-user Agent
+  start      Start the existing Agent user service
+  stop       Stop the Agent without deleting state or SSH keys
+  status     Show systemd and non-secret Agent status
+  fallback   Stop the Agent and show the retained one-shot pairing command
+
+Options (must precede COMMAND):
+  --dry-run                 Print actions without changing files or services
+  --yes                     Accept the single install confirmation
+  --source-dir DIR          Directory containing the three Python helpers
+  --services-file FILE      Reviewed initial service catalog for first bootstrap
+  --port PORT               Agent API port (default: 45871)
+  --code-ttl SECONDS        Initial admin enrollment-code lifetime (60-86400)
+  --host-key FILE           Ed25519 SSH host public key used by preflight
+  -h, --help                Show this help
+
+This controller never invokes sudo and refuses to run as root. Install missing
+system packages (Tailscale, socat, OpenSSH Server, and systemd user support)
+through the operating system first, then rerun it as the future SSH user.
+EOF
+}
+
+fail() {
+  printf 'error: %s\n' "$*" >&2
+  exit 1
+}
+
+note() {
+  printf '%s\n' "$*"
+}
+
+cleanup() {
+  if [[ -n "$CURRENT_TMP" && -e "$CURRENT_TMP" ]]; then
+    rm -f -- "$CURRENT_TMP"
+  fi
+}
+trap cleanup EXIT HUP INT TERM
+
+while (( $# > 0 )); do
+  case "$1" in
+    --dry-run)
+      DRY_RUN=1
+      shift
+      ;;
+    --yes)
+      ASSUME_YES=1
+      shift
+      ;;
+    --source-dir|--services-file|--port|--code-ttl|--host-key)
+      (( $# >= 2 )) || fail "$1 requires a value"
+      option="$1"
+      value="$2"
+      shift 2
+      case "$option" in
+        --source-dir) SOURCE_DIR="$value" ;;
+        --services-file) SERVICES_FILE="$value" ;;
+        --port) AGENT_PORT="$value" ;;
+        --code-ttl) CODE_TTL="$value" ;;
+        --host-key) HOST_KEY="$value" ;;
+      esac
+      ;;
+    -h|--help)
+      usage
+      exit 0
+      ;;
+    --*)
+      fail "unknown option: $1"
+      ;;
+    *)
+      COMMAND="$1"
+      shift
+      break
+      ;;
+  esac
+done
+
+[[ -n "${COMMAND:-}" ]] || { usage >&2; exit 2; }
+(( $# == 0 )) || fail "unexpected arguments after command"
+case "$COMMAND" in
+  preflight|install|start|stop|status|fallback) ;;
+  *) fail "unknown command: $COMMAND" ;;
+esac
+
+[[ "${EUID:-$(id -u)}" -ne 0 ]] || fail "do not run this controller as root or with sudo"
+[[ -n "$TARGET_HOME" && "$TARGET_HOME" == /* && "$TARGET_HOME" != "/" ]] || \
+  fail "HOME must be one explicit absolute user directory"
+[[ ! -L "$TARGET_HOME" ]] || fail "the target home directory cannot be a symbolic link"
+if [[ -e "$TARGET_HOME" ]]; then
+  [[ -d "$TARGET_HOME" && -O "$TARGET_HOME" ]] || \
+    fail "the target home directory must be owned by the current user"
+else
+  fail "the target home directory does not exist"
+fi
+
+[[ "$AGENT_PORT" =~ ^[0-9]+$ ]] && (( AGENT_PORT >= 1 && AGENT_PORT <= 65535 )) || \
+  fail "--port must be an integer from 1 to 65535"
+[[ "$CODE_TTL" =~ ^[0-9]+$ ]] && (( CODE_TTL >= 60 && CODE_TTL <= 86400 )) || \
+  fail "--code-ttl must be an integer from 60 to 86400"
+
+SCRIPT_DIR="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd -P)"
+if [[ -z "$SOURCE_DIR" ]]; then
+  if [[ -f "$SCRIPT_DIR/../../scripts/jkbridge_agent.py" ]]; then
+    SOURCE_DIR="$(cd -- "$SCRIPT_DIR/../../scripts" && pwd -P)"
+  else
+    SOURCE_DIR="$(cd -- "$SCRIPT_DIR/.." && pwd -P)"
+  fi
+else
+  [[ "$SOURCE_DIR" == /* && -d "$SOURCE_DIR" && ! -L "$SOURCE_DIR" ]] || \
+    fail "--source-dir must be an existing absolute directory, not a symbolic link"
+  SOURCE_DIR="$(cd -- "$SOURCE_DIR" && pwd -P)"
+fi
+
+LIB_DIR="$TARGET_HOME/.local/lib/jkbridge"
+BIN_DIR="$TARGET_HOME/.local/bin"
+UNIT_DIR="$TARGET_HOME/.config/systemd/user"
+ENV_DIR="$TARGET_HOME/.config/jkbridge-agent"
+STATE_DIR="$TARGET_HOME/.local/state/jkbridge-agent"
+SSH_KEYS="$TARGET_HOME/.ssh/authorized_keys"
+INSTALL_MANIFEST="$STATE_DIR/install-manifest.sha256"
+UNIT_TARGET="$UNIT_DIR/jkbridge-agent.service"
+ENV_TARGET="$ENV_DIR/agent.env"
+AGENT_TARGET="$LIB_DIR/jkbridge_agent.py"
+RELAY_TARGET="$LIB_DIR/jkbridge_relay.py"
+FALLBACK_TARGET="$LIB_DIR/jkbridge-linux.py"
+CONTROLLER_TARGET="$BIN_DIR/jkbridge-agentctl"
+
+require_command() {
+  command -v "$1" >/dev/null 2>&1 || fail "$2 is required but was not found: $1"
+}
+
+validate_source() {
+  local source="$1"
+  [[ -f "$source" && ! -L "$source" ]] || fail "missing or unsafe package source: $source"
+}
+
+preflight() {
+  require_command python3 "Python 3.9 or newer"
+  require_command tailscale "Tailscale CLI"
+  require_command socat "socat loopback relay support"
+  require_command systemctl "systemd user-service support"
+  require_command install "the POSIX install utility"
+  require_command sha256sum "SHA-256 payload verification"
+  if ! command -v sshd >/dev/null 2>&1 && [[ ! -x /usr/sbin/sshd ]]; then
+    fail "OpenSSH Server is required but sshd was not found"
+  fi
+
+  python3 -c 'import sys; raise SystemExit(0 if sys.version_info >= (3, 9) else 1)' || \
+    fail "Python 3.9 or newer is required"
+  if ! tailscale status --json 2>/dev/null | python3 -c '
+import ipaddress, json, sys
+status = json.load(sys.stdin)
+addresses = (status.get("Self") or {}).get("TailscaleIPs") or []
+valid = any(
+    isinstance(address := ipaddress.ip_address(str(value)), ipaddress.IPv4Address)
+    and address in ipaddress.ip_network("100.64.0.0/10")
+    for value in addresses
+)
+raise SystemExit(0 if status.get("BackendState") == "Running" and valid else 1)
+'; then
+    fail "Tailscale is not running, logged in, and assigned a Tailscale IPv4 address"
+  fi
+  socat -V >/dev/null 2>&1 || fail "socat is installed but cannot run"
+  systemctl --user show-environment >/dev/null 2>&1 || \
+    fail "the systemd user manager is unavailable; log in normally or configure user lingering separately"
+  [[ -f "$HOST_KEY" && ! -L "$HOST_KEY" && -r "$HOST_KEY" ]] || \
+    fail "a readable, non-symlink Ed25519 SSH host public key is required: $HOST_KEY"
+  if ! python3 - "$HOST_KEY" <<'PY'
+import base64
+import pathlib
+import sys
+
+line = pathlib.Path(sys.argv[1]).read_text(encoding="utf-8").splitlines()
+parts = line[0].split() if line else []
+if len(parts) < 2 or parts[0] != "ssh-ed25519":
+    raise SystemExit(1)
+try:
+    blob = base64.b64decode(parts[1], validate=True)
+except Exception:
+    raise SystemExit(1)
+if len(blob) != 51 or blob[4:15] != b"ssh-ed25519":
+    raise SystemExit(1)
+PY
+  then
+    fail "the SSH host public key is not a valid Ed25519 public key"
+  fi
+
+  validate_source "$SOURCE_DIR/jkbridge_agent.py"
+  validate_source "$SOURCE_DIR/jkbridge_relay.py"
+  validate_source "$SOURCE_DIR/jkbridge-linux.py"
+  validate_source "$SCRIPT_DIR/jkbridge-agent.service"
+  python3 - "$SOURCE_DIR" <<'PY'
+import pathlib
+import sys
+
+root = pathlib.Path(sys.argv[1])
+for name in ("jkbridge_agent.py", "jkbridge_relay.py", "jkbridge-linux.py"):
+    source = (root / name).read_text(encoding="utf-8")
+    compile(source, str(root / name), "exec")
+PY
+  if [[ -n "$SERVICES_FILE" ]]; then
+    [[ "$SERVICES_FILE" == /* && -f "$SERVICES_FILE" && ! -L "$SERVICES_FILE" ]] || \
+      fail "--services-file must be one existing absolute regular file"
+    python3 - "$SOURCE_DIR/jkbridge_agent.py" "$SERVICES_FILE" <<'PY'
+import importlib.util
+import pathlib
+import sys
+
+spec = importlib.util.spec_from_file_location("jkbridge_agent_preflight", sys.argv[1])
+if spec is None or spec.loader is None:
+    raise SystemExit(1)
+module = importlib.util.module_from_spec(spec)
+sys.modules[spec.name] = module
+spec.loader.exec_module(module)
+module._load_services_file(pathlib.Path(sys.argv[2]))
+PY
+  fi
+  note "Preflight passed: ordinary-user Agent prerequisites are available."
+}
+
+assert_safe_parent() {
+  local directory="$1"
+  [[ ! -L "$directory" ]] || fail "refusing symbolic-link destination directory: $directory"
+  if [[ -e "$directory" ]]; then
+    [[ -d "$directory" && -O "$directory" ]] || fail "unsafe destination directory: $directory"
+  fi
+}
+
+install_directory() {
+  local directory="$1"
+  local mode="$2"
+  assert_safe_parent "$(dirname -- "$directory")"
+  assert_safe_parent "$directory"
+  if (( DRY_RUN )); then
+    note "DRY-RUN install -d -m $mode $directory"
+  else
+    install -d -m "$mode" -- "$directory"
+  fi
+}
+
+backup_managed_target() {
+  local target="$1"
+  local marker="$2"
+  [[ ! -L "$target" ]] || fail "refusing symbolic-link destination: $target"
+  [[ ! -e "$target" ]] && return 0
+  [[ -f "$target" && -O "$target" ]] || fail "unsafe existing destination: $target"
+  grep -Fq -- "$marker" "$target" || fail "refusing to overwrite an unmanaged file: $target"
+  local backup="$target.backup.$(date -u +%Y%m%dT%H%M%SZ).$$"
+  [[ ! -e "$backup" ]] || fail "backup already exists: $backup"
+  if (( DRY_RUN )); then
+    note "DRY-RUN backup $target -> $backup"
+  else
+    install -m 0600 -- "$target" "$backup"
+  fi
+}
+
+assert_managed_or_absent() {
+  local target="$1"
+  local marker="$2"
+  [[ ! -L "$target" ]] || fail "refusing symbolic-link destination: $target"
+  [[ ! -e "$target" ]] && return 0
+  [[ -f "$target" && -O "$target" ]] || fail "unsafe existing destination: $target"
+  grep -Fq -- "$marker" "$target" || fail "refusing to overwrite an unmanaged file: $target"
+}
+
+atomic_install() {
+  local source="$1"
+  local target="$2"
+  local mode="$3"
+  local marker="$4"
+  backup_managed_target "$target" "$marker"
+  if (( DRY_RUN )); then
+    note "DRY-RUN install -m $mode $source -> $target"
+    return
+  fi
+  CURRENT_TMP="$target.tmp.$$"
+  [[ ! -e "$CURRENT_TMP" ]] || fail "temporary destination already exists: $CURRENT_TMP"
+  install -m "$mode" -- "$source" "$CURRENT_TMP"
+  mv -- "$CURRENT_TMP" "$target"
+  CURRENT_TMP=""
+}
+
+write_environment() {
+  if [[ -e "$ENV_TARGET" ]]; then
+    backup_managed_target "$ENV_TARGET" "Managed by JK Bridge"
+  fi
+  if (( DRY_RUN )); then
+    note "DRY-RUN write Agent port $AGENT_PORT to $ENV_TARGET"
+    return
+  fi
+  CURRENT_TMP="$ENV_TARGET.tmp.$$"
+  umask 077
+  printf '# Managed by JK Bridge agentctl\nJKBRIDGE_AGENT_PORT=%s\n' "$AGENT_PORT" > "$CURRENT_TMP"
+  chmod 0600 "$CURRENT_TMP"
+  mv -- "$CURRENT_TMP" "$ENV_TARGET"
+  CURRENT_TMP=""
+}
+
+sha256_file() {
+  local record
+  record="$(sha256sum -- "$1")"
+  printf '%s\n' "${record%% *}"
+}
+
+installed_manifest_content() {
+  printf '%s\n' \
+    '# JK Bridge agentctl install manifest v1' \
+    "jkbridge_agent.py $(sha256_file "$AGENT_TARGET")" \
+    "jkbridge_relay.py $(sha256_file "$RELAY_TARGET")" \
+    "jkbridge-linux.py $(sha256_file "$FALLBACK_TARGET")" \
+    "jkbridge-agentctl $(sha256_file "$CONTROLLER_TARGET")" \
+    "jkbridge-agent.service $(sha256_file "$UNIT_TARGET")" \
+    "agent.env $(sha256_file "$ENV_TARGET")"
+}
+
+write_install_manifest() {
+  if [[ -e "$INSTALL_MANIFEST" ]]; then
+    backup_managed_target "$INSTALL_MANIFEST" "JK Bridge agentctl install manifest v1"
+  fi
+  if (( DRY_RUN )); then
+    note "DRY-RUN write verified installed-payload manifest $INSTALL_MANIFEST"
+    return
+  fi
+  CURRENT_TMP="$INSTALL_MANIFEST.tmp.$$"
+  umask 077
+  installed_manifest_content > "$CURRENT_TMP"
+  chmod 0600 "$CURRENT_TMP"
+  mv -- "$CURRENT_TMP" "$INSTALL_MANIFEST"
+  CURRENT_TMP=""
+}
+
+assert_no_symlink_chain() {
+  local path="$1"
+  local current="/"
+  local component
+  local -a components
+  IFS='/' read -r -a components <<< "${path#/}"
+  for component in "${components[@]}"; do
+    [[ -n "$component" ]] || continue
+    current="${current%/}/$component"
+    [[ ! -L "$current" ]] || fail "refusing symbolic-link installed path component: $current"
+  done
+}
+
+verify_installed_file() {
+  local path="$1"
+  local expected_mode="$2"
+  assert_no_symlink_chain "$path"
+  [[ -f "$path" && ! -L "$path" && -O "$path" ]] || \
+    fail "installed payload is missing, foreign, or not a regular file: $path"
+  local actual_mode
+  actual_mode="$(stat -c '%a' -- "$path")"
+  [[ "$actual_mode" == "$expected_mode" ]] || \
+    fail "installed payload has unsafe mode $actual_mode (expected $expected_mode): $path"
+}
+
+verify_installed_payload() {
+  require_command sha256sum "SHA-256 payload verification"
+  verify_installed_file "$AGENT_TARGET" 700
+  verify_installed_file "$RELAY_TARGET" 700
+  verify_installed_file "$FALLBACK_TARGET" 700
+  verify_installed_file "$CONTROLLER_TARGET" 700
+  verify_installed_file "$UNIT_TARGET" 600
+  verify_installed_file "$ENV_TARGET" 600
+  verify_installed_file "$INSTALL_MANIFEST" 600
+  local expected actual
+  expected="$(installed_manifest_content)"
+  actual="$(< "$INSTALL_MANIFEST")"
+  [[ "$actual" == "$expected" ]] || \
+    fail "installed JK Bridge payload differs from its install manifest; rerun reviewed install before lifecycle actions"
+}
+
+authorized_snapshot() {
+  if [[ -L "$SSH_KEYS" ]]; then
+    fail "authorized_keys cannot be a symbolic link"
+  elif [[ -e "$SSH_KEYS" ]]; then
+    [[ -f "$SSH_KEYS" && -O "$SSH_KEYS" ]] || fail "authorized_keys has an unsafe owner or type"
+    local record
+    record="$(sha256sum -- "$SSH_KEYS")"
+    printf '%s\n' "${record%% *}"
+  else
+    printf 'absent\n'
+  fi
+}
+
+run_systemctl() {
+  if (( DRY_RUN )); then
+    note "DRY-RUN systemctl --user $*"
+  else
+    systemctl --user "$@"
+  fi
+}
+
+confirm_install() {
+  (( DRY_RUN || ASSUME_YES )) && return
+  [[ -t 0 ]] || fail "install requires one confirmation; rerun interactively or pass --yes"
+  printf 'Install and enable JK Bridge Agent for user %s? [y/N] ' "$(id -un)" >&2
+  read -r answer
+  [[ "$answer" == "y" || "$answer" == "Y" ]] || fail "installation cancelled"
+}
+
+install_agent() {
+  preflight
+  confirm_install
+  note "No sudo/UAC action will be attempted; the service will run as $(id -un)."
+  local before
+  before="$(authorized_snapshot)"
+
+  assert_managed_or_absent "$AGENT_TARGET" "JK Bridge"
+  assert_managed_or_absent "$RELAY_TARGET" "JK Bridge"
+  assert_managed_or_absent "$FALLBACK_TARGET" "JK Bridge"
+  assert_managed_or_absent "$CONTROLLER_TARGET" "JK Bridge"
+  assert_managed_or_absent "$UNIT_TARGET" "Description=JK Bridge"
+  assert_managed_or_absent "$ENV_TARGET" "Managed by JK Bridge"
+  assert_managed_or_absent "$INSTALL_MANIFEST" "JK Bridge agentctl install manifest v1"
+  if [[ -e "$STATE_DIR/state.json" || -e "$STATE_DIR/services.json" ]]; then
+    [[ -f "$STATE_DIR/state.json" && -f "$STATE_DIR/services.json" ]] || \
+      fail "Agent state is incomplete; refusing to guess or overwrite it"
+  fi
+
+  install_directory "$TARGET_HOME/.local" 0700
+  install_directory "$TARGET_HOME/.local/lib" 0700
+  install_directory "$LIB_DIR" 0700
+  install_directory "$BIN_DIR" 0700
+  install_directory "$TARGET_HOME/.config" 0700
+  install_directory "$UNIT_DIR" 0700
+  install_directory "$ENV_DIR" 0700
+  install_directory "$TARGET_HOME/.local/state" 0700
+  install_directory "$STATE_DIR" 0700
+
+  atomic_install "$SOURCE_DIR/jkbridge_agent.py" "$AGENT_TARGET" 0700 "JK Bridge"
+  atomic_install "$SOURCE_DIR/jkbridge_relay.py" "$RELAY_TARGET" 0700 "JK Bridge"
+  atomic_install "$SOURCE_DIR/jkbridge-linux.py" "$FALLBACK_TARGET" 0700 "JK Bridge"
+  atomic_install "$SCRIPT_DIR/jkbridge-agentctl" "$CONTROLLER_TARGET" 0700 "JK Bridge"
+  atomic_install "$SCRIPT_DIR/jkbridge-agent.service" "$UNIT_TARGET" 0600 "Description=JK Bridge"
+  write_environment
+
+  if [[ ! -e "$STATE_DIR/state.json" && ! -e "$STATE_DIR/services.json" ]]; then
+    if (( DRY_RUN )); then
+      note "DRY-RUN bootstrap private Agent state and issue one admin enrollment code"
+    else
+      bootstrap=(
+        python3 "$AGENT_TARGET"
+        --state-dir "$STATE_DIR"
+        --authorized-keys "$SSH_KEYS"
+        bootstrap --code-ttl "$CODE_TTL"
+      )
+      if [[ -n "$SERVICES_FILE" ]]; then
+        bootstrap+=(--services-file "$SERVICES_FILE")
+      fi
+      "${bootstrap[@]}"
+    fi
+  elif [[ -f "$STATE_DIR/state.json" && -f "$STATE_DIR/services.json" ]]; then
+    note "Existing Agent state was preserved; no new enrollment code was issued."
+  else
+    fail "Agent state is incomplete; refusing to guess or overwrite it"
+  fi
+  local after
+  after="$(authorized_snapshot)"
+  [[ "$before" == "$after" ]] || fail "authorized_keys changed during installation; service was not enabled"
+  write_install_manifest
+  if (( ! DRY_RUN )); then
+    verify_installed_payload
+  fi
+  run_systemctl daemon-reload
+  run_systemctl enable --now jkbridge-agent.service
+  note "JK Bridge Agent installation completed. authorized_keys was not changed."
+}
+
+agent_status() {
+  if [[ -x "$AGENT_TARGET" && ! -L "$AGENT_TARGET" && -f "$STATE_DIR/state.json" && -f "$STATE_DIR/services.json" ]]; then
+    python3 "$AGENT_TARGET" \
+      --state-dir "$STATE_DIR" \
+      --authorized-keys "$SSH_KEYS" \
+      status
+  else
+    note "Agent state is not initialized at $STATE_DIR."
+  fi
+}
+
+case "$COMMAND" in
+  preflight)
+    preflight
+    ;;
+  install)
+    install_agent
+    ;;
+  start)
+    require_command systemctl "systemd user-service support"
+    verify_installed_payload
+    run_systemctl start jkbridge-agent.service
+    ;;
+  stop)
+    require_command systemctl "systemd user-service support"
+    verify_installed_payload
+    run_systemctl stop jkbridge-agent.service
+    note "Agent stopped. State, credentials, SSH keys, and one-shot fallback were preserved."
+    ;;
+  status)
+    require_command systemctl "systemd user-service support"
+    verify_installed_payload
+    if (( DRY_RUN )); then
+      note "DRY-RUN systemctl --user --no-pager status jkbridge-agent.service"
+    else
+      systemctl --user --no-pager status jkbridge-agent.service || true
+    fi
+    agent_status
+    ;;
+  fallback)
+    require_command systemctl "systemd user-service support"
+    verify_installed_payload
+    run_systemctl stop jkbridge-agent.service
+    note "Agent stopped without deleting state or any SSH entry."
+    if [[ -x "$FALLBACK_TARGET" && ! -L "$FALLBACK_TARGET" ]]; then
+      note "Use the retained one-shot fallback when Windows requests pairing:"
+      note "  python3 $FALLBACK_TARGET pair"
+    else
+      fail "the retained one-shot helper is missing: $FALLBACK_TARGET"
+    fi
+    ;;
+esac

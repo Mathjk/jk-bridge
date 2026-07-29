@@ -8,7 +8,8 @@ permissions:
   contents: read
 
 jobs:
-  test:
+  verify:
+    name: Source, security, and release verification
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v7
@@ -21,9 +22,40 @@ jobs:
         run: ./scripts/check-public-release.sh
       - name: Documentation link check
         run: ./scripts/check-doc-links.sh
-      - name: Linux helper tests
+      - name: Agent package contract check
+        run: ./scripts/check-agent-package.sh
+      - name: Python helper and Agent tests
         run: python3 -m unittest discover -s tests/linux -p 'test_*.py'
+      - name: Agent security regression tests
+        run: python3 -m unittest discover -s tests/security -p 'test_*.py' -v
+      - name: Portable service-profile privacy tests
+        run: dotnet test JKBridge.slnx -c Release --nologo --filter FullyQualifiedName~ServiceProfileTests
       - name: .NET tests
-        run: dotnet test JKBridge.slnx -c Release --nologo
+        run: dotnet test JKBridge.slnx -c Release --no-restore --nologo
       - name: Release build with warnings as errors
         run: dotnet build JKBridge.slnx -c Release --no-restore --nologo -warnaserror
+
+  installer-compile:
+    name: Compile unsigned Windows installer
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-dotnet@v5
+        with:
+          global-json-file: global.json
+      - name: Install Inno Setup compiler
+        shell: pwsh
+        run: choco install innosetup --yes --no-progress
+      - name: Build with warnings as errors
+        shell: pwsh
+        run: dotnet build JKBridge.slnx -c Release --nologo -warnaserror
+      - name: Compile installer without signing credentials
+        shell: pwsh
+        run: .\scripts\build-installer.ps1
+      - uses: actions/upload-artifact@v7
+        with:
+          name: JKBridge-Setup-win-x64-unsigned
+          path: |
+            artifacts/installer/output/*.exe
+            artifacts/installer/output/*.sha256
+          if-no-files-found: error

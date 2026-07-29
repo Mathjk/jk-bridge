@@ -30,6 +30,17 @@
   <img src="docs/images/device-setup.png" width="900" alt="JK Bridge device setup screen">
 </p>
 
+> [!NOTE]
+> The latest stable release is **v2.1.0**. It is a portable ZIP and uses the
+> one-shot `jkbridge-linux.py` helper; it does not install or require a
+> persistent Linux daemon. This repository also contains **unreleased 2.2.0
+> (vNext) development scaffolding** for a simpler route editor, non-secret
+> service profiles, a Windows installer, and an optional no-AI Linux Agent. Those vNext pieces are
+> not a released end-to-end Agent workflow. A locally built EXE, ZIP, or
+> installer carrying `2.2.0` is a development/acceptance artifact, not a stable
+> Release. Unless a section explicitly says vNext/2.2.0 development, the
+> instructions below describe v2.1.0.
+
 ## Why JK Bridge?
 
 Overleaf, GPU dashboards, Jupyter, and other self-hosted tools are often safest when they listen only on Linux `127.0.0.1`. That also makes them inconvenient to open from a Windows computer.
@@ -135,6 +146,29 @@ These entries are editable. Nothing is bound to the public internet or ordinary 
 
 Each service's SSH forward, browser URL, health target, and Linux authorization port come from one loopback route. For self-signed HTTPS, choose **TCP connect** health in the Services editor. Health warnings remain visible, but they no longer block browser launch after the SSH forward exists.
 
+### Understand the two ports
+
+The Windows and Linux ports do not have to match. In this example, JK Bridge
+listens only on Windows loopback port `8080` and forwards it to Linux loopback
+port `80`:
+
+```text
+browser opens http://127.0.0.1:8080/project
+                Windows localPort 8080
+                         -> Linux remotePort 80
+```
+
+The browser URL always uses the **Windows local port**. Its scheme and path may
+be different service choices, such as `https` and `/login`, but the host remains
+exactly `127.0.0.1`. JK Bridge is a TCP forward: it does not rewrite redirects
+returned by the web app or make a certificate issued for another hostname valid
+for `127.0.0.1`.
+
+In released v2.1.0, review the local port, Linux destination port, and loopback
+URL together in the Services editor. The vNext editor under development can
+derive the URL from protocol + Windows port + launch path, preview the complete
+mapping, and keep an explicit loopback URL as an advanced option.
+
 ## After the first setup
 
 | Situation | What to do |
@@ -148,6 +182,73 @@ Each service's SSH forward, browser URL, health target, and Linux authorization 
 | Upgrade from v2.0.x to v2.1 | Start the new app and re-pair once when prompted to establish a verifiable port-authorization receipt |
 
 Pairing updates only the JK Bridge-managed line in `~/.ssh/authorized_keys` and first backs up the file under `~/.ssh/jkbridge-backups/`.
+
+## Unreleased 2.2.0/vNext migration and optional Agent status
+
+The intended future new-device flow is `sign in to Tailscale -> install JK
+Bridge -> add this computer -> synchronize services -> connect`, after a one-time
+Linux Agent installation. The optional `jkbridge-agent` is designed as an
+ordinary deterministic Linux program: it has no AI, model API, Codex, or cloud
+runtime dependency. SSH remains the restricted data plane, and every Windows
+computer keeps an independent key that can be revoked without affecting another
+computer.
+
+That flow is **not complete or released yet**:
+
+- the repository has a simple/advanced route-editor implementation and tests,
+  but it is vNext code rather than v2.1.0 behavior;
+- the vNext app now has native Service Profile export plus a read-only import
+  preview and explicit confirmation step; this UI has not shipped in v2.1.0 or
+  completed clean-Windows acceptance;
+- an Inno Setup installer skeleton can be built on Windows, but no installer is
+  a stable Release asset and it has not completed clean-machine acceptance or
+  code signing;
+- a development Linux Agent, hardened user-unit/environment packaging assets,
+  package checks, a sibling loopback-relay helper, and a wired Windows
+  enrollment/management client exist in the source tree, but the systemd
+  lifecycle has not been live-accepted and no stable Agent release or completed
+  interoperability/revocation sign-off exists;
+- any enrolled vNext device can manually synchronize its service selection
+  through authenticated `/v1/me` plus `/v1/services`; an administrator can also
+  list all devices and revoke a selected non-current device after explicit
+  confirmation, and can generate a transient 10-minute, one-use code for adding
+  one ordinary device. The first administrator still uses the code printed by
+  Linux bootstrap/recovery;
+- a bounded, read-only discovery engine exists and tests only known online
+  Tailscale peers on port `45871`, checking node ID, MagicDNS identity, tailnet,
+  protocol, and Agent version. The vNext Setup page now exposes this only after
+  an explicit **Discover Agent** action. One result is preselected but not used;
+  multiple results require a choice, and **Use selected address** is always a
+  separate action. Discovery never enrolls a device, so a one-time code and an
+  explicit enrollment click are still required. This GUI has not completed
+  clean-Windows acceptance.
+
+The current vNext source also has an administrator-only **Linux reachable
+target** workflow. It first returns a read-only plan and probe, displays the
+normalized mapping and affected grants, and requires a separate confirmation
+before create/update/delete. Applying a current plan uses the packaged sibling
+`jkbridge_relay.py`, `/usr/bin/socat`, and per-user systemd units to expose only
+`127.0.0.1:<relayPort>` on Linux; it then updates the catalog and exact
+`permitopen` grants transactionally. This is a controlled TCP relay for one
+explicit host and port, not a SOCKS/general proxy. It is implemented and tested
+in source but still needs live Linux lifecycle and clean-Windows acceptance.
+
+Until those release gates are complete, use the one-shot helper for every new
+Windows computer. Do not copy a private key, authorization receipt, or whole
+`config.json` between computers. The vNext Service Profile UI transfers only
+non-secret service choices; importing it never authorizes Linux by itself. As a
+migration fallback, the 2.2.0 development importer can also validate an exact
+v2.1/schema-v3 `config.json` and project only its Services into the same preview.
+It discards every old device, server, identity-path, tailnet, behavior, and
+authorization field; never replace the new computer's configuration with the
+old file, and prefer the non-secret profile export when available.
+The one-shot path will remain the explicit setup and recovery fallback even
+after the Agent becomes available.
+
+The security contract and remaining release questions are tracked in the
+[vNext Agent protocol draft](docs/AGENT_PROTOCOL.md) and
+[Agent threat model](docs/AGENT_THREAT_MODEL.md). They are design and review
+documents, not stable installation instructions.
 
 ## Package contents
 
@@ -197,6 +298,7 @@ Read the full [security design](docs/SECURITY.md) and [pairing protocol](docs/PA
 | [Architecture](docs/ARCHITECTURE.md) | Maintainers and security reviewers |
 | [Security design](docs/SECURITY.md) | Administrators and reviewers |
 | [Pairing protocol](docs/PAIRING_PROTOCOL.md) | Implementers and protocol reviewers |
+| [Agent protocol draft](docs/AGENT_PROTOCOL.md) · [threat model](docs/AGENT_THREAT_MODEL.md) | vNext implementers and security reviewers; not stable installation instructions |
 | [Development guide](docs/DEVELOPMENT.md) | Contributors building and releasing the project |
 | [Windows acceptance checklist](docs/WINDOWS_ACCEPTANCE.md) | Release testers |
 

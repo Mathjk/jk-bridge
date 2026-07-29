@@ -169,16 +169,26 @@ public sealed class ConfigStore : IDisposable
                     cancellationToken)
                 .ConfigureAwait(false);
             var sourceSchema = config?.SchemaVersion;
-            var wasMigrated = sourceSchema is 1 or 2;
-            if (wasMigrated)
+            var wasMigrated = sourceSchema is 1 or 2 or 3;
+            config = sourceSchema switch
             {
-                config = config! with
+                1 => config! with
                 {
                     SchemaVersion = AppConfig.CurrentSchemaVersion,
-                    SetupCompleted = sourceSchema == 1 || config.SetupCompleted,
+                    SetupCompleted = true,
                     Authorization = new ForwardAuthorizationGrant(),
-                };
-            }
+                },
+                2 => config! with
+                {
+                    SchemaVersion = AppConfig.CurrentSchemaVersion,
+                    Authorization = new ForwardAuthorizationGrant(),
+                },
+                3 => config! with
+                {
+                    SchemaVersion = AppConfig.CurrentSchemaVersion,
+                },
+                _ => config,
+            };
 
             ConfigValidator.EnsureValid(config);
             return new(true, config, null, wasMigrated);

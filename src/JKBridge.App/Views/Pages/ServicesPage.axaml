@@ -59,7 +59,7 @@
                                         </Border>
                                         <Grid Grid.Row="1" Grid.Column="1" Grid.ColumnSpan="2"
                                               ColumnDefinitions="*,Auto,Auto" Margin="12,10,0,0">
-                                            <TextBlock Text="{Binding LocalUrl}" Classes="caption"
+                                            <TextBlock Text="{Binding BrowserUrlPreview}" Classes="caption"
                                                        VerticalAlignment="Center" TextTrimming="CharacterEllipsis" />
                                             <Button Grid.Column="1" Content="检查" Classes="ghost" Command="{Binding RetryCommand}" />
                                             <Button Grid.Column="2" Content="打开 ↗" Classes="ghost" Command="{Binding OpenCommand}"
@@ -78,7 +78,55 @@
                     <ScrollViewer HorizontalScrollBarVisibility="Disabled">
                         <StackPanel>
                             <TextBlock Text="编辑转发" Classes="section-title" />
-                            <TextBlock Text="保存后，活动隧道会安全重连一次。" Classes="page-subtitle" Margin="0,2,0,18" />
+                            <TextBlock Text="Windows 入口和 Linux 服务端口可以不同；保存后活动隧道会安全重连。"
+                                       Classes="page-subtitle" Margin="0,2,0,14" TextWrapping="Wrap" />
+
+                            <Border Classes="bridge-rail" Padding="14,12" Margin="0,0,0,16">
+                                <StackPanel Spacing="4">
+                                    <TextBlock Text="实时转发路径" Classes="eyebrow" />
+                                    <TextBlock Text="{Binding RoutePreview}" Classes="technical-strong"
+                                               TextWrapping="Wrap" />
+                                    <TextBlock Text="浏览器或软件只连接 Windows 本机，JK Bridge 再经 SSH + Tailscale 访问 Linux。"
+                                               Classes="caption" TextWrapping="Wrap" />
+                                </StackPanel>
+                            </Border>
+
+                            <Border Classes="card" Padding="12" Margin="0,0,0,16">
+                                <StackPanel>
+                                    <TextBlock Text="从模板填写" Classes="body-strong" />
+                                    <TextBlock Text="选择只显示预览；确认并点击应用后才会覆盖当前草稿，且仍需另行保存。"
+                                               Classes="caption" Margin="0,2,0,7" TextWrapping="Wrap" />
+                                    <ComboBox ItemsSource="{Binding ServiceTemplates}"
+                                              SelectedItem="{Binding SelectedTemplate}"
+                                              Classes="field" PlaceholderText="选择 Overleaf、Sub2API 或通用模板">
+                                        <ComboBox.ItemTemplate>
+                                            <DataTemplate x:DataType="vm:ServiceTemplateOptionViewModel">
+                                                <StackPanel Margin="0,3">
+                                                    <TextBlock Text="{Binding DisplayName}" Classes="body-strong" />
+                                                    <TextBlock Text="{Binding Summary}" Classes="caption" />
+                                                </StackPanel>
+                                            </DataTemplate>
+                                        </ComboBox.ItemTemplate>
+                                    </ComboBox>
+                                    <Grid ColumnDefinitions="*,Auto" Margin="0,8,0,0"
+                                          IsVisible="{Binding HasSelectedTemplate}">
+                                        <StackPanel>
+                                            <Grid ColumnDefinitions="Auto,*">
+                                                <ToggleSwitch IsChecked="{Binding TemplateApplyConfirmed}" />
+                                                <TextBlock Grid.Column="1" Text="确认覆盖当前未保存草稿"
+                                                           Classes="body" Margin="8,0,0,0"
+                                                           VerticalAlignment="Center" />
+                                            </Grid>
+                                            <TextBlock Text="{Binding TemplateApplyFeedback}" Classes="caption"
+                                                       Margin="0,3,10,0" TextWrapping="Wrap" />
+                                        </StackPanel>
+                                        <Button Grid.Column="1" Content="应用到草稿" Classes="ghost"
+                                                Command="{Binding ApplySelectedTemplateCommand}"
+                                                IsEnabled="{Binding CanApplySelectedTemplate}"
+                                                VerticalAlignment="Center" />
+                                    </Grid>
+                                </StackPanel>
+                            </Border>
 
                             <TextBlock Text="服务名称" Classes="body-strong" Margin="0,0,0,6" />
                             <TextBox Text="{Binding Name}" Classes="field" PlaceholderText="例如 Overleaf" />
@@ -88,28 +136,143 @@
 
                             <Grid ColumnDefinitions="*,14,*" Margin="0,14,0,0">
                                 <StackPanel>
-                                    <TextBlock Text="Windows 本地端口" Classes="body-strong" Margin="0,0,0,6" />
+                                    <TextBlock Text="Windows 访问端口" Classes="body-strong" Margin="0,0,0,6" />
                                     <TextBox Text="{Binding LocalPortText}" Classes="field technical" />
+                                    <TextBlock Text="浏览器和软件在这台 Windows 上使用"
+                                               Classes="caption" Margin="0,5,0,0" TextWrapping="Wrap" />
                                 </StackPanel>
                                 <StackPanel Grid.Column="2">
-                                    <TextBlock Text="Linux 远端端口" Classes="body-strong" Margin="0,0,0,6" />
+                                    <TextBlock Text="Linux 服务端口" Classes="body-strong" Margin="0,0,0,6" />
                                     <TextBox Text="{Binding RemotePortText}" Classes="field technical" />
+                                    <TextBlock Text="最终连接 Linux 的 127.0.0.1 端口"
+                                               Classes="caption" Margin="0,5,0,0" TextWrapping="Wrap" />
                                 </StackPanel>
                             </Grid>
 
-                            <TextBlock Text="浏览器地址" Classes="body-strong" Margin="0,14,0,6" />
-                            <TextBox Text="{Binding LocalUrl}" Classes="field technical" />
+                            <Border Classes="issue-banner"
+                                    Classes.warning="{Binding HasLocalPortConflict}"
+                                    Margin="0,10,0,0" Padding="12,10">
+                                <Grid ColumnDefinitions="*,Auto">
+                                    <StackPanel>
+                                        <TextBlock Text="Windows 端口检查" Classes="body-strong" />
+                                        <TextBlock Text="{Binding LocalPortAvailabilityHint}" Classes="caption"
+                                                   Margin="0,2,0,0" TextWrapping="Wrap" />
+                                    </StackPanel>
+                                    <Button Grid.Column="1" Content="{Binding SuggestedLocalPortText}"
+                                            Classes="ghost" Command="{Binding ApplySuggestedLocalPortCommand}"
+                                            IsVisible="{Binding HasSuggestedLocalPort}"
+                                            VerticalAlignment="Center" Margin="10,0,0,0" />
+                                </Grid>
+                            </Border>
 
-                            <TextBlock Text="健康检查方式" Classes="body-strong" Margin="0,14,0,6" />
-                            <ComboBox SelectedIndex="{Binding HealthModeIndex}" Classes="field">
-                                <ComboBoxItem Content="TCP 端口（适合自签名 HTTPS）" />
-                                <ComboBoxItem Content="HTTP 状态码" />
-                                <ComboBoxItem Content="JSON ok=true" />
-                            </ComboBox>
-                            <TextBlock Text="健康检查只用于提示，不再阻止浏览器打开已建立的转发。"
-                                       Classes="caption" Margin="0,5,0,0" />
+                            <Grid ColumnDefinitions="0.42*,14,*" Margin="0,14,0,0">
+                                <StackPanel>
+                                    <TextBlock Text="访问协议" Classes="body-strong" Margin="0,0,0,6" />
+                                    <ComboBox SelectedIndex="{Binding ProtocolIndex}" Classes="field"
+                                              IsEnabled="{Binding UsesGeneratedUrl}">
+                                        <ComboBoxItem Content="HTTP" />
+                                        <ComboBoxItem Content="HTTPS" />
+                                    </ComboBox>
+                                </StackPanel>
+                                <StackPanel Grid.Column="2">
+                                    <TextBlock Text="打开路径" Classes="body-strong" Margin="0,0,0,6" />
+                                    <TextBox Text="{Binding LaunchPath}" Classes="field technical"
+                                             IsEnabled="{Binding UsesGeneratedUrl}"
+                                             PlaceholderText="例如 /project 或 /#/login" />
+                                </StackPanel>
+                            </Grid>
+
+                            <TextBlock Text="打开网址预览" Classes="body-strong" Margin="0,14,0,6" />
+                            <Border Classes="code-chip" Padding="10,8">
+                                <Grid ColumnDefinitions="*,Auto">
+                                    <TextBlock Text="{Binding BrowserUrlPreview}" Classes="technical-strong"
+                                               VerticalAlignment="Center" TextWrapping="Wrap" />
+                                    <Button Grid.Column="1" Content="复制" Classes="ghost"
+                                            Command="{Binding CopyAddressCommand}" Margin="8,0,0,0" />
+                                </Grid>
+                            </Border>
+                            <TextBlock Text="{Binding BrowserUrlValidationHint}"
+                                       Classes="caption" Margin="0,5,0,0" TextWrapping="Wrap" />
+
+                            <Border Classes="issue-banner"
+                                    Classes.warning="{Binding RequiresLinuxReauthorization}"
+                                    Margin="0,14,0,0" Padding="12,10">
+                                <StackPanel>
+                                    <TextBlock Text="端口授权" Classes="body-strong" />
+                                    <TextBlock Text="{Binding ReauthorizationHint}" Classes="caption"
+                                               Margin="0,2,0,0" TextWrapping="Wrap" />
+                                </StackPanel>
+                            </Border>
+
+                            <Grid ColumnDefinitions="*,Auto" Margin="0,16,0,0">
+                                <StackPanel>
+                                    <TextBlock Text="高级设置" Classes="body-strong" />
+                                    <TextBlock Text="完整网址与健康检查；通常不需要修改"
+                                               Classes="caption" />
+                                </StackPanel>
+                                <ToggleSwitch Grid.Column="1" IsChecked="{Binding IsAdvanced}"
+                                              VerticalAlignment="Center" />
+                            </Grid>
+
+                            <StackPanel IsVisible="{Binding IsAdvanced}" Margin="0,12,0,0">
+                                <Grid ColumnDefinitions="*,Auto">
+                                    <StackPanel>
+                                        <TextBlock Text="手动设置完整网址" Classes="body-strong" />
+                                        <TextBlock Text="仍只允许相同 Windows 端口上的 127.0.0.1 地址"
+                                                   Classes="caption" TextWrapping="Wrap" />
+                                    </StackPanel>
+                                    <ToggleSwitch Grid.Column="1" IsChecked="{Binding UseCustomUrl}"
+                                                  VerticalAlignment="Center" />
+                                </Grid>
+                                <TextBox Text="{Binding LocalUrl}" Classes="field technical"
+                                         IsEnabled="{Binding UseCustomUrl}" Margin="0,7,0,0" />
+
+                                <Grid ColumnDefinitions="*,Auto" Margin="0,14,0,0">
+                                    <StackPanel>
+                                        <TextBlock Text="独立健康检查路径" Classes="body-strong" />
+                                        <TextBlock Text="默认从打开网址推导；查询参数和 # 片段不会发送给服务"
+                                                   Classes="caption" TextWrapping="Wrap" />
+                                    </StackPanel>
+                                    <ToggleSwitch Grid.Column="1" IsChecked="{Binding UseCustomHealthPath}"
+                                                  VerticalAlignment="Center" />
+                                </Grid>
+                                <TextBox Text="{Binding HealthPathText}" Classes="field technical"
+                                         IsEnabled="{Binding UseCustomHealthPath}" Margin="0,7,0,0"
+                                         PlaceholderText="例如 /api/health" />
+                                <TextBlock Text="{Binding HealthPathValidationHint}"
+                                           Classes="caption" Margin="0,5,0,0" TextWrapping="Wrap" />
+
+                                <TextBlock Text="健康检查方式" Classes="body-strong" Margin="0,14,0,6" />
+                                <ComboBox SelectedIndex="{Binding HealthModeIndex}" Classes="field">
+                                    <ComboBoxItem Content="TCP 端口（适合自签名 HTTPS）" />
+                                    <ComboBoxItem Content="HTTP 状态码" />
+                                    <ComboBoxItem Content="JSON ok=true" />
+                                </ComboBox>
+                                <TextBlock Text="{Binding HealthModeExplanation}"
+                                           Classes="caption" Margin="0,5,0,0" TextWrapping="Wrap" />
+                                <TextBlock Text="健康检查只用于提示，不再阻止浏览器打开已建立的转发。"
+                                           Classes="caption" Margin="0,3,0,0" TextWrapping="Wrap" />
+
+                                <Border Classes="issue-banner warning" Margin="0,10,0,0"
+                                        IsVisible="{Binding IsHttps}" Padding="12,10">
+                                    <StackPanel>
+                                        <TextBlock Text="HTTPS、证书与 SNI" Classes="body-strong" />
+                                        <TextBlock Text="{Binding HttpsCompatibilityHint}" Classes="caption"
+                                                   Margin="0,2,0,0" TextWrapping="Wrap" />
+                                    </StackPanel>
+                                </Border>
+
+                                <Border Classes="issue-banner" Margin="0,10,0,0" Padding="12,10">
+                                    <StackPanel>
+                                        <TextBlock Text="网页跳转" Classes="body-strong" />
+                                        <TextBlock Text="相对跳转仍会经过本机隧道；跳到原始 10.x 地址或原始主机名的绝对网址会绕开 127.0.0.1。JK Bridge 不会改写重定向、Cookie、CORS 或 WebSocket 地址。"
+                                                   Classes="caption" Margin="0,2,0,0" TextWrapping="Wrap" />
+                                    </StackPanel>
+                                </Border>
+                            </StackPanel>
+
                             <TextBlock Text="{Binding #ServicesRoot.DataContext.ServiceFeedback}"
-                                       Classes="caption" Margin="0,5,0,0" />
+                                       Classes="caption" Margin="0,10,0,0" TextWrapping="Wrap" />
 
                             <Grid ColumnDefinitions="*,Auto" Margin="0,18,0,0">
                                 <StackPanel>

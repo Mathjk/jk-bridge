@@ -21,7 +21,7 @@ RG_BASE=(
 
 PUBLIC_PATHS=(
   README.md README.zh-CN.md CONTRIBUTING.md SECURITY.md CHANGELOG.md
-  docs scripts src .github
+  docs scripts src packaging .github
 )
 
 failed=0
@@ -51,10 +51,13 @@ check_public_sources() {
 check_all 'Private-key material' '-----BEGIN (?:OPENSSH |RSA |EC |DSA )?PRIVATE KEY-----'
 check_all 'Known credential format' '(?:tskey-(?:auth|client|api)-[A-Za-z0-9_-]{16,}|github_pat_[A-Za-z0-9_]{20,}|gh[pousr]_[A-Za-z0-9]{20,}|AKIA[0-9A-Z]{16})'
 check_all 'Likely hard-coded secret' '(?i)(?:password|passwd|client_secret|access_token|api_key)\s*[:=]\s*["'"'][^"'"'\r\n]{8,}["'"']'
-check_all 'Machine-specific Linux home path' '(?<![A-Za-z0-9_])/home/[A-Za-z0-9._-]+/'
-check_all 'Machine-specific Windows profile path' '(?i)[A-Z]:\\Users\\(?!Public(?:\\|$)|Default(?:\\|$))[^%<>{}\\/\s]+\\'
+check_public_sources 'Machine-specific Linux home path' '(?<![A-Za-z0-9_])/home/[A-Za-z0-9._-]+/'
+check_public_sources 'Machine-specific Windows profile path' '(?i)[A-Z]:\\Users\\(?!Public(?:\\|$)|Default(?:\\|$))[^%<>{}\\/\s]+\\'
 check_public_sources 'Generated Tailscale tailnet suffix' '(?i)\btail[a-f0-9]{6,}\.ts\.net\b'
 check_public_sources 'Embedded valid Ed25519 public key' 'ssh-ed25519\s+AAAAC3NzaC1lZDI1NTE5AAAAI[A-Za-z0-9+/]{42}[A-Za-z0-9+/=]'
+check_public_sources 'Concrete pairing token in URI' "(?i)jkbridge://[^[:space:]\"'<>]+\\?token=[A-Za-z0-9_-]{32,}"
+check_public_sources 'Literal recovery or device credential' '(?i)"(?:bootstrapCredential|deviceCredential|enrollmentCredential|pairingToken|recoveryCode)"\s*:\s*"[A-Za-z0-9_-]{24,}"'
+check_public_sources 'Literal JK Bridge authorization credential' '(?i)(?:authorization\s*:\s*)?(?:bearer|jkbridge-(?:device|enrollment))\s+[A-Za-z0-9_-]{24,}'
 
 tailscale_ips="$(rg "${RG_BASE[@]}" --pcre2 -- '(?<![0-9])100\.(?:6[4-9]|[7-9][0-9]|1[01][0-9]|12[0-7])(?:\.[0-9]{1,3}){2}(?![0-9])' "${PUBLIC_PATHS[@]}" 2>/dev/null || true)"
 tailscale_ips="$(printf '%s\n' "$tailscale_ips" | grep -Ev '100\.64\.0\.(0|10)(/10)?' || true)"
@@ -70,7 +73,23 @@ while IFS= read -r path; do
   esac
   printf '\n[Runtime or credential file present] %s\n' "$path" >&2
   failed=1
-done < <(find . -type f \( -name 'config.json' -o -name 'known_hosts' -o -name '*.pem' -o -name '*.pfx' -o -name 'id_rsa' -o -name 'id_ed25519' \) -print)
+done < <(find . -type f \( \
+  -name 'config.json' -o \
+  -name 'known_hosts' -o \
+  -name '*.pem' -o \
+  -name '*.pfx' -o \
+  -name 'id_rsa' -o \
+  -name 'id_ed25519' -o \
+  -name 'state.json' -o \
+  -name 'state.json.*' -o \
+  -name '.transaction.json' -o \
+  -name 'devices.json' -o \
+  -name 'credentials.json' -o \
+  -name 'bootstrap.json' -o \
+  -name 'recovery.json' -o \
+  -name 'server-secret' -o \
+  -name 'server-secret.*' \
+\) -print)
 
 if (( failed != 0 )); then
   printf '\nPublic-release scan FAILED. Remove or replace every reported value before publishing.\n' >&2

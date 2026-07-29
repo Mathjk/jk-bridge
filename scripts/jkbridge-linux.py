@@ -37,6 +37,7 @@ MAX_REQUEST_BYTES = 64 * 1024
 MAX_PORTS = 32
 MANAGED_COMMENT = "JK Bridge managed"
 LEGACY_MANAGED_COMMENT = "JK Bridge dedicated tunnel key"
+AGENT_MANAGED_COMMENT = "JK Bridge agent"
 TAILSCALE_IPV4 = ipaddress.ip_network("100.64.0.0/10")
 TAILSCALE_IPV6 = ipaddress.ip_network("fd7a:115c:a1e0::/48")
 SSH_USER_PATTERN = re.compile(r"^[A-Za-z_][A-Za-z0-9_.-]{0,63}$")
@@ -146,6 +147,35 @@ def is_legacy_managed_authorized_line(line: str, public_key: str) -> bool:
     )
 
 
+def is_agent_managed_authorized_line(
+    line: str, public_key: str, fingerprint: str
+) -> bool:
+    """Recognize only the canonical per-device line emitted by the Agent.
+
+    This permits a stopped Agent deployment to fall back to one-shot pairing
+    with the same Windows key. A marker alone, wildcard grant, altered option,
+    or malformed device id is never sufficient.
+    """
+
+    marker = " {} {} ".format(public_key, AGENT_MANAGED_COMMENT)
+    value = line.strip()
+    if marker not in value:
+        return False
+    comment = value.rsplit(marker, 1)[1].split()
+    if (
+        len(comment) != 2
+        or not re.fullmatch(r"[0-9a-f]{32}", comment[0])
+        or comment[1] != fingerprint
+    ):
+        return False
+    return _is_exact_restricted_entry(
+        line,
+        public_key,
+        AGENT_MANAGED_COMMENT + " " + comment[0] + " " + fingerprint,
+        allow_wildcard=False,
+    )
+
+
 def _assert_safe_ssh_paths(home: Path) -> Path:
     home = home.resolve(strict=True)
     ssh_dir = home / ".ssh"
@@ -217,7 +247,11 @@ def _open_lock(path: Path):
     except OSError as exc:
         raise PairingError("The JK Bridge SSH lock file is unsafe or unavailable.") from exc
     metadata = os.fstat(descriptor)
-    if metadata.st_uid != os.getuid() or not stat.S_ISREG(metadata.st_mode):
+    if (
+        metadata.st_uid != os.getuid()
+        or not stat.S_ISREG(metadata.st_mode)
+        or metadata.st_nlink != 1
+    ):
         os.close(descriptor)
         raise PairingError("The JK Bridge SSH lock file has an unsafe owner or type.")
     os.fchmod(descriptor, 0o600)
@@ -255,7 +289,10 @@ def install_authorized_key(home: Path, public_key: str, ports: Sequence[int]) ->
             existing_is_legacy = is_legacy_managed_authorized_line(
                 lines[index], normalized
             )
-            if not existing_is_managed and not existing_is_legacy:
+            existing_is_agent = is_agent_managed_authorized_line(
+                lines[index], normalized, fingerprint
+            )
+            if not existing_is_managed and not existing_is_legacy and not existing_is_agent:
                 raise PairingError(
                     "The same public key already exists outside a JK Bridge managed entry. "
                     "Generate a different Windows identity key instead of adding a restricted duplicate."

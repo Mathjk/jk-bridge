@@ -7,11 +7,42 @@ on:
       - 'v*'
 
 permissions:
-  contents: write
+  contents: read
 
 jobs:
-  package:
+  verify:
+    name: Source and security release gate
     runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+      - name: Install release-scan dependency
+        run: sudo apt-get update && sudo apt-get install --yes ripgrep
+      - uses: actions/setup-dotnet@v5
+        with:
+          global-json-file: global.json
+      - name: Public-release privacy scan
+        run: ./scripts/check-public-release.sh
+      - name: Documentation link check
+        run: ./scripts/check-doc-links.sh
+      - name: Agent package contract check
+        run: ./scripts/check-agent-package.sh
+      - name: Python helper and Agent tests
+        run: python3 -m unittest discover -s tests/linux -p 'test_*.py'
+      - name: Agent security regression tests
+        run: python3 -m unittest discover -s tests/security -p 'test_*.py' -v
+      - name: Portable service-profile privacy tests
+        run: dotnet test JKBridge.slnx -c Release --nologo --filter FullyQualifiedName~ServiceProfileTests
+      - name: .NET tests
+        run: dotnet test JKBridge.slnx -c Release --no-restore --nologo
+      - name: Release build with warnings as errors
+        run: dotnet build JKBridge.slnx -c Release --no-restore --nologo -warnaserror
+
+  portable-package:
+    name: Build portable Windows ZIP
+    needs: verify
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
     steps:
       - uses: actions/checkout@v7
       - name: Install release-scan dependency
@@ -36,3 +67,29 @@ jobs:
           files: |
             artifacts/JKBridge-win-x64.zip
             artifacts/JKBridge-win-x64.zip.sha256
+
+  installer-package:
+    name: Compile optional unsigned Windows installer
+    needs: verify
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-dotnet@v5
+        with:
+          global-json-file: global.json
+      - name: Install Inno Setup compiler
+        shell: pwsh
+        run: choco install innosetup --yes --no-progress
+      - name: Build with warnings as errors
+        shell: pwsh
+        run: dotnet build JKBridge.slnx -c Release --nologo -warnaserror
+      - name: Compile installer without signing credentials
+        shell: pwsh
+        run: .\scripts\build-installer.ps1
+      - uses: actions/upload-artifact@v7
+        with:
+          name: JKBridge-Setup-win-x64-unsigned
+          path: |
+            artifacts/installer/output/*.exe
+            artifacts/installer/output/*.sha256
+          if-no-files-found: error

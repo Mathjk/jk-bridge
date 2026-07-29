@@ -1,5 +1,10 @@
 # Windows 11 Acceptance Checklist
 
+The checklist through **Privacy and logs** is the released v2.1 portable-client
+baseline. The final **unreleased 2.2.0/vNext release gates** section covers development targets.
+Unchecked vNext items are requirements, not evidence that an installer, Linux
+Agent, enrollment workflow, or Service Profile UI currently ships.
+
 ## Packaging
 
 - [ ] Verify `JKBridge-win-x64.zip` against the detached `JKBridge-win-x64.zip.sha256` before extraction.
@@ -88,3 +93,107 @@
 - [ ] Config writes recover from interruption using the valid backup.
 - [ ] Log rotation honors the size and retention caps.
 - [ ] Public-release scan finds no real machine names, tailnet suffixes, user paths, generated keys, pairing tokens, credentials, runtime configuration, or logs.
+
+## Unreleased 2.2.0/vNext release gates — not part of v2.1.0
+
+Do not publish an installer or describe Agent enrollment as stable until every
+applicable item below has passed on disposable, clean Windows machines and a
+test Linux node. Each Windows test device must use a unique identity.
+
+### Current source inventory — not acceptance evidence
+
+The development tree currently contains the following implementations and
+automated tests. This list explains what can be exercised; it does **not** mark
+any unchecked live gate below as passed:
+
+- Windows Agent enrollment, authenticated self/catalog synchronization,
+  administrator device listing/revocation, and administrator-generated
+  10-minute one-use ordinary-device codes are wired to the Setup page.
+- The administrator relay panel is wired for read-only plan/probe, preview,
+  separate confirmation, apply, read-only delete-plan, and confirmed delete.
+  The Agent coordinates `jkbridge_relay.py`, `socat`, per-user systemd units,
+  catalog revisions, and exact device grants.
+- A bounded read-only Agent discovery engine, controller integration, and Setup
+  candidate/selection controls exist. A single result is only preselected;
+  **Use selected address** remains explicit, and discovery never enrolls.
+- Linux package assets and automated package checks exist, but there is no
+  completed real-user systemd lifecycle run. The installer and all vNext
+  Windows flows still require disposable clean-Windows acceptance.
+
+### Clean Windows installer
+
+- [ ] Build the Inno Setup skeleton on Windows with the documented build script; verify the produced installer and detached SHA-256 before execution.
+- [ ] On a clean Windows 11 x64 user profile with no .NET runtime, install per-user without requiring administrator rights for JK Bridge files and launch the self-contained app.
+- [ ] With both prerequisites present, the installer reports Tailscale and `ssh.exe`/`ssh-keygen.exe` detected and performs no elevation.
+- [ ] With Tailscale absent, the installer offers only the official download page; it neither downloads an unpinned executable nor attempts Tailscale login.
+- [ ] With OpenSSH Client absent, accepting the optional-feature action produces one clear UAC prompt and verifies both required executables afterward.
+- [ ] Canceling or denying OpenSSH UAC leaves JK Bridge installed, reports the missing prerequisite, and does not loop, roll back unrelated files, or claim readiness.
+- [ ] Silent install never opens an external URL, installs a Windows capability, or triggers an elevation prompt.
+- [ ] Installer startup-task selection creates only the current-user Run entry; uninstall removes only installer-owned binaries, shortcuts, and that exact entry.
+- [ ] Portable ZIP and installer can coexist for release testing without sharing a running instance or overwriting an unrelated directory.
+- [ ] Code-signed installer, EXE, and uninstaller verify with an accepted timestamp before the installer is promoted from development artifact to stable Release asset.
+
+### Simple route editor, templates, and port conflicts
+
+- [ ] Simple mode clearly labels **Windows access port** and **Linux service port** and previews `Windows 127.0.0.1:<local> -> Linux 127.0.0.1:<remote>`.
+- [ ] Protocol + Windows local port + launch path generates an exact `http(s)://127.0.0.1:<local>/...` URL and preserves query and fragment components.
+- [ ] Overleaf, Sub2API, generic HTTP, and generic HTTPS templates materialize valid loopback routes with documented default ports and health modes.
+- [ ] Changing only Windows local port, protocol, launch path, or local preference does not request or manufacture a new Linux grant.
+- [ ] Adding, enabling, or changing a Linux remote port reports the exact authorization expansion and blocks until Agent authorization or one-shot re-pairing succeeds.
+- [ ] An occupied Windows local port identifies the conflict and suggests a free port, but does not terminate the owner or silently change the saved URL.
+- [ ] After the user accepts a suggested port, browser launch, health target, and SSH `-L` use that same local port while `permitopen` still names only the Linux remote port.
+- [ ] Advanced custom URLs accept only HTTP(S), exact `127.0.0.1`, and the selected local port; wildcard, LAN, public, credential-bearing, and mismatched-port URLs fail validation.
+
+### Non-secret Service Profile
+
+- [ ] Native save/open pickers export and select `.json` profiles without requiring PowerShell, and canceling either picker leaves configuration and files unchanged except for an export the user explicitly completed.
+- [ ] Export contains only the explicit service allow-list and never a private-key path/content, pairing token, Agent credential/reference, server identity, tailnet identity, or authorization receipt.
+- [ ] Import rejects unknown fields, unsupported versions, oversized documents, duplicate service IDs/local ports, non-loopback routes, unsafe URLs, and invalid health paths before mutation.
+- [ ] The legacy-import path accepts only an exact valid v2.1/schema-v3 `config.json`, identifies it separately from a Service Profile, and projects only Services; schema 1/2/4, mixed/unknown/duplicate/missing fields, server/tailnet/behavior data, key paths, Agent state, and authorization receipts never reach the candidate configuration.
+- [ ] Import previews additions, changes, removals, local conflicts, new Linux ports that require authorization, and stale ports whose grants should be contracted before enabling the apply action.
+- [ ] Applying requires a separate explicit confirmation after preview; canceling or declining changes nothing, while accepted import writes atomically with a recoverable backup and preserves all device/server-specific fields.
+- [ ] If local services change after preview, apply fails closed and requires a fresh preview instead of applying a stale diff.
+- [ ] Importing a profile never marks Agent enrollment or Linux authorization successful; a fresh device remains blocked until a verified Agent operation or one-shot pair returns its own receipt.
+
+### Optional no-AI Linux Agent enrollment
+
+- [ ] Package the existing versioned Linux Agent, per-user systemd unit, environment example, and operator guide; run their non-secret/least-privilege package check against the final delivery.
+- [ ] Live-test the packaged non-root systemd install, bootstrap, start, restart, login persistence, status, upgrade, rollback, disable, and uninstall paths before describing the source assets as a stable workflow.
+- [ ] The Agent runs without ChatGPT, Codex, a model API key, cloud inference, or any AI runtime and never sends runtime state to such a service.
+- [ ] The management listener binds only the selected Linux Tailscale IPv4, never `0.0.0.0`, ordinary LAN, public interfaces, or Tailscale Funnel.
+- [ ] A clean Windows computer with Tailscale signed in and OpenSSH available can choose **Add this computer**, validate a manually entered exact tailnet endpoint, create its own Ed25519 key, enroll, synchronize services, and connect without opening PowerShell or CMD.
+- [ ] On clean Windows, the explicit discovery action checks only current online peers from local Tailscale status on port `45871`, never scans a range, validates stable node ID/MagicDNS/tailnet/protocol/Agent version, preselects only one unambiguous result without using it, requires a user choice for multiple results, requires **Use selected address** in every case, and never enrolls by discovery alone. No-result, timeout, cancellation, and manual-endpoint fallback remain actionable and non-mutating.
+- [ ] Enrollment rejects an Agent endpoint outside `100.64.0.0/10`, redirects, proxies, unexpected peer identity, unknown protocol/catalog version, reused or expired enrollment secret, and any receipt/catalog port mismatch.
+- [ ] Windows stores the device credential only through the OS credential store; logs, diagnostics, clipboard state after completion, and `config.json` contain no reusable secret.
+- [ ] Two clean Windows devices enroll with different key fingerprints and independently listed device IDs while receiving only their exact manifest-derived `permitopen` ports.
+- [ ] An enrolled administrator can manually synchronize the catalog, refresh the full device list, and see stable device IDs, roles, fingerprints, service selection, revocation state, and current-device marking.
+- [ ] An enrolled administrator can explicitly generate a 10-minute, one-use code that enrolls only one ordinary device; the code is shown transiently with its expiry and is absent from configuration, logs, diagnostics, and persisted UI state.
+- [ ] Leaving Setup, expiry, and regeneration hide or replace the previous device code; successful consumption makes every reuse fail even if the administrator window still displays its transient copy. Clipboard copy occurs only on explicit user action, warns that Windows will not auto-clear the clipboard, and never copies an administrator recovery code.
+- [ ] A first administrator can be established only with Linux bootstrap/recovery, while an ordinary device cannot generate enrollment codes through either the UI or a direct API request.
+- [ ] Device-list and revoke controls remain unavailable to an ordinary device; ordinary-device synchronization uses authenticated `GET /v1/me` plus `/v1/services` and never requires or leaks the administrator-only device list.
+- [ ] Revocation requires selection plus an explicit confirmation, refuses Windows self-revocation, and cannot remove the final administrator through an alternate request path.
+- [ ] Revoking the second device removes only its managed key/credential; its next management request and new SSH connection fail, while the first device's tunnel and key remain usable.
+- [ ] The UI states that revocation cannot terminate an already established SSH session and provides an operator action for immediate session cutoff when required.
+- [ ] Stopping or uninstalling the Agent disables enrollment/synchronization but does not remove existing exact OpenSSH grants, stop application services, or break an already authorized reconnect.
+
+### Administrator-controlled Linux relays
+
+- [ ] Final Linux delivery includes executable sibling `jkbridge_relay.py`, verifies `/usr/bin/socat`, and installs the Agent with write access only to its state, managed SSH entries, and the current user's systemd unit directory; no root service is introduced.
+- [ ] A clean administrator Windows GUI can enter one service ID, Linux relay port, exact DNS-or-IPv4 target and TCP port, Windows local port, HTTP(S) choice, and launch path without using PowerShell/CMD.
+- [ ] **Generate plan and probe** is read-only: it creates no unit, catalog change, grant, backup, or recovery journal, and previews the normalized three-hop mapping, dependency result, port occupancy, target reachability, catalog revision, added/removed ports, affected devices, and create/update/no-change/blocked action.
+- [ ] Apply remains disabled until the current preview is applicable and the user separately confirms it. Editing any field or changing Linux/catalog/device state invalidates the plan; a stale or altered plan token fails closed.
+- [ ] Create writes only an Agent-marked per-user `jkbridge-relay-<slug>.service`, binds `socat` only to Linux `127.0.0.1:<relayPort>`, enables/starts it, updates the catalog, and expands only the exact catalog-derived `permitopen` grants disclosed by the plan.
+- [ ] Update backs up the prior managed unit and restarts it; injected unit, systemctl, catalog, grant, or persistence failures restore or converge safely without overwriting an unrelated file or leaving broader authorization than the committed catalog.
+- [ ] Delete requires a separate read-only delete plan plus explicit confirmation, contracts catalog/device grants before removing only the matching Agent-managed unit, and refuses an absent, modified, conflicting, or unmanaged unit without deleting it.
+- [ ] Target validation rejects URLs, credentials, wildcard/CIDR, IPv6, broadcast/multicast, self-loop, UDP, SOCKS/general proxy, Funnel, exit-node, and subnet-route forms; Linux relay and application listeners remain loopback-only.
+- [ ] Windows `localPort` may differ from Linux `relayPort`; browser URL, health check, and SSH `-L` use the Windows port while Linux authorization names only `127.0.0.1:<relayPort>`.
+- [ ] HTTPS acceptance covers certificate hostname, SNI, cookie-domain, redirect, and application-host behavior; a TCP-ready probe is not presented as proof that `https://127.0.0.1:<port>` is application-compatible.
+- [ ] Perform real Linux create, update, reboot/login persistence, Agent restart, rollback, delete, and uninstall tests plus clean-Windows GUI tests before marking the relay workflow released.
+
+### One-shot fallback and recovery
+
+- [ ] With no Agent installed, a vNext client clearly offers `jkbridge-linux.py pair` and completes Pairing Protocol V1 without trying an Agent endpoint repeatedly.
+- [ ] With the Agent stopped, incompatible, or unreachable, choosing one-shot fallback uses a fresh temporary code, preserves host-key pinning and per-device key isolation, and never creates a wildcard grant.
+- [ ] Canceling fallback returns to an actionable setup screen and does not save partial server, credential, enrollment, or authorization state.
+- [ ] A device enrolled through the Agent can recover through explicit one-shot pairing with the same dedicated public key while preserving exact routes and a verifiable authorization receipt.
+- [ ] Linux `status` and `remove --fingerprint` remain functional and safe alongside Agent-managed entries, backups, and locks.

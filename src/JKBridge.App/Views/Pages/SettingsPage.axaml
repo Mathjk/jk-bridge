@@ -124,7 +124,7 @@
                                        Classes="page-subtitle" Margin="0,2,0,16" />
                             <Grid ColumnDefinitions="140,*" Margin="0,3">
                                 <TextBlock Text="产品" Classes="muted" />
-                                <TextBlock Grid.Column="1" Text="JK Bridge 2.0" Classes="body-strong" />
+                                <TextBlock Grid.Column="1" Text="JK Bridge 2.2.0" Classes="body-strong" />
                             </Grid>
                             <Grid ColumnDefinitions="140,*" Margin="0,3">
                                 <TextBlock Text="配置目录" Classes="muted" />
@@ -136,6 +136,19 @@
                             </Grid>
                             <Separator Classes="quiet" />
                             <TextBlock Text="{Binding SettingsFeedback}" Classes="caption" TextWrapping="Wrap" />
+                            <Separator Classes="quiet" Margin="0,12,0,10" />
+                            <TextBlock Text="版本检查" Classes="body-strong" />
+                            <TextBlock Text="{Binding UpdateCheckFeedback}" Classes="caption"
+                                       TextWrapping="Wrap" Margin="0,4,0,0" />
+                            <TextBlock Text="{Binding UpdateReleaseUrl}" Classes="technical"
+                                       TextWrapping="Wrap" Margin="0,6,0,0"
+                                       IsVisible="{Binding HasUpdateReleaseInfo}" />
+                            <Button Content="手动检查官方 Release" Classes="secondary"
+                                    HorizontalAlignment="Left" Margin="0,10,0,0"
+                                    Command="{Binding CheckForUpdatesCommand}"
+                                    IsEnabled="{Binding CanCheckForUpdates}" />
+                            <TextBlock Text="不会自动检查、下载或安装；显示的地址由固定官方仓库元数据校验。"
+                                       Classes="caption" TextWrapping="Wrap" Margin="0,5,0,0" />
                             <Button Content="打开诊断与日志" Classes="secondary" HorizontalAlignment="Left"
                                     Margin="0,14,0,0" Command="{Binding ShowDiagnosticsCommand}" />
                         </StackPanel>
