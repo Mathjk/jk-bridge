@@ -2,13 +2,19 @@
 
 All notable changes are documented here. The project follows semantic versioning after the first public release.
 
-## Unreleased — v2.2.0 / Preview 3 development
+## 2.2.0-preview.4 - 2026-08-09
 
-This section records source currently under development. It does not change the
+This prerelease records source still under development. It does not change the
 contents or support boundary of the published v2.1.0 stable Release. Preview 1
-and Preview 2 were published only for development acceptance; Preview 3 builds
-identify themselves as `2.2.0-preview.3` and remain prereleases rather than
+through Preview 3 were published only for development acceptance; Preview 4 builds
+identify themselves as `2.2.0-preview.4` and remain prereleases rather than
 stable v2.2.0.
+
+### Fixed
+
+- Split in-app updates into an explicit download-and-verify phase and a separate install phase, so the first click never launches setup or exits JK Bridge.
+- Added streamed byte/percentage progress, checksum and verification stages, cancellation, and clear failure states for official installer downloads.
+- Start the normal visible Windows setup wizard first, then request a controlled application shutdown only after process creation succeeds; failed launches leave JK Bridge running.
 
 ### Added
 

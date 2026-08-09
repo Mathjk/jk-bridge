@@ -472,11 +472,15 @@ separately role-gated. See
   rejects reparse-point destinations, and writes by durable atomic replacement.
 - The Settings page checks for updates only on user action. Stable builds use
   the fixed latest-release endpoint; prerelease builds use a bounded official
-  release list and retain their Preview channel. A second explicit action can
-  download an exact official installer/checksum pair, accept only GitHub's
-  release-asset CDN redirect, stream a bounded EXE into the managed update
-  directory, verify SHA-256, and start the normal installer without silent
-  flags. It never performs a background check, download, or installation.
+  release list and retain their Preview channel. A second explicit action
+  downloads an exact official installer/checksum pair, accepts only GitHub's
+  release-asset CDN redirect, streams a bounded EXE into the managed update
+  directory, reports byte/percentage and verification progress, supports
+  cancellation, and verifies SHA-256. Success only stages the EXE. A third
+  explicit action revalidates the managed path, starts the normal visible
+  installer without silent flags, and requests controlled shutdown only after
+  process creation succeeds. It never performs a background check, download, or
+  installation.
 
 ## Publishing
 

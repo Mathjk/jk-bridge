@@ -124,7 +124,7 @@
                                        Classes="page-subtitle" Margin="0,2,0,16" />
                             <Grid ColumnDefinitions="140,*" Margin="0,3">
                                 <TextBlock Text="产品" Classes="muted" />
-                                <TextBlock Grid.Column="1" Text="JK Bridge 2.2.0 Preview 2" Classes="body-strong" />
+                                <TextBlock Grid.Column="1" Text="{Binding ApplicationVersionText}" Classes="body-strong" />
                             </Grid>
                             <Grid ColumnDefinitions="140,*" Margin="0,3">
                                 <TextBlock Text="配置目录" Classes="muted" />
@@ -147,12 +147,31 @@
                                     HorizontalAlignment="Left" Margin="0,10,0,0"
                                     Command="{Binding CheckForUpdatesCommand}"
                                     IsEnabled="{Binding CanCheckForUpdates}" />
-                            <Button Content="下载并覆盖安装" Classes="primary"
+                            <StackPanel Margin="0,10,0,0"
+                                        IsVisible="{Binding IsUpdateProgressVisible}">
+                                <TextBlock Text="{Binding UpdateStageText}" Classes="body-strong" />
+                                <ProgressBar Minimum="0" Maximum="100"
+                                             Value="{Binding UpdateProgressPercent}"
+                                             IsIndeterminate="{Binding IsUpdateProgressIndeterminate}"
+                                             Height="8" Margin="0,6,0,0" />
+                                <TextBlock Text="{Binding UpdateProgressText}" Classes="caption"
+                                           TextWrapping="Wrap" Margin="0,5,0,0" />
+                            </StackPanel>
+                            <Button Content="取消当前更新操作" Classes="secondary"
+                                    HorizontalAlignment="Left" Margin="0,8,0,0"
+                                    Command="{Binding CancelReleaseUpdateCommand}"
+                                    IsVisible="{Binding CanCancelReleaseUpdate}" />
+                            <Button Content="下载并校验更新" Classes="primary"
                                     HorizontalAlignment="Left" Margin="0,8,0,0"
                                     Command="{Binding InstallCheckedReleaseCommand}"
                                     IsVisible="{Binding HasUpdateInstaller}"
                                     IsEnabled="{Binding CanInstallUpdate}" />
-                            <TextBlock Text="不会后台检查或静默安装；点击覆盖安装后会从固定官方 Release 下载 EXE 与 SHA-256，校验通过才启动普通安装向导。当前安装包未代码签名，Windows 可能显示 SmartScreen 提示。"
+                            <Button Content="开始安装（将退出 JK Bridge）" Classes="primary"
+                                    HorizontalAlignment="Left" Margin="0,8,0,0"
+                                    Command="{Binding LaunchDownloadedReleaseInstallerCommand}"
+                                    IsVisible="{Binding IsUpdateReadyToInstall}"
+                                    IsEnabled="{Binding CanLaunchDownloadedReleaseInstaller}" />
+                            <TextBlock Text="不会后台检查或静默安装。第一步只从固定官方 Release 下载 EXE 与 SHA-256 并校验，主程序不会退出；第二步确认安装后才启动普通 Windows 安装向导，并在向导成功启动后安全退出。真实安装进度由安装向导显示。当前安装包未代码签名，Windows 可能显示 SmartScreen 提示。"
                                        Classes="caption" TextWrapping="Wrap" Margin="0,5,0,0" />
                             <Button Content="打开诊断与日志" Classes="secondary" HorizontalAlignment="Left"
                                     Margin="0,14,0,0" Command="{Binding ShowDiagnosticsCommand}" />

@@ -56,7 +56,15 @@ public partial class App : Application
                 new DevicePairingService(),
                 new StartupRegistration(),
                 logDirectory,
-                () => _mainWindow);
+                () => _mainWindow,
+                applicationExitRequester: () =>
+                {
+                    Dispatcher.UIThread.Post(() =>
+                    {
+                        _ = ExitAsync();
+                    });
+                    return Task.CompletedTask;
+                });
 
             _mainWindow = new MainWindow { DataContext = _controller.ViewModel };
             _mainWindow.Closing += MainWindow_OnClosing;

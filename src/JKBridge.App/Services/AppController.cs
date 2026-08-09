@@ -34,6 +34,13 @@ public sealed partial class AppController : IBridgeUiActions, IAsyncDisposable
         AgentRelayPlanResponse Plan,
         AgentRelayProbeResponse? Probe);
 
+    private sealed class InlineProgress<T>(Action<T> report) : IProgress<T>
+    {
+        private readonly Action<T> _report = report;
+
+        public void Report(T value) => _report(value);
+    }
+
     private readonly ConfigStore _configStore;
     private readonly RollingFileLogger _logger;
     private readonly IBridgeRuntime _runtime;
@@ -47,6 +54,7 @@ public sealed partial class AppController : IBridgeUiActions, IAsyncDisposable
     private readonly IReleaseUpdateChecker _releaseUpdateChecker;
     private readonly bool _ownsReleaseUpdateChecker;
     private readonly Action<string> _installerLauncher;
+    private readonly Func<Task> _applicationExitRequester;
     private readonly string _updateDirectory;
     private readonly StartupRegistration _startupRegistration;
     private readonly Func<Window?> _getWindow;
@@ -58,6 +66,7 @@ public sealed partial class AppController : IBridgeUiActions, IAsyncDisposable
     private PendingAgentRelayPlan? _pendingAgentRelayPlan;
     private AgentCatalogUpdatePreview? _pendingAgentCatalogUpdate;
     private ReleaseInstallerAsset? _pendingReleaseInstaller;
+    private ReleaseInstallerDownload? _downloadedReleaseInstaller;
     private DateTimeOffset _agentEnrollmentCodeExpiresAt;
     private int _resumeAfterSleep;
     private CancellationTokenSource? _pairingCancellation;
@@ -94,7 +103,8 @@ public sealed partial class AppController : IBridgeUiActions, IAsyncDisposable
         DiagnosticBundleService? diagnosticBundleService = null,
         IReleaseUpdateChecker? releaseUpdateChecker = null,
         Action<string>? installerLauncher = null,
-        IWindowsLocalServiceDiscovery? windowsLocalDiscovery = null)
+        IWindowsLocalServiceDiscovery? windowsLocalDiscovery = null,
+        Func<Task>? applicationExitRequester = null)
     {
         _configStore = configStore ?? throw new ArgumentNullException(nameof(configStore));
         _logger = logger ?? throw new ArgumentNullException(nameof(logger));
@@ -133,10 +143,12 @@ public sealed partial class AppController : IBridgeUiActions, IAsyncDisposable
             _windowsLocalDiscovery = windowsLocalDiscovery;
         }
         _installerLauncher = installerLauncher ?? LaunchInstaller;
+        _applicationExitRequester = applicationExitRequester ?? (() => Task.CompletedTask);
         _updateDirectory = Path.Combine(
             Path.GetDirectoryName(_logDirectory) ?? _logDirectory,
             "Updates");
         ViewModel = new MainViewModel(this);
+        ViewModel.ApplicationVersionText = $"JK Bridge {GetApplicationVersion()}";
 
         _runtime.SnapshotChanged += RuntimeOnSnapshotChanged;
         _logger.EventWritten += LoggerOnEventWritten;
@@ -2555,11 +2567,18 @@ public sealed partial class AppController : IBridgeUiActions, IAsyncDisposable
             ViewModel.IsUpdateChecking = true;
             ViewModel.HasUpdateReleaseInfo = false;
             ViewModel.HasUpdateInstaller = false;
+            ViewModel.IsUpdateReadyToInstall = false;
+            ViewModel.IsUpdateProgressVisible = false;
+            ViewModel.IsUpdateProgressIndeterminate = false;
+            ViewModel.UpdateProgressPercent = 0;
+            ViewModel.UpdateProgressText = "尚未开始下载";
+            ViewModel.UpdateStageText = "正在检查版本";
             ViewModel.UpdateReleaseUrl = string.Empty;
             ViewModel.UpdateCheckFeedback =
                 "正在查询 JK Bridge 官方 GitHub Releases…";
         });
         _pendingReleaseInstaller = null;
+        _downloadedReleaseInstaller = null;
 
         try
         {
@@ -2573,8 +2592,8 @@ public sealed partial class AppController : IBridgeUiActions, IAsyncDisposable
                 ViewModel.UpdateReleaseUrl = result.ReleasePage.AbsoluteUri;
                 ViewModel.UpdateCheckFeedback = result.Installer is not null
                     ? result.UpdateAvailable
-                        ? $"发现新版本 {result.LatestVersion}（当前 {result.CurrentVersion}）。可点击下方按钮下载、核验 SHA-256 并启动覆盖安装。"
-                        : $"当前版本为 {result.CurrentVersion}；可重新下载官方 {result.LatestVersion} 安装器并覆盖安装。"
+                        ? $"发现新版本 {result.LatestVersion}（当前 {result.CurrentVersion}）。可先下载并核验 SHA-256，完成后再单独开始安装。"
+                        : $"当前版本为 {result.CurrentVersion}；可重新下载并核验官方 {result.LatestVersion} 安装器，再决定是否开始安装。"
                     : result.UpdateAvailable
                         ? $"发现新版本 {result.LatestVersion}（当前 {result.CurrentVersion}），但该 Release 没有成对的 Windows 安装器和 SHA-256；请使用下方官方地址。"
                         : $"没有发现比当前构建号 {result.CurrentVersion} 更新的正式 Release；当前构建可能是未发布开发版。官方最新正式版：{result.LatestVersion}。";
@@ -2629,43 +2648,80 @@ public sealed partial class AppController : IBridgeUiActions, IAsyncDisposable
         RunOnUi(() =>
         {
             ViewModel.IsUpdateChecking = true;
+            ViewModel.IsUpdateReadyToInstall = false;
+            ViewModel.IsUpdateProgressVisible = true;
+            ViewModel.IsUpdateProgressIndeterminate = true;
+            ViewModel.UpdateProgressPercent = 0;
+            ViewModel.UpdateStageText = "准备下载";
+            ViewModel.UpdateProgressText = "等待官方服务器响应";
             ViewModel.UpdateCheckFeedback =
                 $"正在下载官方 {installer.Version} 安装器并核验 SHA-256…";
         });
+        _downloadedReleaseInstaller = null;
 
         try
         {
+            var progress = new InlineProgress<ReleaseDownloadProgress>(
+                ReportReleaseDownloadProgress);
             var download = await _releaseUpdateChecker
-                .DownloadInstallerAsync(installer, _updateDirectory, cancellation.Token)
+                .DownloadInstallerAsync(
+                    installer,
+                    _updateDirectory,
+                    progress,
+                    cancellation.Token)
                 .ConfigureAwait(false);
-            var installerPath = ValidateDownloadedInstallerPath(download.InstallerPath);
-            _installerLauncher(installerPath);
-            RunOnUi(() => ViewModel.UpdateCheckFeedback =
-                $"SHA-256 校验通过，安装器已启动。请在 Windows 安装向导中确认覆盖安装；当前安装包尚未代码签名，SmartScreen 提示属预期。校验值：{download.Sha256}");
+            ValidateDownloadedInstallerPath(download.InstallerPath);
+            _downloadedReleaseInstaller = download;
+            RunOnUi(() =>
+            {
+                ViewModel.IsUpdateReadyToInstall = true;
+                ViewModel.IsUpdateProgressIndeterminate = false;
+                ViewModel.UpdateProgressPercent = 100;
+                ViewModel.UpdateStageText = "下载与校验完成";
+                ViewModel.UpdateProgressText = "100% · SHA-256 校验通过";
+                ViewModel.UpdateCheckFeedback =
+                    $"官方 {download.Version} 安装器已下载并通过 SHA-256 校验。此时 JK Bridge 仍在运行；确认后再点击“开始安装”。校验值：{download.Sha256}";
+            });
             await SafeLogAsync(
                     DiagnosticSeverity.Information,
                     "Updates",
-                    "A verified official installer was explicitly launched.",
+                    "An official installer was downloaded and verified for explicit installation.",
                     $"Release: {installer.Version}; SHA-256: {download.Sha256}")
                 .ConfigureAwait(false);
         }
         catch (OperationCanceledException) when (cancellation.IsCancellationRequested)
         {
-            RunOnUi(() => ViewModel.UpdateCheckFeedback =
-                "安装器下载已取消或超时；没有启动任何安装程序。");
+            _downloadedReleaseInstaller = null;
+            RunOnUi(() =>
+            {
+                ViewModel.IsUpdateReadyToInstall = false;
+                ViewModel.IsUpdateProgressIndeterminate = false;
+                ViewModel.UpdateStageText = "下载已取消";
+                ViewModel.UpdateProgressText = "已保留当前版本，没有启动安装程序";
+                ViewModel.UpdateCheckFeedback =
+                    "安装器下载已取消或超时；没有启动任何安装程序，JK Bridge 会继续运行。";
+            });
         }
         catch (Exception exception) when (
             exception is ReleaseUpdateException or IOException or UnauthorizedAccessException or
                 InvalidOperationException or System.ComponentModel.Win32Exception)
         {
+            _downloadedReleaseInstaller = null;
             await SafeLogAsync(
                     DiagnosticSeverity.Warning,
                     "Updates",
-                    "The explicit installer download or launch failed safely.",
+                    "The explicit installer download or verification failed safely.",
                     exception.GetType().FullName)
                 .ConfigureAwait(false);
-            RunOnUi(() => ViewModel.UpdateCheckFeedback =
-                "无法完成官方安装器下载、SHA-256 校验或启动；没有执行覆盖安装。可改用上方官方 Release 地址手动下载。");
+            RunOnUi(() =>
+            {
+                ViewModel.IsUpdateReadyToInstall = false;
+                ViewModel.IsUpdateProgressIndeterminate = false;
+                ViewModel.UpdateStageText = "下载或校验失败";
+                ViewModel.UpdateProgressText = "没有启动安装程序";
+                ViewModel.UpdateCheckFeedback =
+                    "无法完成官方安装器下载或 SHA-256 校验；没有执行覆盖安装。可改用上方官方 Release 地址手动下载。";
+            });
         }
         finally
         {
@@ -2700,11 +2756,13 @@ public sealed partial class AppController : IBridgeUiActions, IAsyncDisposable
 
     private static void LaunchInstaller(string installerPath)
     {
-        Process.Start(new ProcessStartInfo(installerPath)
+        using var process = Process.Start(new ProcessStartInfo(installerPath)
         {
             UseShellExecute = true,
+            WindowStyle = ProcessWindowStyle.Normal,
             WorkingDirectory = Path.GetDirectoryName(installerPath),
-        });
+        }) ?? throw new System.ComponentModel.Win32Exception(
+            "Windows did not return a process for the installer launch.");
     }
 
     public Task OpenLogFolderAsync()
@@ -2784,6 +2842,7 @@ public sealed partial class AppController : IBridgeUiActions, IAsyncDisposable
         _pendingAgentRelayPlan = null;
         _pendingAgentCatalogUpdate = null;
         _pendingReleaseInstaller = null;
+        _downloadedReleaseInstaller = null;
         _serviceProfileImportPreview = null;
         var serviceProfileCancellation = Interlocked.Exchange(ref _serviceProfileCancellation, null);
         serviceProfileCancellation?.Cancel();

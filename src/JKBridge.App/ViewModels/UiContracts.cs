@@ -182,6 +182,10 @@ public interface IBridgeUiActions
     Task ExportDiagnosticBundleAsync() => Task.CompletedTask;
     Task CheckForUpdatesAsync() => Task.CompletedTask;
     Task InstallCheckedReleaseAsync() => Task.CompletedTask;
+    void CancelReleaseUpdate()
+    {
+    }
+    Task LaunchDownloadedReleaseInstallerAsync() => Task.CompletedTask;
     Task SaveSettingsAsync(SettingsDraft settings);
     Task PairDeviceAsync(PairingDraft pairing);
 

@@ -20,6 +20,13 @@ public interface IReleaseUpdateChecker
         CancellationToken cancellationToken = default) =>
         Task.FromException<ReleaseInstallerDownload>(
             new NotSupportedException("This update checker does not download installers."));
+
+    Task<ReleaseInstallerDownload> DownloadInstallerAsync(
+        ReleaseInstallerAsset installer,
+        string destinationDirectory,
+        IProgress<ReleaseDownloadProgress>? progress,
+        CancellationToken cancellationToken = default) =>
+        DownloadInstallerAsync(installer, destinationDirectory, cancellationToken);
 }
 
 /// <summary>
@@ -92,6 +99,20 @@ public sealed partial class GitHubReleaseUpdateService : IReleaseUpdateChecker, 
         string destinationDirectory,
         CancellationToken cancellationToken = default)
     {
+        return await DownloadInstallerAsync(
+                installer,
+                destinationDirectory,
+                progress: null,
+                cancellationToken)
+            .ConfigureAwait(false);
+    }
+
+    public async Task<ReleaseInstallerDownload> DownloadInstallerAsync(
+        ReleaseInstallerAsset installer,
+        string destinationDirectory,
+        IProgress<ReleaseDownloadProgress>? progress,
+        CancellationToken cancellationToken = default)
+    {
         ArgumentNullException.ThrowIfNull(installer);
         var validated = ValidateInstallerAsset(installer);
         var destinationRoot = Path.GetFullPath(
@@ -106,6 +127,8 @@ public sealed partial class GitHubReleaseUpdateService : IReleaseUpdateChecker, 
         string? stagingDirectory = null;
         try
         {
+            progress?.Report(new ReleaseDownloadProgress(
+                ReleaseDownloadStage.FetchingChecksum));
             var checksumBytes = await DownloadSmallAssetAsync(
                     validated.ChecksumUri,
                     MaximumChecksumBytes,
@@ -126,11 +149,19 @@ public sealed partial class GitHubReleaseUpdateService : IReleaseUpdateChecker, 
                     timeout.Token)
                 .ConfigureAwait(false);
 
+            progress?.Report(new ReleaseDownloadProgress(
+                ReleaseDownloadStage.DownloadingInstaller));
             var actualHash = await DownloadInstallerFileAsync(
                     validated.DownloadUri,
                     installerPath,
+                    progress,
                     timeout.Token)
                 .ConfigureAwait(false);
+            var installerBytes = new FileInfo(installerPath).Length;
+            progress?.Report(new ReleaseDownloadProgress(
+                ReleaseDownloadStage.VerifyingInstaller,
+                installerBytes,
+                installerBytes));
             var expectedHashBytes = Convert.FromHexString(expectedHash);
             var actualHashBytes = Convert.FromHexString(actualHash);
             if (!CryptographicOperations.FixedTimeEquals(expectedHashBytes, actualHashBytes))
@@ -257,10 +288,14 @@ public sealed partial class GitHubReleaseUpdateService : IReleaseUpdateChecker, 
     private async Task<string> DownloadInstallerFileAsync(
         Uri uri,
         string destinationPath,
+        IProgress<ReleaseDownloadProgress>? progress,
         CancellationToken cancellationToken)
     {
         using var response = await SendAssetRequestAsync(uri, cancellationToken).ConfigureAwait(false);
         ValidateAssetResponse(response, MaximumInstallerBytes);
+        var expectedBytes = response.Content.Headers.ContentLength;
+        progress?.Report(new ReleaseDownloadProgress(
+            ReleaseDownloadStage.DownloadingInstaller, 0, expectedBytes));
         await using var input = await response.Content
             .ReadAsStreamAsync(cancellationToken)
             .ConfigureAwait(false);
@@ -274,6 +309,7 @@ public sealed partial class GitHubReleaseUpdateService : IReleaseUpdateChecker, 
         using var hash = IncrementalHash.CreateHash(HashAlgorithmName.SHA256);
         var buffer = new byte[64 * 1024];
         long total = 0;
+        long nextProgressReport = 256 * 1024;
         while (true)
         {
             var read = await input.ReadAsync(buffer, cancellationToken).ConfigureAwait(false);
@@ -290,9 +326,22 @@ public sealed partial class GitHubReleaseUpdateService : IReleaseUpdateChecker, 
 
             hash.AppendData(buffer, 0, read);
             await output.WriteAsync(buffer.AsMemory(0, read), cancellationToken).ConfigureAwait(false);
+            if (total >= nextProgressReport ||
+                (expectedBytes.HasValue && total >= expectedBytes.Value))
+            {
+                progress?.Report(new ReleaseDownloadProgress(
+                    ReleaseDownloadStage.DownloadingInstaller,
+                    total,
+                    expectedBytes));
+                nextProgressReport = total + (256 * 1024);
+            }
         }
 
         await output.FlushAsync(cancellationToken).ConfigureAwait(false);
+        progress?.Report(new ReleaseDownloadProgress(
+            ReleaseDownloadStage.DownloadingInstaller,
+            total,
+            expectedBytes));
         return Convert.ToHexString(hash.GetHashAndReset()).ToLowerInvariant();
     }
 
@@ -829,6 +878,24 @@ public sealed record ReleaseInstallerDownload(
     string InstallerPath,
     string Sha256,
     string Version);
+
+public enum ReleaseDownloadStage
+{
+    FetchingChecksum,
+    DownloadingInstaller,
+    VerifyingInstaller,
+}
+
+public sealed record ReleaseDownloadProgress(
+    ReleaseDownloadStage Stage,
+    long BytesReceived = 0,
+    long? TotalBytes = null)
+{
+    public double? Percentage =>
+        TotalBytes is > 0
+            ? Math.Clamp(BytesReceived * 100d / TotalBytes.Value, 0d, 100d)
+            : null;
+}
 
 public sealed record ReleaseUpdateCheckResult(
     bool UpdateAvailable,

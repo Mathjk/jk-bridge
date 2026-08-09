@@ -115,6 +115,8 @@ public sealed class GitHubReleaseUpdateServiceTests
         using var httpClient = new HttpClient(handler) { Timeout = Timeout.InfiniteTimeSpan };
         using var service = new GitHubReleaseUpdateService(httpClient);
         var destination = Path.Combine(Path.GetTempPath(), $"jkbridge-update-{Guid.NewGuid():N}");
+        var progress = new List<ReleaseDownloadProgress>();
+        var progressReporter = new RecordingProgress<ReleaseDownloadProgress>(progress.Add);
 
         try
         {
@@ -125,11 +127,17 @@ public sealed class GitHubReleaseUpdateServiceTests
                     installerName,
                     installerUri,
                     checksumUri),
-                destination);
+                destination,
+                progressReporter);
 
             Assert.Equal(installerBytes, await File.ReadAllBytesAsync(result.InstallerPath));
             Assert.Equal(expectedHash, result.Sha256);
             Assert.Equal(2, handler.Requests.Count);
+            Assert.Equal(ReleaseDownloadStage.FetchingChecksum, progress[0].Stage);
+            Assert.Contains(progress, item =>
+                item.Stage == ReleaseDownloadStage.DownloadingInstaller &&
+                item.Percentage == 100);
+            Assert.Equal(ReleaseDownloadStage.VerifyingInstaller, progress[^1].Stage);
         }
         finally
         {
@@ -450,6 +458,11 @@ public sealed class GitHubReleaseUpdateServiceTests
         };
         response.Content.Headers.ContentType = new MediaTypeHeaderValue("application/octet-stream");
         return response;
+    }
+
+    private sealed class RecordingProgress<T>(Action<T> recorder) : IProgress<T>
+    {
+        public void Report(T value) => recorder(value);
     }
 
     private sealed class RecordingHandler(

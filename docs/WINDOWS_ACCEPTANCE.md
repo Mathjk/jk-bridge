@@ -152,10 +152,14 @@ any unchecked live gate below as passed:
 ### In-app Release update
 
 - [ ] A stable build queries only the fixed latest stable endpoint; a Preview build queries the bounded official list, selects the highest published SemVer, and does not downgrade to an older stable release.
-- [ ] The install action appears only when one Release contains the exact Windows installer and matching `.sha256` asset URLs under `Mathjk/jk-bridge`.
-- [ ] Explicit download accepts only the exact GitHub asset URL and one HTTPS redirect to `release-assets.githubusercontent.com`, streams no more than 256 MiB, and launches only after SHA-256 matches.
+- [ ] The download action appears only when one Release contains the exact Windows installer and matching `.sha256` asset URLs under `Mathjk/jk-bridge`.
+- [ ] Explicit download accepts only the exact GitHub asset URL and one HTTPS redirect to `release-assets.githubusercontent.com`, streams no more than 256 MiB, and displays received bytes, percentage when Content-Length is present, and checksum/verification stages.
+- [ ] Completing **Download and verify update** stages the verified EXE but does not launch setup, close the window, hide to tray, or exit JK Bridge.
 - [ ] Mismatched hashes, malformed checksum names, foreign redirects, oversized content, cancellation, and timeout leave no staged EXE and never start a process.
-- [ ] Overlay-install Preview 2 over Preview 1 while JK Bridge is running; confirm setup closes/replaces the app cleanly and preserves configuration, Credential Manager entries, SSH keys, startup preference, and Agent administrator identity.
+- [ ] Cancelling a check or download returns control promptly, leaves the installed version running, and exposes a retryable state.
+- [ ] **Start installation (JK Bridge will exit)** starts the normal visible setup wizard first; only successful process creation requests controlled application shutdown, bypassing close-to-tray behavior.
+- [ ] A setup process-creation failure leaves JK Bridge running and keeps the verified installer retryable.
+- [ ] Overlay-install Preview 4 over Preview 3 while JK Bridge is running; confirm the setup wizard shows installation progress and preserves configuration, Credential Manager entries, SSH keys, startup preference, and Agent administrator identity.
 - [ ] No update check, download, setup process, UAC prompt, or browser action occurs without the corresponding explicit user action; no silent installer flags are supplied.
 
 ### Simple route editor, templates, and port conflicts

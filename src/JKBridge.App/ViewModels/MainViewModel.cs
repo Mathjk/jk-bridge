@@ -106,6 +106,13 @@ public partial class MainViewModel : ViewModelBase
     [ObservableProperty] private bool _isUpdateChecking;
     [ObservableProperty] private bool _hasUpdateReleaseInfo;
     [ObservableProperty] private bool _hasUpdateInstaller;
+    [ObservableProperty] private bool _isUpdateReadyToInstall;
+    [ObservableProperty] private bool _isUpdateProgressVisible;
+    [ObservableProperty] private bool _isUpdateProgressIndeterminate;
+    [ObservableProperty] private double _updateProgressPercent;
+    [ObservableProperty] private string _updateProgressText = "尚未开始下载";
+    [ObservableProperty] private string _updateStageText = "等待检查";
+    [ObservableProperty] private string _applicationVersionText = "JK Bridge";
     [ObservableProperty] private string _updateCheckFeedback = "仅在你点击后查询 JK Bridge 官方 GitHub Releases；确认后可下载、校验并启动覆盖安装。";
     [ObservableProperty] private string _updateReleaseUrl = string.Empty;
     [ObservableProperty] private bool _isLinuxServicesMode = true;
@@ -229,7 +236,10 @@ public partial class MainViewModel : ViewModelBase
     public bool HasDiscoveredWindowsLocalServices => DiscoveredWindowsLocalServices.Count > 0;
     public bool CanExportDiagnosticBundle => !IsDiagnosticBundleBusy;
     public bool CanCheckForUpdates => !IsUpdateChecking;
-    public bool CanInstallUpdate => HasUpdateInstaller && !IsUpdateChecking;
+    public bool CanInstallUpdate =>
+        HasUpdateInstaller && !IsUpdateChecking && !IsUpdateReadyToInstall;
+    public bool CanCancelReleaseUpdate => IsUpdateChecking && !IsUpdateReadyToInstall;
+    public bool CanLaunchDownloadedReleaseInstaller => IsUpdateReadyToInstall && !IsUpdateChecking;
     public bool CanStartPairing =>
         !IsPairing && !IsAgentEnrolling && !IsAgentDiscovering && !IsAgentManaging && !IsServiceProfileBusy;
     public bool CanStartAgentEnrollment =>
@@ -298,9 +308,17 @@ public partial class MainViewModel : ViewModelBase
     {
         OnPropertyChanged(nameof(CanCheckForUpdates));
         OnPropertyChanged(nameof(CanInstallUpdate));
+        OnPropertyChanged(nameof(CanCancelReleaseUpdate));
+        OnPropertyChanged(nameof(CanLaunchDownloadedReleaseInstaller));
     }
     partial void OnHasUpdateInstallerChanged(bool value) =>
         OnPropertyChanged(nameof(CanInstallUpdate));
+    partial void OnIsUpdateReadyToInstallChanged(bool value)
+    {
+        OnPropertyChanged(nameof(CanInstallUpdate));
+        OnPropertyChanged(nameof(CanCancelReleaseUpdate));
+        OnPropertyChanged(nameof(CanLaunchDownloadedReleaseInstaller));
+    }
     partial void OnIsPairingChanged(bool value)
     {
         OnPropertyChanged(nameof(CanStartPairing));
@@ -534,6 +552,15 @@ public partial class MainViewModel : ViewModelBase
     [RelayCommand]
     private Task InstallCheckedReleaseAsync() =>
         CanInstallUpdate ? _actions.InstallCheckedReleaseAsync() : Task.CompletedTask;
+
+    [RelayCommand]
+    private void CancelReleaseUpdate() => _actions.CancelReleaseUpdate();
+
+    [RelayCommand]
+    private Task LaunchDownloadedReleaseInstallerAsync() =>
+        CanLaunchDownloadedReleaseInstaller
+            ? _actions.LaunchDownloadedReleaseInstallerAsync()
+            : Task.CompletedTask;
 
     [RelayCommand]
     private async Task PairDeviceAsync()

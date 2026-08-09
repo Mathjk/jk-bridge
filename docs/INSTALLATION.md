@@ -224,17 +224,21 @@ unrelated third party as an official Release. The installer can detect
 Tailscale, open its official download page, and offer a UAC-confirmed OpenSSH
 Client installation; it cannot sign in to Tailscale for you.
 
-Starting with Preview 2, an installed build can use **Settings → Version check
-→ Check official Release**, followed by **Download and overlay install**.
-Preview builds remain on the Preview channel; stable builds use the stable
-channel. JK Bridge accepts only a matching installer and `.sha256` pair from the
-same official Release, verifies the download, and then starts the normal setup
-wizard. It does not check in the background, install silently, or bypass
-SmartScreen. Configuration, device credentials, and SSH keys live outside the
-installation directory and are retained by a normal same-user overlay install.
-Preview 1 does not yet contain this control, so the Preview 1 → Preview 2
-transition requires one final manual Preview 2 installer download; later builds
-can use the Settings action.
+Starting with Preview 4, an installed build can use **Settings → Version check
+→ Check official Release**, followed by **Download and verify update**. Preview
+builds remain on the Preview channel; stable builds use the stable channel. JK
+Bridge accepts only a matching installer and `.sha256` pair from the same
+official Release. The first phase shows real byte/percentage progress and
+verification stages, can be cancelled, and leaves JK Bridge running. Only the
+separate **Start installation (JK Bridge will exit)** action starts the normal
+visible Windows setup wizard. JK Bridge requests a controlled shutdown only
+after setup process creation succeeds; the setup wizard then displays the real
+installation progress. The flow does not check in the background, install
+silently, or bypass SmartScreen. Configuration, device credentials, and SSH keys
+live outside the installation directory and are retained by a normal same-user
+overlay install. Preview 1 has no update control. If the old one-step action in
+Preview 2/3 stalls, manually download Preview 4, or explicitly exit the old tray
+process before running its already verified installer.
 
 ## 5. Copy and run the Linux helper
 

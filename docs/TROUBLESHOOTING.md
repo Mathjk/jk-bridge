@@ -46,18 +46,21 @@ Do not post raw pairing codes, `config.json`, private keys, Tailscale JSON, or `
 
 The executable is currently unsigned, so SmartScreen may show an unknown publisher. A verified Release hash confirms file integrity but does not suppress SmartScreen.
 
-## The Settings overlay-install action is unavailable or fails
+## The Settings update action is unavailable or fails
 
-- Preview 1 has no direct-update control. Manually download the official
-  Preview 2 installer and `.sha256`, verify them, and overlay-install once.
-- Run **Check official Release** first. **Download and overlay install** appears
+- Preview 1 has no direct-update control. If the old one-step action in Preview
+  2/3 stalls, manually download the official Preview 4 installer and
+  `.sha256`, or explicitly exit the old tray process before running its already
+  verified installer.
+- Run **Check official Release** first. **Download and verify update** appears
   only when the selected Release has the exact EXE and `.sha256` pair.
-- A checksum mismatch, untrusted redirect, or timeout fails closed and never
-  starts setup. Retry after checking GitHub connectivity, or manually use the
-  official Release page displayed in Settings.
-- Setup remains an interactive wizard and may ask to close the running JK
-  Bridge process. Reopen the app after setup; configuration and device
-  credentials should remain intact.
+- Download bytes, percentage, and verification stage are visible, and the
+  operation can be cancelled. A checksum mismatch, untrusted redirect,
+  cancellation, or timeout never starts setup or exits JK Bridge.
+- After verification, select **Start installation (JK Bridge will exit)**.
+  JK Bridge exits only after the normal visible setup wizard starts
+  successfully; the wizard displays real installation progress. A launch
+  failure leaves JK Bridge running so the action can be retried.
 
 ## Tailscale is missing, signed out, or cannot find Linux
 
