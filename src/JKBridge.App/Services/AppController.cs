@@ -1,3 +1,4 @@
+using System.ComponentModel;
 using System.Diagnostics;
 using System.Reflection;
 using System.Security.Cryptography;
@@ -65,7 +66,9 @@ public sealed partial class AppController : IBridgeUiActions, IAsyncDisposable
     private ServiceProfileImportPreview? _serviceProfileImportPreview;
     private PendingAgentRelayPlan? _pendingAgentRelayPlan;
     private AgentCatalogUpdatePreview? _pendingAgentCatalogUpdate;
+    private IReadOnlyList<AgentLoopbackServiceCandidate> _lastLinuxLoopbackDiscovery = [];
     private ReleaseInstallerAsset? _pendingReleaseInstaller;
+    private Uri? _pendingReleasePage;
     private ReleaseInstallerDownload? _downloadedReleaseInstaller;
     private DateTimeOffset _agentEnrollmentCodeExpiresAt;
     private int _resumeAfterSleep;
@@ -168,6 +171,7 @@ public sealed partial class AppController : IBridgeUiActions, IAsyncDisposable
         {
             var loaded = await _configStore.LoadWithResultAsync(cancellationToken).ConfigureAwait(false);
             _config = loaded.Config;
+            ConfigureReleaseUpdateNetwork(_config.UpdateNetwork);
             if (loaded.Source == ConfigLoadSource.Defaults || loaded.WasMigrated)
             {
                 await _configStore.SaveAsync(_config, cancellationToken).ConfigureAwait(false);
@@ -434,6 +438,7 @@ public sealed partial class AppController : IBridgeUiActions, IAsyncDisposable
         previous?.Dispose();
         RunOnUi(() =>
         {
+            ViewModel.AgentSetupCode = string.Empty;
             ViewModel.AgentRecoveryCode = string.Empty;
             ViewModel.BeginAgentEnrollment();
         });
@@ -442,13 +447,30 @@ public sealed partial class AppController : IBridgeUiActions, IAsyncDisposable
 
         try
         {
+            var endpoint = enrollment.Endpoint;
+            var recoveryCode = enrollment.RecoveryCode;
+            if (!string.IsNullOrWhiteSpace(enrollment.SetupCode))
+            {
+                if (!AgentSetupCode.TryParse(
+                        enrollment.SetupCode,
+                        out var parsedSetupCode,
+                        out var setupCodeError))
+                {
+                    throw new AgentEnrollmentException(
+                        $"Agent 设置码无效：{setupCodeError}");
+                }
+
+                endpoint = parsedSetupCode!.Endpoint.ToString();
+                recoveryCode = parsedSetupCode.EnrollmentCredential.Export();
+            }
+
             await _runtime.StopAsync(cancellation.Token).ConfigureAwait(false);
             var progress = new Progress<AgentEnrollmentProgress>(item =>
                 RunOnUi(() => ViewModel.ApplyAgentEnrollmentProgress(item.Stage, item.Detail)));
             var result = await _agentEnrollmentService.EnrollAsync(
                     new AgentEnrollmentRequest(
-                        enrollment.Endpoint,
-                        enrollment.RecoveryCode,
+                        endpoint,
+                        recoveryCode,
                         enrollment.DeviceLabel,
                         enrollment.IdentityFile),
                     progress,
@@ -2314,6 +2336,297 @@ public sealed partial class AppController : IBridgeUiActions, IAsyncDisposable
         }
     }
 
+    public async Task AddLinuxUrlDraftAsync(string linuxLocalUrl)
+    {
+        if (!LinuxLocalServiceUrl.TryParse(linuxLocalUrl, out var parsed, out _))
+        {
+            RunOnUi(() => ViewModel.LinuxQuickAddFeedback =
+                "只接受 Linux 上的 http(s)://127.0.0.1:端口/路径 或 localhost 地址；不能包含用户名密码。");
+            return;
+        }
+
+        var recognized = _lastLinuxLoopbackDiscovery.FirstOrDefault(candidate =>
+            candidate.Port == parsed!.Port);
+        ServiceDefinition? added = null;
+        try
+        {
+            var saved = await SaveConfigAsync(
+                current =>
+                {
+                    if (current.Services.Any(service => service.RemotePort == parsed!.Port))
+                    {
+                        throw new InvalidOperationException(
+                            "该 Linux 端口已经存在于服务清单中，请编辑现有服务。");
+                    }
+
+                    var baseId = recognized is not null
+                        ? CreateDiscoveredServiceId(recognized)
+                        : $"linux-{parsed!.Port}";
+                    var id = baseId;
+                    var suffix = 2;
+                    while (current.Services.Any(service =>
+                               string.Equals(service.Id, id, StringComparison.OrdinalIgnoreCase)))
+                    {
+                        id = $"{baseId}-{suffix++}";
+                    }
+
+                    var localPort = FindAvailableLocalPort(
+                        parsed!.Port,
+                        current.Services.Select(service => service.LocalPort).ToHashSet());
+                    var title = recognized?.Title;
+                    added = new ServiceDefinition
+                    {
+                        Id = id,
+                        Name = string.IsNullOrWhiteSpace(title)
+                            ? $"Linux 本机服务 {parsed.Port}"
+                            : title,
+                        Description =
+                            $"从 Linux 本机网址创建；目标固定为 127.0.0.1:{parsed.Port}。保存前请复核。",
+                        Icon = recognized is null
+                            ? "Globe"
+                            : IconForDiscoveredTemplate(recognized.SuggestedTemplateId),
+                        Enabled = false,
+                        Favorite = false,
+                        LocalPort = localPort,
+                        RemoteHost = ServiceDefinition.LoopbackHost,
+                        RemotePort = parsed.Port,
+                        OpenUrl = ServiceOpenUrl.Build(
+                            parsed.Scheme,
+                            localPort,
+                            parsed.LaunchPath),
+                        HealthPath = parsed.LaunchPath,
+                        HealthKind = parsed.Scheme == "http"
+                            ? HealthCheckKind.HttpStatus
+                            : HealthCheckKind.TcpConnect,
+                    };
+                    return current with
+                    {
+                        Services = current.Services.Select(service => service with { })
+                            .Append(added)
+                            .ToList(),
+                    };
+                },
+                "Linux 地址已作为停用服务加入编辑器；尚未修改 Linux 清单或 SSH 授权。")
+                .ConfigureAwait(false);
+
+            if (!saved || added is null)
+            {
+                return;
+            }
+
+            RunOnUi(() =>
+            {
+                ViewModel.LinuxQuickAddUrl = string.Empty;
+                ViewModel.LinuxQuickAddFeedback = parsed!.RemovedQueryOrFragment
+                    ? "已加入停用草稿；为防止 token 泄漏，查询参数和 # 片段已移除且未保存。"
+                    : "已加入停用草稿；请在右侧复核，再通过 Agent 差异预览明确授权。";
+                ViewModel.SelectedService = ViewModel.Services.FirstOrDefault(service =>
+                    string.Equals(service.Id, added.Id, StringComparison.Ordinal));
+            });
+        }
+        catch (InvalidOperationException exception)
+        {
+            RunOnUi(() => ViewModel.LinuxQuickAddFeedback = exception.Message);
+        }
+    }
+
+    public async Task ScanLinuxPendingServicesAsync()
+    {
+        if (!TryBeginAgentManagement(
+                "正在只读检查 Linux 当前 127.0.0.1 监听…",
+                out var cancellation))
+        {
+            return;
+        }
+
+        try
+        {
+            var response = await _agentManagementService.DiscoverLoopbackServicesAsync(
+                    CreateAgentManagementRequest(_config),
+                    cancellation.Token)
+                .ConfigureAwait(false);
+            _lastLinuxLoopbackDiscovery = response.Candidates.ToArray();
+            var items = response.Candidates.Select(candidate =>
+                new LinuxPendingServiceUiState(
+                    candidate.Port,
+                    candidate.ProcessName,
+                    candidate.Scheme,
+                    candidate.WebDetected,
+                    candidate.StatusCode,
+                    candidate.Title,
+                    candidate.SuggestedTemplateId)).ToArray();
+            RunOnUi(() => ViewModel.ApplyLinuxPendingServices(
+                items,
+                items.Length == 0
+                    ? "没有发现尚未加入清单的 127.0.0.1 监听。未扫描磁盘或端口范围。"
+                    : $"发现 {items.Length} 个待确认监听；尚未保存服务，也未修改任何 SSH 授权。"));
+        }
+        catch (OperationCanceledException) when (cancellation.IsCancellationRequested)
+        {
+            RunOnUi(() => ViewModel.ApplyLinuxPendingServices(
+                [],
+                "Linux 服务发现已取消或超时；没有修改配置或授权。"));
+        }
+        catch (AgentEnrollmentException exception)
+        {
+            RunOnUi(() => ViewModel.ApplyLinuxPendingServices([], exception.Message));
+        }
+        catch (Exception exception)
+        {
+            await SafeLogAsync(
+                    DiagnosticSeverity.Error,
+                    "Agent",
+                    "Linux loopback service discovery failed safely.",
+                    exception.GetType().FullName)
+                .ConfigureAwait(false);
+            RunOnUi(() => ViewModel.ApplyLinuxPendingServices(
+                [],
+                "Linux 服务发现未能安全完成；没有修改配置或授权。"));
+        }
+        finally
+        {
+            EndAgentManagement(cancellation);
+        }
+    }
+
+    public async Task AddLinuxPendingServiceAsync(LinuxPendingServiceUiState candidate)
+    {
+        ArgumentNullException.ThrowIfNull(candidate);
+        var discovered = _lastLinuxLoopbackDiscovery.FirstOrDefault(item =>
+            item.Port == candidate.Port &&
+            string.Equals(item.BindAddress, "127.0.0.1", StringComparison.Ordinal) &&
+            string.Equals(item.Title, candidate.Title, StringComparison.Ordinal));
+        if (discovered is null)
+        {
+            RunOnUi(() => ViewModel.LinuxPendingServiceFeedback =
+                "该候选已过期，请重新扫描后再加入。");
+            return;
+        }
+
+        ServiceDefinition? added = null;
+        try
+        {
+        var saved = await SaveConfigAsync(
+            current =>
+            {
+                if (current.Services.Any(service => service.RemotePort == discovered.Port))
+                {
+                    throw new InvalidOperationException(
+                        "该 Linux 端口已经存在于服务清单中，请编辑现有服务。");
+                }
+
+                var baseId = CreateDiscoveredServiceId(discovered);
+                var id = baseId;
+                var suffix = 2;
+                while (current.Services.Any(service =>
+                           string.Equals(service.Id, id, StringComparison.OrdinalIgnoreCase)))
+                {
+                    id = $"{baseId}-{suffix++}";
+                }
+
+                var localPort = FindAvailableLocalPort(
+                    discovered.Port,
+                    current.Services.Select(service => service.LocalPort).ToHashSet());
+                var scheme = discovered.Scheme is "http" or "https"
+                    ? discovered.Scheme
+                    : "http";
+                var healthKind = discovered.Scheme == "http"
+                    ? HealthCheckKind.HttpStatus
+                    : HealthCheckKind.TcpConnect;
+                added = new ServiceDefinition
+                {
+                    Id = id,
+                    Name = discovered.Title,
+                    Description =
+                        $"由 Linux Agent 从当前 127.0.0.1:{discovered.Port} 监听发现；保存前请复核。",
+                    Icon = IconForDiscoveredTemplate(discovered.SuggestedTemplateId),
+                    Enabled = false,
+                    Favorite = false,
+                    LocalPort = localPort,
+                    RemoteHost = ServiceDefinition.LoopbackHost,
+                    RemotePort = discovered.Port,
+                    OpenUrl = ServiceOpenUrl.Build(scheme, localPort, "/"),
+                    HealthPath = "/",
+                    HealthKind = healthKind,
+                };
+                return current with
+                {
+                    Services = current.Services.Select(service => service with { })
+                        .Append(added)
+                        .ToList(),
+                };
+            },
+            "候选已作为停用服务加入编辑器；复核并保存后，再到 Agent 管理区预览授权差异。")
+            .ConfigureAwait(false);
+
+        if (!saved || added is null)
+        {
+            return;
+        }
+
+        _lastLinuxLoopbackDiscovery = _lastLinuxLoopbackDiscovery
+            .Where(item => item.Port != discovered.Port)
+            .ToArray();
+        RunOnUi(() =>
+        {
+            ViewModel.ApplyLinuxPendingServices(
+                _lastLinuxLoopbackDiscovery.Select(item => new LinuxPendingServiceUiState(
+                    item.Port,
+                    item.ProcessName,
+                    item.Scheme,
+                    item.WebDetected,
+                    item.StatusCode,
+                    item.Title,
+                    item.SuggestedTemplateId)),
+                "已加入停用草稿；Linux 清单和 SSH 授权仍未改变。");
+            ViewModel.SelectedService = ViewModel.Services.FirstOrDefault(service =>
+                string.Equals(service.Id, added.Id, StringComparison.Ordinal));
+        });
+        }
+        catch (InvalidOperationException exception)
+        {
+            RunOnUi(() => ViewModel.LinuxPendingServiceFeedback = exception.Message);
+        }
+    }
+
+    private static string CreateDiscoveredServiceId(AgentLoopbackServiceCandidate candidate)
+    {
+        var source = candidate.SuggestedTemplateId is not ("generic-http" or "generic-local-web")
+            ? candidate.SuggestedTemplateId
+            : candidate.ProcessName;
+        var builder = new StringBuilder();
+        foreach (var character in (source ?? string.Empty).ToLowerInvariant())
+        {
+            if (char.IsAsciiLetterOrDigit(character))
+            {
+                builder.Append(character);
+            }
+            else if (builder.Length > 0 && builder[^1] != '-')
+            {
+                builder.Append('-');
+            }
+        }
+
+        var normalized = builder.ToString().Trim('-');
+        if (string.IsNullOrWhiteSpace(normalized) ||
+            normalized[0] is < 'a' or > 'z')
+        {
+            normalized = "local-service";
+        }
+        return normalized.Length <= 36 ? normalized : normalized[..36].TrimEnd('-');
+    }
+
+    private static string IconForDiscoveredTemplate(string templateId) =>
+        templateId switch
+        {
+            "syncthing" => "Sync",
+            "jupyter" => "Notebook",
+            "overleaf" => "FileText",
+            "grafana" => "Chart",
+            "ollama" => "Cpu",
+            _ => "Globe",
+        };
+
     public async Task SaveServiceAsync(ServiceUiState state)
     {
         try
@@ -2421,6 +2734,13 @@ public sealed partial class AppController : IBridgeUiActions, IAsyncDisposable
             return;
         }
 
+        if (Volatile.Read(ref _releaseUpdateActive) != 0)
+        {
+            RunOnUi(() => ViewModel.SettingsFeedback =
+                "更新操作正在进行；请先完成或取消更新，再保存网络设置。");
+            return;
+        }
+
         if (!int.TryParse(settings.SshPort, out var sshPort))
         {
             RunOnUi(() => ViewModel.SettingsFeedback = "SSH 端口必须是 1–65535 的整数。");
@@ -2432,6 +2752,12 @@ public sealed partial class AppController : IBridgeUiActions, IAsyncDisposable
             1 => ThemePreference.Light,
             2 => ThemePreference.Dark,
             _ => ThemePreference.System,
+        };
+        var updateNetworkMode = settings.UpdateNetworkModeIndex switch
+        {
+            1 => UpdateNetworkMode.ManualProxy,
+            2 => UpdateNetworkMode.Direct,
+            _ => UpdateNetworkMode.System,
         };
         AppConfig BuildSettingsConfig(AppConfig current)
         {
@@ -2463,6 +2789,13 @@ public sealed partial class AppController : IBridgeUiActions, IAsyncDisposable
                     StartWithWindows = settings.StartWithWindows,
                     Theme = theme,
                 },
+                UpdateNetwork = new UpdateNetworkSettings
+                {
+                    Mode = updateNetworkMode,
+                    ManualProxyUrl = updateNetworkMode == UpdateNetworkMode.ManualProxy
+                        ? settings.UpdateManualProxyUrl.Trim()
+                        : string.Empty,
+                },
             };
         }
 
@@ -2493,8 +2826,57 @@ public sealed partial class AppController : IBridgeUiActions, IAsyncDisposable
 
         if (await SaveConfigAsync(BuildSettingsConfig, "设置已保存，连接配置已经重新应用。"))
         {
-            RunOnUi(() => ApplyTheme(theme));
+            ConfigureReleaseUpdateNetwork(_config.UpdateNetwork);
+            RunOnUi(() =>
+            {
+                ApplyTheme(theme);
+                ViewModel.SettingsFeedback = "设置已保存；新的更新网络方式将在下一次检查或下载时使用。";
+            });
         }
+    }
+
+    public async Task OpenReleasePageAsync()
+    {
+        var releasePage = _pendingReleasePage;
+        if (releasePage is null)
+        {
+            RunOnUi(() => ViewModel.UpdateCheckFeedback = "请先检查更新，再打开对应的官方 Release 页面。");
+            return;
+        }
+
+        try
+        {
+            Process.Start(new ProcessStartInfo(releasePage.AbsoluteUri)
+            {
+                UseShellExecute = true,
+            });
+            await SafeLogAsync(
+                    DiagnosticSeverity.Information,
+                    "Updates",
+                    "The official release page was explicitly opened in the default browser.")
+                .ConfigureAwait(false);
+        }
+        catch (Exception exception) when (
+            exception is InvalidOperationException or Win32Exception)
+        {
+            await SetClipboardTextAsync(releasePage.AbsoluteUri).ConfigureAwait(false);
+            RunOnUi(() => ViewModel.UpdateCheckFeedback =
+                "无法打开默认浏览器；官方 Release 地址已复制到剪贴板。");
+        }
+    }
+
+    public async Task CopyLinuxQuickPairCommandAsync()
+    {
+        await SetClipboardTextAsync(LinuxPairingBootstrap.PairCommand).ConfigureAwait(false);
+        RunOnUi(() => ViewModel.LinuxQuickPairFeedback =
+            "一行命令已复制。请粘贴到 Linux 终端运行，再把以 jkbridge:// 开头的配对码填回这里。");
+    }
+
+    public async Task CopyLinuxAgentInstallCommandAsync()
+    {
+        await SetClipboardTextAsync(LinuxAgentBootstrap.InstallCommand).ConfigureAwait(false);
+        RunOnUi(() => ViewModel.LinuxAgentInstallFeedback =
+            "Agent 安装/升级命令已复制。请在 Linux 以目标 SSH 用户运行，不要使用 sudo；完成后复制 JKBA1 设置码。");
     }
 
     public async Task CopyDiagnosticSummaryAsync()
@@ -2618,6 +3000,7 @@ public sealed partial class AppController : IBridgeUiActions, IAsyncDisposable
                 "正在查询 JK Bridge 官方 GitHub Releases…";
         });
         _pendingReleaseInstaller = null;
+        _pendingReleasePage = null;
         _downloadedReleaseInstaller = null;
 
         try
@@ -2625,6 +3008,7 @@ public sealed partial class AppController : IBridgeUiActions, IAsyncDisposable
             var result = await _releaseUpdateChecker
                 .CheckAsync(GetApplicationVersion(), cancellation.Token)
                 .ConfigureAwait(false);
+            _pendingReleasePage = result.ReleasePage;
             RunOnUi(() =>
             {
                 ViewModel.HasUpdateReleaseInfo = true;
@@ -2683,7 +3067,7 @@ public sealed partial class AppController : IBridgeUiActions, IAsyncDisposable
             return;
         }
 
-        var cancellation = new CancellationTokenSource(TimeSpan.FromMinutes(10));
+        var cancellation = new CancellationTokenSource(TimeSpan.FromMinutes(30));
         Interlocked.Exchange(ref _releaseUpdateCancellation, cancellation)?.Dispose();
         RunOnUi(() =>
         {
@@ -2695,7 +3079,7 @@ public sealed partial class AppController : IBridgeUiActions, IAsyncDisposable
             ViewModel.UpdateStageText = "准备下载";
             ViewModel.UpdateProgressText = "等待官方服务器响应";
             ViewModel.UpdateCheckFeedback =
-                $"正在下载官方 {installer.Version} 安装器并核验 SHA-256…";
+                $"正在通过{DescribeUpdateNetwork(_config.UpdateNetwork)}下载官方 {installer.Version} 安装器并核验 SHA-256…";
         });
         _downloadedReleaseInstaller = null;
 
@@ -3113,6 +3497,113 @@ public sealed partial class AppController : IBridgeUiActions, IAsyncDisposable
             ? "需要处理"
             : ViewModel.IsSshHealthy ? "已验证" : "未启动";
         ViewModel.HostFingerprint = ComputeFingerprint(_config.Server.PinnedHostKey);
+        UpdateConnectionDoctor(snapshot, enabled, available);
+    }
+
+    private void UpdateConnectionDoctor(
+        TunnelSnapshot snapshot,
+        int enabledServices,
+        int availableServices)
+    {
+        var diagnosis = snapshot.Phase switch
+        {
+            TunnelPhase.NeedsTailscale => (
+                "第 1 层未通过",
+                "Tailscale 0/1 · Linux 0/1 · SSH 0/1 · 网页 0/1",
+                "Windows 尚未获得可用的 Tailscale 身份。",
+                "Tailscale 未运行、未登录，或本机状态不可读。",
+                "先打开 Tailscale 并确认已登录正确账号，再重新检查。",
+                "重新检查",
+                ConnectionDoctorActionKind.Refresh),
+            TunnelPhase.WrongTailnet => (
+                "第 1 层未通过",
+                "Tailscale 0/1 · Linux 0/1 · SSH 0/1 · 网页 0/1",
+                "当前登录的 tailnet 与配对时固定的 tailnet 不一致。",
+                "Tailscale 账号或网络切换后，JK Bridge 拒绝连接到不同信任域。",
+                "切回原 tailnet；若确实更换环境，请重新进行设备配置。",
+                "打开设备配置",
+                ConnectionDoctorActionKind.Setup),
+            TunnelPhase.PeerUnavailable => (
+                "第 2 层未通过",
+                "Tailscale 1/1 · Linux 0/1 · SSH 0/1 · 网页 0/1",
+                "Tailscale 正常，但找不到已配对的 Linux 节点。",
+                "Linux 可能关机、Tailscale 离线，或节点名称已变化。",
+                "确认 Linux 在线且 Tailscale 已连接；节点更换时重新配置。",
+                "重新检查",
+                ConnectionDoctorActionKind.Refresh),
+            TunnelPhase.NeedsKeySetup or TunnelPhase.NeedsPairing => (
+                "第 3 层未通过",
+                "Tailscale 1/1 · Linux 1/1 · SSH 0/1 · 网页 0/1",
+                "已到达 Linux，但当前 Windows 的 SSH 身份尚未获得精确端口授权。",
+                "密钥未生成、未配对，或新服务端口尚未授权。",
+                "打开设备配置完成一行配对；Agent 用户可预览并确认服务清单授权。",
+                "打开设备配置",
+                ConnectionDoctorActionKind.Setup),
+            TunnelPhase.HostKeyBlocked => (
+                "第 3 层安全阻止",
+                "Tailscale 1/1 · Linux 1/1 · SSH 0/1 · 网页 0/1",
+                "Linux 返回的 SSH 主机密钥与已固定身份不一致。",
+                "这可能是系统重装、主机变化或中间人风险，软件不会自动信任。",
+                "先人工核对 Linux 主机密钥；确认设备确已更换后再重新配对。",
+                "打开设备配置",
+                ConnectionDoctorActionKind.Setup),
+            TunnelPhase.PortConflict => (
+                "第 3 层未通过",
+                "Tailscale 1/1 · Linux 1/1 · SSH 0/1 · 网页 0/1",
+                "Windows 本机端口已被其他程序占用，SSH 无法建立入口。",
+                "某个服务选择的 Windows 访问端口发生冲突。",
+                "打开服务页，采用建议端口并保存后重试连接。",
+                "打开服务页",
+                ConnectionDoctorActionKind.Services),
+            TunnelPhase.Degraded => (
+                "第 4 层部分未通过",
+                $"Tailscale 1/1 · Linux 1/1 · SSH 1/1 · 网页 {availableServices}/{enabledServices}",
+                "安全隧道已建立，但一个或多个 Linux 网页服务没有通过健康检查。",
+                "对应进程可能未启动、端口填写错误，或 HTTPS/健康路径不兼容。",
+                "打开服务页查看失败项；先确认 Linux 进程监听，再复核端口和健康检查。",
+                "打开服务页",
+                ConnectionDoctorActionKind.Services),
+            TunnelPhase.Connected => (
+                "四层全部通过",
+                $"Tailscale 1/1 · Linux 1/1 · SSH 1/1 · 网页 {availableServices}/{enabledServices}",
+                "从 Windows 到 Linux 网页服务的完整链路正常。",
+                "未发现连接根因。",
+                "可直接从概览或服务页打开网页；需要复查时重新运行连接医生。",
+                "重新检查",
+                ConnectionDoctorActionKind.Refresh),
+            TunnelPhase.Starting or TunnelPhase.Preflight or TunnelPhase.Reconnecting => (
+                "正在分层检查",
+                "正在确认 Tailscale → Linux → SSH → 网页",
+                "连接医生正在等待当前检查完成。",
+                "尚未形成稳定结论。",
+                "等待片刻；如长时间没有变化，可点击立即重试。",
+                "立即重试",
+                ConnectionDoctorActionKind.Retry),
+            TunnelPhase.Faulted => (
+                "连接流程异常",
+                "已完成的层级见下方四张状态卡",
+                "连接流程安全停止，未继续尝试不可信或不完整的链路。",
+                DetailFor(snapshot),
+                "先按四张状态卡定位；仍无法处理时导出安全诊断包。",
+                "立即重试",
+                ConnectionDoctorActionKind.Retry),
+            _ => (
+                "尚未连接",
+                "等待开始 Tailscale → Linux → SSH → 网页 检查",
+                "当前没有活动连接。",
+                "连接尚未启动或已暂停。",
+                "点击开始检查；如尚未配置设备，会自动转到设备配置。",
+                "开始检查",
+                ConnectionDoctorActionKind.Refresh),
+        };
+        ViewModel.ApplyConnectionDoctor(
+            diagnosis.Item1,
+            diagnosis.Item2,
+            diagnosis.Item3,
+            diagnosis.Item4,
+            diagnosis.Item5,
+            diagnosis.Item6,
+            diagnosis.Item7);
     }
 
     private void ApplyConfigToViewModel()
@@ -3137,6 +3628,13 @@ public sealed partial class AppController : IBridgeUiActions, IAsyncDisposable
             ThemePreference.Dark => 2,
             _ => 0,
         };
+        ViewModel.UpdateNetworkModeIndex = _config.UpdateNetwork.Mode switch
+        {
+            UpdateNetworkMode.ManualProxy => 1,
+            UpdateNetworkMode.Direct => 2,
+            _ => 0,
+        };
+        ViewModel.UpdateManualProxyUrl = _config.UpdateNetwork.ManualProxyUrl;
         ViewModel.MarkThemeSaved(_config.Behavior.Theme);
         ViewModel.ApplySetupState(
             _config.SetupCompleted,
@@ -3388,6 +3886,22 @@ public sealed partial class AppController : IBridgeUiActions, IAsyncDisposable
             await clipboard.SetTextAsync(value);
         }
     }
+
+    private void ConfigureReleaseUpdateNetwork(UpdateNetworkSettings settings)
+    {
+        if (_releaseUpdateChecker is IReleaseUpdateNetworkConfigurator configurable)
+        {
+            configurable.ConfigureNetwork(settings);
+        }
+    }
+
+    private static string DescribeUpdateNetwork(UpdateNetworkSettings settings) =>
+        settings.Mode switch
+        {
+            UpdateNetworkMode.ManualProxy => $"本机代理 {settings.ManualProxyUrl} ",
+            UpdateNetworkMode.Direct => "直连网络 ",
+            _ => "Windows 系统代理 ",
+        };
 
     private async Task<ServiceHealth> ProbeServiceAsync(ServiceDefinition service)
     {

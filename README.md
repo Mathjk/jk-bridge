@@ -106,19 +106,26 @@ Get-Content .\JKBridge-win-x64.zip.sha256
 
 The two hashes must match. Extract the ZIP to a permanent folder. Releases are not currently code-signed, so Windows may show an unknown-publisher warning; verify the hash before choosing to run the app.
 
-### 3. Copy the Linux helper to Linux
+### 3. Start quick pairing on Linux
 
-The extracted ZIP already contains `jkbridge-linux.py`; there is no separate installer. Copy that one file to the Linux user's home directory using Tailscale file transfer, SCP, a shared folder, or removable media.
+Open **Device setup** in the Windows app and select **Copy one-line pairing
+command**. Paste that command into a Linux terminal as the ordinary account that
+JK Bridge should use for SSH—never with `sudo`. Python 3 is the only requirement;
+there is no repository clone, download directory, or `cd` step.
 
-Run it as the ordinary Linux account that JK Bridge should use for SSH—never with `sudo`:
+The command carries the compressed `jkbridge-linux.py` embedded in the Windows
+build, verifies its pinned SHA-256, and only then executes `pair`. Linux does
+not need internet access. Keep the terminal open. The helper prints a
+`jkbridge://...` code that expires after 10 minutes and one successful use.
+
+If the helper has already been copied manually, the traditional recovery path
+remains available:
 
 ```bash
 chmod 700 ~/jkbridge-linux.py
 python3 ~/jkbridge-linux.py status
 python3 ~/jkbridge-linux.py pair
 ```
-
-Keep this terminal open. The helper prints a `jkbridge://...` code that expires after 10 minutes and after one successful use.
 
 ### 4. Pair from Windows
 
@@ -221,14 +228,23 @@ That optional Agent-first flow is **not the supported default in v2.2.0**:
   enrollment/management client exist in the source tree. One deployed pair has
   completed non-root install/bootstrap/start/restart/status, explicit Agent
   discovery, first-admin enrollment, catalog synchronization, exact SSH grants,
-  and connection. The complete clean-machine lifecycle, second-device
-  revocation, and stable-release sign-off remain open;
+  and connection. Manifest-verified upgrade, rollback, state-preserving
+  uninstall, second-device revocation, and automated tests are implemented;
+  clean-machine live acceptance and stable-release sign-off remain open;
+- the current source build exposes a two-step Agent setup: copy one self-
+  contained command from Windows into the ordinary Linux user's terminal, then
+  paste the printed `JKBA1.` setup code into Windows. There is no clone,
+  download-directory, or `cd` step. The same command upgrades an already
+  managed Agent while preserving its identity, so Windows needs no new code.
+  Python 3.9+, Tailscale, OpenSSH Server, `socat`, `ss`, and a systemd user
+  manager remain explicit OS prerequisites and are never installed with sudo;
 - any enrolled Agent device can manually synchronize its service selection
   through authenticated `/v1/me` plus `/v1/services`; an administrator can also
   list all devices and revoke a selected non-current device after explicit
   confirmation, and can generate a transient 10-minute, one-use code for adding
   one ordinary device. The first administrator still uses the code printed by
-  Linux bootstrap/recovery;
+  Linux bootstrap/recovery, now wrapped with the verified endpoint in the
+  `JKBA1.` setup code;
 - a bounded, read-only discovery engine exists and tests only known online
   Tailscale peers on port `45871`, checking node ID, MagicDNS identity, tailnet,
   protocol, and Agent version. The v2.2.0 Setup page exposes this in its advanced
@@ -237,6 +253,21 @@ That optional Agent-first flow is **not the supported default in v2.2.0**:
   separate action. Discovery never enrolls a device, so a one-time code and an
   explicit enrollment click are still required. This GUI has not completed
   clean-Windows acceptance.
+
+The current source Services page also has an administrator-only **Linux pending
+services** inbox. One explicit scan reads only the current exact
+`127.0.0.1` listener table and performs bounded loopback metadata probes; it
+does not scan disks or port ranges. The user may instead paste a strict
+`http(s)://127.0.0.1:port/path` or `localhost` URL. Both paths create only a
+disabled Windows draft, strip query/fragment secrets from pasted URLs, and
+leave the Linux catalog and SSH grants unchanged until the existing diff
+preview is explicitly confirmed. Recognition templates cover Syncthing,
+JupyterLab, Grafana, Ollama, ComfyUI, Stable Diffusion WebUI, Overleaf, and
+Sub2API with a generic fallback.
+
+Diagnostics now presents a four-layer **Connection Doctor** (Tailscale peer,
+SSH trust/authorization, tunnel, and service health) with a specific cause,
+next action, and contextual retry/setup/services button.
 
 The optional experimental Agent in v2.2.0 also has an administrator-only
 **Linux reachable target** workflow. It first returns a read-only plan and probe, displays the

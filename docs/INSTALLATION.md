@@ -220,20 +220,20 @@ an official Release. The official installer can detect Tailscale, open its
 official download page, and offer a UAC-confirmed OpenSSH Client installation;
 it cannot sign in to Tailscale for you.
 
-Starting with Preview 4, an installed build can use **Settings → Version check
-→ Check official Release**, followed by **Download and verify update**. Preview
-builds remain on the Preview channel; stable builds use the stable channel. JK
-Bridge accepts only a matching installer and `.sha256` pair from the same
-official Release. The first phase shows real byte/percentage progress and
-verification stages, can be cancelled, and leaves JK Bridge running. Only the
-separate **Start installation (JK Bridge will exit)** action starts the normal
-visible Windows setup wizard. JK Bridge requests a controlled shutdown only
-after setup process creation succeeds; the setup wizard then displays the real
-installation progress.
-Preview 6 uses the Windows/.NET system proxy for GitHub metadata and assets
-while retaining exact-host, redirect, size, and SHA-256 validation. Preview 4/5
-forced direct connections; a proxy-dependent machine must manually install
-Preview 6 once before later in-app downloads can use its system proxy.
+An installed build can use **Settings → Software update → Check official
+Release**, followed by **Download and verify update**. Preview builds remain on
+the Preview channel; stable builds use the stable channel. JK Bridge accepts
+only a matching installer and `.sha256` pair from the same official Release.
+The first phase shows bytes, percentage, average speed, estimated remaining time
+and verification stages, can be cancelled, and leaves JK Bridge running. Only
+the separate **Start installation (JK Bridge will exit)** action starts the
+normal visible Windows setup wizard. JK Bridge requests a controlled shutdown
+only after setup process creation succeeds; the setup wizard then displays the
+real installation progress.
+Update traffic can follow the Windows system proxy, use an explicitly entered
+loopback HTTP proxy, or connect directly. Manual proxy URLs accept only
+`localhost`, `127.0.0.1`, or `::1` with an explicit port and no credentials
+or path. Every mode retains exact-host, redirect, size, and SHA-256 validation.
 Preview 6 then recognizes stable v2.2.0 as a newer semantic version and selects
 the stable installer/checksum pair, which is the intended test path for this
 release.
@@ -245,19 +245,27 @@ overlay install. Preview 1 has no update control. If the old one-step action in
 Preview 2/3 stalls, manually download Preview 4, or explicitly exit the old tray
 process before running its already verified installer.
 
-## 5. Copy and run the Linux helper
+## 5. Start quick pairing on Linux
 
-The extracted Windows package contains `jkbridge-linux.py`. Copy it to the ordinary Linux user's home directory by Tailscale file transfer, SCP, a shared folder, or removable media.
+In Windows **Device setup**, select **Copy one-line pairing command**, then paste
+it into a Linux terminal as the ordinary target SSH user. Do not use `sudo`.
+A clean Linux system needs only Python 3; it does not need a project download,
+script lookup, or working-directory change.
 
-On Linux:
+The command carries the compressed helper embedded in the Windows build and
+verifies its pinned SHA-256 before execution, so Linux needs no internet access.
+Keep the terminal open and copy the complete `jkbridge://...` value. Treat it like a temporary password: it
+expires after 10 minutes, one successful request, cancellation, or too many
+failed requests.
+
+If the helper was already copied manually, the traditional recovery commands
+remain available:
 
 ```bash
 chmod 700 ~/jkbridge-linux.py
 python3 ~/jkbridge-linux.py status
 python3 ~/jkbridge-linux.py pair
 ```
-
-Do not use `sudo`. Keep the terminal open and copy the complete `jkbridge://...` value. Treat it like a temporary password: do not publish it or save it in notes. It expires after 10 minutes, one successful request, cancellation, or too many failed requests.
 
 ## 6. Pair and connect on Windows
 

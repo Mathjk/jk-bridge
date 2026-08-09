@@ -92,7 +92,9 @@ public sealed record SettingsDraft(
     bool AutoReconnect,
     bool CloseToTray,
     bool StartWithWindows,
-    int ThemeIndex);
+    int ThemeIndex,
+    int UpdateNetworkModeIndex,
+    string UpdateManualProxyUrl);
 
 public sealed record PairingDraft(
     string PairingCode,
@@ -102,7 +104,8 @@ public sealed record AgentEnrollmentDraft(
     string Endpoint,
     string RecoveryCode,
     string DeviceLabel,
-    string IdentityFile);
+    string IdentityFile,
+    string SetupCode = "");
 
 public sealed record AgentDeviceUiState(
     string DeviceId,
@@ -132,6 +135,22 @@ public sealed record AgentRelayDraft(
     string WindowsLocalPort,
     bool GrantToAllDevices);
 
+public sealed record LinuxPendingServiceUiState(
+    int Port,
+    string ProcessName,
+    string Scheme,
+    bool WebDetected,
+    int? StatusCode,
+    string Title,
+    string SuggestedTemplateId)
+{
+    public string DisplayText =>
+        $"{Title} · 127.0.0.1:{Port} · " +
+        (WebDetected
+            ? $"{Scheme.ToUpperInvariant()} {(StatusCode is int status ? status : 0)}"
+            : "仅检测到 TCP 监听");
+}
+
 public sealed record AgentDiscoveryCandidateUiState(
     string Endpoint,
     string DisplayName,
@@ -160,6 +179,9 @@ public interface IBridgeUiActions
     Task CopyAddressAsync(string localUrl);
     Task SetServiceEnabledAsync(string serviceId, bool enabled);
     Task AddServiceAsync();
+    Task ScanLinuxPendingServicesAsync() => Task.CompletedTask;
+    Task AddLinuxPendingServiceAsync(LinuxPendingServiceUiState service) => Task.CompletedTask;
+    Task AddLinuxUrlDraftAsync(string linuxLocalUrl) => Task.CompletedTask;
     Task SaveServiceAsync(ServiceUiState service);
     Task RemoveServiceAsync(string serviceId);
     Task ScanWindowsLocalServicesAsync() => Task.CompletedTask;
@@ -182,6 +204,7 @@ public interface IBridgeUiActions
     Task ExportDiagnosticBundleAsync() => Task.CompletedTask;
     Task CheckForUpdatesAsync() => Task.CompletedTask;
     Task InstallCheckedReleaseAsync() => Task.CompletedTask;
+    Task OpenReleasePageAsync() => Task.CompletedTask;
     void CancelReleaseUpdate()
     {
     }
@@ -191,11 +214,13 @@ public interface IBridgeUiActions
     }
     Task SaveSettingsAsync(SettingsDraft settings);
     Task CompleteWelcomeTutorialAsync() => Task.CompletedTask;
+    Task CopyLinuxQuickPairCommandAsync() => Task.CompletedTask;
+    Task CopyLinuxAgentInstallCommandAsync() => Task.CompletedTask;
     Task PairDeviceAsync(PairingDraft pairing);
 
     /// <summary>
     /// Explicitly enrolls this Windows device with an optional Linux Agent.
-    /// Implementations must treat <see cref="AgentEnrollmentDraft.RecoveryCode"/> as a secret.
+    /// Implementations must treat both the setup code and recovery code as secrets.
     /// </summary>
     Task EnrollWithAgentAsync(AgentEnrollmentDraft enrollment) => Task.CompletedTask;
     Task SyncAgentCatalogAsync() => Task.CompletedTask;

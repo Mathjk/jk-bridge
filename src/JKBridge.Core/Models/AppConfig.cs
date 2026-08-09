@@ -4,7 +4,7 @@ namespace JKBridge.Core.Models;
 
 public sealed record AppConfig
 {
-    public const int CurrentSchemaVersion = 6;
+    public const int CurrentSchemaVersion = 7;
 
     public int SchemaVersion { get; init; } = CurrentSchemaVersion;
 
@@ -17,6 +17,8 @@ public sealed record AppConfig
     public BehaviorSettings Behavior { get; init; } = new();
 
     public ForwardAuthorizationGrant Authorization { get; init; } = new();
+
+    public UpdateNetworkSettings UpdateNetwork { get; init; } = new();
 
     public AgentRegistration Agent { get; init; } = new();
 
@@ -107,6 +109,20 @@ public sealed record BehaviorSettings
 
     [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingDefault)]
     public bool WelcomeTutorialCompleted { get; init; }
+}
+
+public sealed record UpdateNetworkSettings
+{
+    public UpdateNetworkMode Mode { get; init; } = UpdateNetworkMode.System;
+
+    public string ManualProxyUrl { get; init; } = string.Empty;
+}
+
+public enum UpdateNetworkMode
+{
+    System,
+    ManualProxy,
+    Direct,
 }
 
 public sealed record ForwardAuthorizationGrant

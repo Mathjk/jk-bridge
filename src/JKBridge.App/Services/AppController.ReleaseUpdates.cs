@@ -117,14 +117,17 @@ public sealed partial class AppController
                     {
                         ViewModel.IsUpdateProgressIndeterminate = false;
                         ViewModel.UpdateProgressPercent = percentage;
+                        var speed = FormatTransferRate(progress.BytesPerSecond);
+                        var remaining = FormatRemaining(progress.EstimatedRemaining);
                         ViewModel.UpdateProgressText =
-                            $"{FormatByteCount(progress.BytesReceived)} / {FormatByteCount(totalBytes)} · {percentage:0}%";
+                            $"{FormatByteCount(progress.BytesReceived)} / {FormatByteCount(totalBytes)} · {percentage:0}%{speed}{remaining}";
                     }
                     else
                     {
                         ViewModel.IsUpdateProgressIndeterminate = true;
+                        var speed = FormatTransferRate(progress.BytesPerSecond);
                         ViewModel.UpdateProgressText =
-                            $"{FormatByteCount(progress.BytesReceived)} 已下载";
+                            $"{FormatByteCount(progress.BytesReceived)} 已下载{speed}";
                     }
                     break;
                 case ReleaseDownloadStage.VerifyingInstaller:
@@ -150,5 +153,30 @@ public sealed partial class AppController
         }
 
         return $"{bytes} B";
+    }
+
+    private static string FormatTransferRate(double? bytesPerSecond)
+    {
+        if (bytesPerSecond is null || bytesPerSecond <= 0 ||
+            double.IsNaN(bytesPerSecond.Value) || double.IsInfinity(bytesPerSecond.Value))
+        {
+            return string.Empty;
+        }
+
+        return $" · {FormatByteCount((long)bytesPerSecond.Value)}/s";
+    }
+
+    private static string FormatRemaining(TimeSpan? remaining)
+    {
+        if (remaining is null || remaining < TimeSpan.Zero ||
+            remaining > TimeSpan.FromDays(1))
+        {
+            return string.Empty;
+        }
+
+        var text = remaining.Value.TotalMinutes >= 1
+            ? $"{Math.Ceiling(remaining.Value.TotalMinutes):0} 分钟"
+            : $"{Math.Max(1, Math.Ceiling(remaining.Value.TotalSeconds)):0} 秒";
+        return $" · 约 {text}";
     }
 }

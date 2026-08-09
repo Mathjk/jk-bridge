@@ -246,6 +246,22 @@ public sealed class AgentClient : IDisposable
         return AgentProtocolValidation.ValidateRename(response, deviceId, validatedLabel);
     }
 
+    public async Task<AgentLoopbackDiscoveryResponse> GetLoopbackDiscoveryAsync(
+        AgentCredential adminCredential,
+        CancellationToken cancellationToken = default)
+    {
+        var authorization = CreateDeviceAuthorization(adminCredential);
+        var response = await SendAsync<AgentLoopbackDiscoveryResponse>(
+                HttpMethod.Get,
+                "v1/discovery",
+                requestBody: null,
+                authorization,
+                cancellationToken,
+                adminCredential)
+            .ConfigureAwait(false);
+        return ValidateLoopbackDiscovery(response);
+    }
+
     public async Task<AgentServiceCatalogResponse> GetServiceCatalogAsync(
         AgentCredential deviceCredential,
         CancellationToken cancellationToken = default)
@@ -855,6 +871,64 @@ public sealed class AgentClient : IDisposable
                 response.NextServicesRevision)),
             response.Applied,
             response.BackupCreated);
+    }
+
+    private static AgentLoopbackDiscoveryResponse ValidateLoopbackDiscovery(
+        AgentLoopbackDiscoveryResponse? response)
+    {
+        if (response is null ||
+            response.ProtocolVersion != AgentProtocol.Version ||
+            response.Scope != "current-127.0.0.1-listeners" ||
+            response.Candidates is null ||
+            response.Candidates.Count > AgentProtocol.MaximumServices ||
+            response.ExcludedKnownServiceCount < 0 ||
+            string.IsNullOrWhiteSpace(response.Note) ||
+            response.Note.Length > 256)
+        {
+            throw new AgentProtocolException(
+                "JK Bridge Agent returned an invalid loopback discovery response.",
+                "invalid_response");
+        }
+
+        var ports = new HashSet<int>();
+        foreach (var candidate in response.Candidates)
+        {
+            if (candidate.Port is < 1 or > 65535 ||
+                !ports.Add(candidate.Port) ||
+                candidate.BindAddress != "127.0.0.1" ||
+                candidate.ProcessName.Length > 64 ||
+                candidate.ProcessName.Any(character =>
+                    !(char.IsAsciiLetterOrDigit(character) || character is '_' or '-' or '.' or '+')) ||
+                candidate.Scheme is not ("http" or "https" or "tcp") ||
+                candidate.StatusCode is not null and (< 100 or > 599) ||
+                string.IsNullOrWhiteSpace(candidate.Title) ||
+                candidate.Title != candidate.Title.Trim() ||
+                candidate.Title.Length > 120 ||
+                candidate.Title.Any(char.IsControl) ||
+                candidate.HealthPath != "/" ||
+                candidate.SuggestedTemplateId.Length is < 1 or > 48 ||
+                candidate.SuggestedTemplateId[0] is < 'a' or > 'z' ||
+                candidate.SuggestedTemplateId.Any(character =>
+                    character is not (>= 'a' and <= 'z') and
+                    not (>= '0' and <= '9') and
+                    not '-'))
+            {
+                throw new AgentProtocolException(
+                    "JK Bridge Agent returned an unsafe loopback discovery candidate.",
+                    "invalid_response");
+            }
+
+            if (candidate.WebDetected != !candidate.Scheme.Equals("tcp", StringComparison.Ordinal) ||
+                candidate.Scheme == "https" && candidate.TlsCertificateVerified is not false ||
+                candidate.Scheme != "https" && candidate.TlsCertificateVerified is not null)
+            {
+                throw new AgentProtocolException(
+                    "JK Bridge Agent returned inconsistent loopback probe metadata.",
+                    "invalid_response");
+            }
+        }
+
+        return response;
     }
 
     private static string NormalizeRevision(JsonElement value)

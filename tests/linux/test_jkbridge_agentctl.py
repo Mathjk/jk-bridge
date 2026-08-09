@@ -1,5 +1,8 @@
+import base64
 import hashlib
+import json
 import os
+import shutil
 import stat
 import subprocess
 import tempfile
@@ -31,7 +34,7 @@ class AgentControllerFixture:
             "tailscale",
             "#!/bin/sh\n"
             "printf '%s\\n' "
-            "'{\"BackendState\":\"Running\",\"Self\":{\"TailscaleIPs\":[\"100.64.0.10\"]}}'\n",
+            "'{\"BackendState\":\"Running\",\"CurrentTailnet\":{\"MagicDNSSuffix\":\"example.ts.net\"},\"Self\":{\"DNSName\":\"linux.example.ts.net.\",\"StableID\":\"node-fixture\",\"TailscaleIPs\":[\"100.64.0.10\"]}}'\n",
         )
         self._executable("socat", "#!/bin/sh\nexit 0\n")
         self._executable(
@@ -56,12 +59,14 @@ class AgentControllerFixture:
         )
         return environment
 
-    def command(self, *arguments: str) -> subprocess.CompletedProcess[str]:
+    def command(
+        self, *arguments: str, source_dir: Path = SOURCE_DIR
+    ) -> subprocess.CompletedProcess[str]:
         return subprocess.run(
             [
                 str(CONTROLLER),
                 "--source-dir",
-                str(SOURCE_DIR),
+                str(source_dir),
                 "--host-key",
                 str(self.host_key),
                 *arguments,
@@ -144,9 +149,122 @@ class AgentControllerTests(unittest.TestCase):
             self.assertTrue(manifest.is_file())
             self.assertTrue(install_manifest.is_file())
             self.assertEqual(0o600, install_manifest.stat().st_mode & 0o777)
+            setup_code = next(
+                line for line in result.stdout.splitlines() if line.startswith("JKBA1.")
+            )
+            encoded = setup_code.removeprefix("JKBA1.")
+            payload = json.loads(
+                base64.urlsafe_b64decode(encoded + "=" * (-len(encoded) % 4))
+            )
+            self.assertEqual(1, payload["version"])
+            self.assertEqual("http://100.64.0.10:45999/", payload["endpoint"])
+            self.assertEqual(43, len(payload["enrollmentCode"]))
+            self.assertNotIn(
+                payload["enrollmentCode"],
+                state.read_text(encoding="utf-8"),
+            )
             calls = fixture.log.read_text(encoding="utf-8")
             self.assertIn("--user daemon-reload", calls)
             self.assertIn("--user enable --now jkbridge-agent.service", calls)
+
+    def test_upgrade_and_rollback_preserve_state_keys_and_custom_port(self):
+        with tempfile.TemporaryDirectory() as temporary:
+            root = Path(temporary)
+            fixture = AgentControllerFixture(root)
+            ssh_dir = fixture.home / ".ssh"
+            ssh_dir.mkdir(mode=0o700)
+            authorized = ssh_dir / "authorized_keys"
+            authorized.write_text("# retained through lifecycle\n", encoding="utf-8")
+            installed = fixture.command("--yes", "--port", "45999", "install")
+            self.assertEqual(0, installed.returncode, installed.stderr)
+
+            state_dir = fixture.home / ".local" / "state" / "jkbridge-agent"
+            state_digest = hashlib.sha256((state_dir / "state.json").read_bytes()).hexdigest()
+            key_digest = hashlib.sha256(authorized.read_bytes()).hexdigest()
+            upgrade_source = root / "upgrade-source"
+            shutil.copytree(SOURCE_DIR, upgrade_source)
+            source_agent = upgrade_source / "jkbridge_agent.py"
+            source_agent.write_text(
+                source_agent.read_text(encoding="utf-8") + "\n# upgraded fixture\n",
+                encoding="utf-8",
+            )
+
+            upgraded = fixture.command("--yes", "upgrade", source_dir=upgrade_source)
+
+            self.assertEqual(0, upgraded.returncode, upgraded.stderr)
+            installed_agent = (
+                fixture.home / ".local" / "lib" / "jkbridge" / "jkbridge_agent.py"
+            )
+            self.assertIn("# upgraded fixture", installed_agent.read_text(encoding="utf-8"))
+            snapshots = list((state_dir / "rollback").iterdir())
+            self.assertEqual(1, len(snapshots))
+            self.assertTrue((snapshots[0] / "snapshot.sha256").is_file())
+            self.assertIn(
+                "JKBRIDGE_AGENT_PORT=45999",
+                (
+                    fixture.home / ".config" / "jkbridge-agent" / "agent.env"
+                ).read_text(encoding="utf-8"),
+            )
+            self.assertEqual(
+                state_digest,
+                hashlib.sha256((state_dir / "state.json").read_bytes()).hexdigest(),
+            )
+            self.assertEqual(key_digest, hashlib.sha256(authorized.read_bytes()).hexdigest())
+
+            rolled_back = fixture.command("--yes", "rollback")
+
+            self.assertEqual(0, rolled_back.returncode, rolled_back.stderr)
+            self.assertNotIn("# upgraded fixture", installed_agent.read_text(encoding="utf-8"))
+            self.assertEqual(
+                state_digest,
+                hashlib.sha256((state_dir / "state.json").read_bytes()).hexdigest(),
+            )
+            self.assertEqual(key_digest, hashlib.sha256(authorized.read_bytes()).hexdigest())
+            calls = fixture.log.read_text(encoding="utf-8")
+            self.assertIn("--user stop jkbridge-agent.service", calls)
+            self.assertIn("--user start jkbridge-agent.service", calls)
+
+    def test_uninstall_removes_verified_runtime_but_preserves_private_state_and_keys(self):
+        with tempfile.TemporaryDirectory() as temporary:
+            fixture = AgentControllerFixture(Path(temporary))
+            ssh_dir = fixture.home / ".ssh"
+            ssh_dir.mkdir(mode=0o700)
+            authorized = ssh_dir / "authorized_keys"
+            authorized.write_text("# preserved after uninstall\n", encoding="utf-8")
+            installed = fixture.command("--yes", "install")
+            self.assertEqual(0, installed.returncode, installed.stderr)
+            state_dir = fixture.home / ".local" / "state" / "jkbridge-agent"
+            state_digest = hashlib.sha256((state_dir / "state.json").read_bytes()).hexdigest()
+            key_digest = hashlib.sha256(authorized.read_bytes()).hexdigest()
+
+            removed = fixture.command("--yes", "uninstall")
+
+            self.assertEqual(0, removed.returncode, removed.stderr)
+            self.assertFalse(
+                (fixture.home / ".local" / "lib" / "jkbridge" / "jkbridge_agent.py").exists()
+            )
+            self.assertFalse(
+                (fixture.home / ".local" / "bin" / "jkbridge-agentctl").exists()
+            )
+            self.assertFalse(
+                (
+                    fixture.home
+                    / ".config"
+                    / "systemd"
+                    / "user"
+                    / "jkbridge-agent.service"
+                ).exists()
+            )
+            self.assertFalse((state_dir / "install-manifest.sha256").exists())
+            self.assertEqual(
+                state_digest,
+                hashlib.sha256((state_dir / "state.json").read_bytes()).hexdigest(),
+            )
+            self.assertEqual(key_digest, hashlib.sha256(authorized.read_bytes()).hexdigest())
+            self.assertIn(
+                "--user disable --now jkbridge-agent.service",
+                fixture.log.read_text(encoding="utf-8"),
+            )
 
     def test_fallback_stops_only_and_retains_state_keys_and_one_shot_helper(self):
         with tempfile.TemporaryDirectory() as temporary:

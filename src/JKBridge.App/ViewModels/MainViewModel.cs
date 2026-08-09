@@ -3,6 +3,7 @@ using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
 using JKBridge.App.Services;
 using JKBridge.Core.Models;
+using JKBridge.Core.Pairing;
 
 namespace JKBridge.App.ViewModels;
 
@@ -13,6 +14,14 @@ public enum AppPage
     Services,
     Diagnostics,
     Settings,
+}
+
+public enum ConnectionDoctorActionKind
+{
+    Refresh,
+    Retry,
+    Setup,
+    Services,
 }
 
 public sealed record WelcomeTutorialStep(
@@ -162,6 +171,13 @@ public partial class MainViewModel : ViewModelBase
     [ObservableProperty] private bool _hasSshIssue;
     [ObservableProperty] private bool _isDiagnosticBundleBusy;
     [ObservableProperty] private string _diagnosticBundleFeedback = "诊断包仅包含允许列出的匿名状态和脱敏日志；导出前由你选择保存位置。";
+    [ObservableProperty] private string _connectionDoctorStatus = "等待检查";
+    [ObservableProperty] private string _connectionDoctorProgressText = "尚未完成分层检查";
+    [ObservableProperty] private string _connectionDoctorSummary = "点击“重新检查”，连接医生会按 Tailscale、Linux、SSH、网页四层定位。";
+    [ObservableProperty] private string _connectionDoctorRootCause = "尚无结论";
+    [ObservableProperty] private string _connectionDoctorNextStep = "先运行一次检查。";
+    [ObservableProperty] private string _connectionDoctorActionLabel = "开始检查";
+    [ObservableProperty] private ConnectionDoctorActionKind _connectionDoctorActionKind = ConnectionDoctorActionKind.Refresh;
 
     // Editable settings draft. Persistence belongs to the injected adapter.
     [ObservableProperty] private string _linuxHost = string.Empty;
@@ -191,9 +207,23 @@ public partial class MainViewModel : ViewModelBase
     [ObservableProperty] private string _applicationFooterText = "JK Bridge · Windows 11";
     [ObservableProperty] private string _updateCheckFeedback = "仅在你点击后查询 JK Bridge 官方 GitHub Releases；确认后可下载、校验并启动覆盖安装。";
     [ObservableProperty] private string _updateReleaseUrl = string.Empty;
+    [ObservableProperty] private int _updateNetworkModeIndex;
+    [ObservableProperty] private string _updateManualProxyUrl = string.Empty;
+    [ObservableProperty]
+    private string _linuxQuickPairFeedback =
+        "复制到 Linux 终端运行；只需 Python 3，无需 Linux 外网、下载项目或切换目录。";
     [ObservableProperty] private bool _isLinuxServicesMode = true;
     [ObservableProperty] private bool _isWindowsLocalServiceScanning;
     [ObservableProperty] private string _serviceFeedback = "远端主机固定为 127.0.0.1，不会暴露给局域网。";
+    [ObservableProperty] private bool _isLinuxPendingServiceScanning;
+    [ObservableProperty]
+    private string _linuxPendingServiceFeedback =
+        "Agent 管理员可读取 Linux 当前 127.0.0.1 监听；不会扫描磁盘或端口范围。";
+    [ObservableProperty] private LinuxPendingServiceUiState? _selectedLinuxPendingService;
+    [ObservableProperty] private string _linuxQuickAddUrl = string.Empty;
+    [ObservableProperty]
+    private string _linuxQuickAddFeedback =
+        "也可直接粘贴 Linux 上的 http(s)://127.0.0.1:端口/路径。";
     [ObservableProperty]
     private string _windowsLocalScanFeedback =
         "点击“扫描本机”读取当前回环监听；不会扫描磁盘或遍历全部端口。";
@@ -212,9 +242,13 @@ public partial class MainViewModel : ViewModelBase
     [ObservableProperty] private string _configuredDeviceText = "尚未配置 Linux 设备";
 
     // Optional Linux Agent enrollment. The recovery code stays only in this transient UI draft.
+    [ObservableProperty] private string _agentSetupCode = string.Empty;
     [ObservableProperty] private string _agentEndpoint = string.Empty;
     [ObservableProperty] private string _agentRecoveryCode = string.Empty;
     [ObservableProperty] private string _agentDeviceLabel = Environment.MachineName;
+    [ObservableProperty]
+    private string _linuxAgentInstallFeedback =
+        "复制后在 Linux 终端运行；无需下载项目、进入目录或使用 sudo。";
     [ObservableProperty] private bool _isAgentEnrolling;
     [ObservableProperty] private string _agentEnrollmentFeedback = "Agent 是可选项；不可用时仍可使用下方的一次性配对。";
     [ObservableProperty] private string _agentConnectionStatus = "等待开始";
@@ -299,6 +333,7 @@ public partial class MainViewModel : ViewModelBase
 
     public ObservableCollection<AgentDeviceUiState> AgentDevices { get; } = [];
     public ObservableCollection<AgentDiscoveryCandidateUiState> AgentDiscoveryCandidates { get; } = [];
+    public ObservableCollection<LinuxPendingServiceUiState> LinuxPendingServices { get; } = [];
 
     public bool IsOverview => SelectedPage == AppPage.Overview;
     public bool IsSetup => SelectedPage == AppPage.Setup;
@@ -317,6 +352,14 @@ public partial class MainViewModel : ViewModelBase
     public bool HasNoIssue => !HasIssue;
     public bool IsWindowsLocalServicesMode => !IsLinuxServicesMode;
     public bool CanScanWindowsLocalServices => !IsWindowsLocalServiceScanning;
+    public bool CanScanLinuxPendingServices =>
+        IsAgentConfigured && CurrentAgentDeviceIsAdmin &&
+        !IsLinuxPendingServiceScanning && !IsAgentManaging;
+    public bool CanAddSelectedLinuxPendingService =>
+        CanScanLinuxPendingServices && SelectedLinuxPendingService is not null;
+    public bool CanAddLinuxUrlDraft =>
+        !string.IsNullOrWhiteSpace(LinuxQuickAddUrl) && !IsAgentManaging;
+    public bool HasLinuxPendingServices => LinuxPendingServices.Count > 0;
     public bool HasDiscoveredWindowsLocalServices => DiscoveredWindowsLocalServices.Count > 0;
     public bool CanExportDiagnosticBundle => !IsDiagnosticBundleBusy;
     public bool CanCheckForUpdates => !IsUpdateChecking;
@@ -326,6 +369,16 @@ public partial class MainViewModel : ViewModelBase
     public bool CanLaunchDownloadedReleaseInstaller => IsUpdateReadyToInstall && !IsUpdateChecking;
     public bool CanStartPairing =>
         !IsPairing && !IsAgentEnrolling && !IsAgentDiscovering && !IsAgentManaging && !IsServiceProfileBusy;
+    public bool IsManualUpdateProxy => UpdateNetworkModeIndex == 1;
+    public string UpdateNetworkModeDescription =>
+        UpdateNetworkModeIndex switch
+        {
+            1 => "使用本机 HTTP 代理；仅接受 127.0.0.1、localhost 或 ::1 与明确端口。",
+            2 => "绕过系统代理直接连接 GitHub；受限网络中可能很慢或失败。",
+            _ => "跟随 Windows/.NET 系统代理；系统没有代理时会直接连接。",
+        };
+    public string LinuxQuickPairCommand => LinuxPairingBootstrap.PairCommand;
+    public string LinuxAgentInstallCommand => LinuxAgentBootstrap.InstallCommand;
     public bool CanStartAgentEnrollment =>
         !IsAgentEnrolling && !IsAgentDiscovering && !IsPairing && !IsAgentManaging && !IsServiceProfileBusy;
     public bool CanManageAgent =>
@@ -455,6 +508,12 @@ public partial class MainViewModel : ViewModelBase
         OnPropertyChanged(nameof(CanApplyAgentCatalogUpdate));
     }
 
+    partial void OnUpdateNetworkModeIndexChanged(int value)
+    {
+        OnPropertyChanged(nameof(IsManualUpdateProxy));
+        OnPropertyChanged(nameof(UpdateNetworkModeDescription));
+    }
+
     partial void OnIsAgentEnrollingChanged(bool value)
     {
         OnPropertyChanged(nameof(CanStartPairing));
@@ -479,6 +538,8 @@ public partial class MainViewModel : ViewModelBase
         OnPropertyChanged(nameof(CanUseDiscoveredAgent));
         OnPropertyChanged(nameof(CanApplyAgentCatalogUpdate));
         OnPropertyChanged(nameof(CanRebindAgentEndpoint));
+        OnPropertyChanged(nameof(CanScanLinuxPendingServices));
+        OnPropertyChanged(nameof(CanAddSelectedLinuxPendingService));
     }
 
     partial void OnIsAgentManagingChanged(bool value)
@@ -495,6 +556,9 @@ public partial class MainViewModel : ViewModelBase
         OnPropertyChanged(nameof(CanUseDiscoveredAgent));
         OnPropertyChanged(nameof(CanApplyAgentCatalogUpdate));
         OnPropertyChanged(nameof(CanRebindAgentEndpoint));
+        OnPropertyChanged(nameof(CanScanLinuxPendingServices));
+        OnPropertyChanged(nameof(CanAddSelectedLinuxPendingService));
+        OnPropertyChanged(nameof(CanAddLinuxUrlDraft));
     }
 
     partial void OnCurrentAgentDeviceIsAdminChanged(bool value)
@@ -505,7 +569,21 @@ public partial class MainViewModel : ViewModelBase
         OnPropertyChanged(nameof(CanDiscoverAgents));
         OnPropertyChanged(nameof(CanUseDiscoveredAgent));
         OnPropertyChanged(nameof(CanApplyAgentCatalogUpdate));
+        OnPropertyChanged(nameof(CanScanLinuxPendingServices));
+        OnPropertyChanged(nameof(CanAddSelectedLinuxPendingService));
     }
+
+    partial void OnIsLinuxPendingServiceScanningChanged(bool value)
+    {
+        OnPropertyChanged(nameof(CanScanLinuxPendingServices));
+        OnPropertyChanged(nameof(CanAddSelectedLinuxPendingService));
+    }
+
+    partial void OnSelectedLinuxPendingServiceChanged(LinuxPendingServiceUiState? value) =>
+        OnPropertyChanged(nameof(CanAddSelectedLinuxPendingService));
+
+    partial void OnLinuxQuickAddUrlChanged(string value) =>
+        OnPropertyChanged(nameof(CanAddLinuxUrlDraft));
 
     partial void OnSelectedAgentDeviceChanged(AgentDeviceUiState? value)
     {
@@ -714,6 +792,16 @@ public partial class MainViewModel : ViewModelBase
     private Task RunDiagnosticsAsync() => _actions.RunDiagnosticsAsync();
 
     [RelayCommand]
+    private Task RunConnectionDoctorActionAsync() =>
+        ConnectionDoctorActionKind switch
+        {
+            ConnectionDoctorActionKind.Setup => RunAndNavigateAsync(AppPage.Setup),
+            ConnectionDoctorActionKind.Services => RunAndNavigateAsync(AppPage.Services),
+            ConnectionDoctorActionKind.Retry => _actions.RetryAsync(),
+            _ => _actions.RunDiagnosticsAsync(),
+        };
+
+    [RelayCommand]
     private Task ExportDiagnosticBundleAsync() =>
         CanExportDiagnosticBundle ? _actions.ExportDiagnosticBundleAsync() : Task.CompletedTask;
 
@@ -726,6 +814,9 @@ public partial class MainViewModel : ViewModelBase
         CanInstallUpdate ? _actions.InstallCheckedReleaseAsync() : Task.CompletedTask;
 
     [RelayCommand]
+    private Task OpenReleasePageAsync() => _actions.OpenReleasePageAsync();
+
+    [RelayCommand]
     private void CancelReleaseUpdate() => _actions.CancelReleaseUpdate();
 
     [RelayCommand]
@@ -733,6 +824,13 @@ public partial class MainViewModel : ViewModelBase
         CanLaunchDownloadedReleaseInstaller
             ? _actions.LaunchDownloadedReleaseInstallerAsync()
             : Task.CompletedTask;
+
+    [RelayCommand]
+    private Task CopyLinuxQuickPairCommandAsync() => _actions.CopyLinuxQuickPairCommandAsync();
+
+    [RelayCommand]
+    private Task CopyLinuxAgentInstallCommandAsync() =>
+        _actions.CopyLinuxAgentInstallCommandAsync();
 
     [RelayCommand]
     private async Task PairDeviceAsync()
@@ -757,7 +855,8 @@ public partial class MainViewModel : ViewModelBase
             AgentEndpoint,
             AgentRecoveryCode,
             AgentDeviceLabel,
-            PairingIdentityFile));
+            PairingIdentityFile,
+            AgentSetupCode));
     }
 
     [RelayCommand]
@@ -882,7 +981,8 @@ public partial class MainViewModel : ViewModelBase
         var draft = new SettingsDraft(
             LinuxHost, LinuxUser, SshPort, IdentityFile, PinnedHostKey,
             AutoConnect, AutoReconnect, CloseToTray, StartWithWindows,
-            ThemeIndex);
+            ThemeIndex, UpdateNetworkModeIndex,
+            UpdateManualProxyUrl);
 
         await _actions.SaveSettingsAsync(draft);
     }
@@ -949,12 +1049,65 @@ public partial class MainViewModel : ViewModelBase
         _actions.AddWindowsLocalServiceAsync();
 
     [RelayCommand]
+    private async Task ScanLinuxPendingServicesAsync()
+    {
+        if (!CanScanLinuxPendingServices)
+        {
+            return;
+        }
+
+        IsLinuxPendingServiceScanning = true;
+        LinuxPendingServiceFeedback = "正在让 Linux Agent 读取当前回环监听并做有限网页识别…";
+        try
+        {
+            await _actions.ScanLinuxPendingServicesAsync();
+        }
+        finally
+        {
+            IsLinuxPendingServiceScanning = false;
+        }
+    }
+
+    [RelayCommand]
+    private Task AddSelectedLinuxPendingServiceAsync() =>
+        CanAddSelectedLinuxPendingService && SelectedLinuxPendingService is not null
+            ? _actions.AddLinuxPendingServiceAsync(SelectedLinuxPendingService)
+            : Task.CompletedTask;
+
+    [RelayCommand]
+    private async Task AddLinuxUrlDraftAsync()
+    {
+        if (!CanAddLinuxUrlDraft)
+        {
+            return;
+        }
+
+        await _actions.AddLinuxUrlDraftAsync(LinuxQuickAddUrl);
+    }
+
+    [RelayCommand]
     private Task SaveSelectedServiceAsync() =>
         SelectedService is null ? Task.CompletedTask : SaveServiceDraftAsync(SelectedService);
 
     [RelayCommand]
     private Task RemoveSelectedServiceAsync() =>
         SelectedService is null ? Task.CompletedTask : _actions.RemoveServiceAsync(SelectedService.Id);
+
+    public void ApplyLinuxPendingServices(
+        IEnumerable<LinuxPendingServiceUiState> services,
+        string feedback)
+    {
+        LinuxPendingServices.Clear();
+        foreach (var service in services)
+        {
+            LinuxPendingServices.Add(service);
+        }
+        SelectedLinuxPendingService = LinuxPendingServices.FirstOrDefault();
+        IsAgentManaging = false;
+        LinuxPendingServiceFeedback = feedback;
+        OnPropertyChanged(nameof(HasLinuxPendingServices));
+        OnPropertyChanged(nameof(CanAddSelectedLinuxPendingService));
+    }
 
     public void ApplyBridgeState(BridgeUiState state)
     {
@@ -1054,6 +1207,24 @@ public partial class MainViewModel : ViewModelBase
         }
 
         OnPropertyChanged(nameof(HasDiscoveredWindowsLocalServices));
+    }
+
+    public void ApplyConnectionDoctor(
+        string status,
+        string progress,
+        string summary,
+        string rootCause,
+        string nextStep,
+        string actionLabel,
+        ConnectionDoctorActionKind actionKind)
+    {
+        ConnectionDoctorStatus = status;
+        ConnectionDoctorProgressText = progress;
+        ConnectionDoctorSummary = summary;
+        ConnectionDoctorRootCause = rootCause;
+        ConnectionDoctorNextStep = nextStep;
+        ConnectionDoctorActionLabel = actionLabel;
+        ConnectionDoctorActionKind = actionKind;
     }
 
     public void SetDiagnostics(IEnumerable<DiagnosticUiState> diagnostics)
@@ -1469,6 +1640,12 @@ public partial class MainViewModel : ViewModelBase
             ServiceProfileImportConfirmed = false;
             ServiceProfileImportSummary = "尚未选择导入文件。";
         }
+    }
+
+    private Task RunAndNavigateAsync(AppPage page)
+    {
+        SelectedPage = page;
+        return Task.CompletedTask;
     }
 
     private async Task SaveServiceDraftAsync(ServiceCardViewModel service)

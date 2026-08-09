@@ -3,6 +3,7 @@ using System.Net.Http.Headers;
 using System.Security.Cryptography;
 using System.Text;
 using System.Text.Json;
+using JKBridge.Core.Models;
 using JKBridge.Core.Updates;
 
 namespace JKBridge.Core.Tests;
@@ -20,8 +21,50 @@ public sealed class GitHubReleaseUpdateServiceTests
         Assert.False(handler.UseCookies);
         Assert.False(handler.PreAuthenticate);
         Assert.Null(handler.Credentials);
-        Assert.Equal(2, handler.MaxConnectionsPerServer);
+        Assert.Equal(4, handler.MaxConnectionsPerServer);
         Assert.Equal(32, handler.MaxResponseHeadersLength);
+        Assert.Equal(TimeSpan.FromSeconds(10), handler.ConnectTimeout);
+        Assert.True(handler.EnableMultipleHttp2Connections);
+    }
+
+    [Fact]
+    public void ManualProxyTransport_AcceptsOnlyPreviouslyValidatedLoopbackProxy()
+    {
+        using var handler = GitHubReleaseUpdateService.CreateDefaultHandler(
+            new UpdateNetworkSettings
+            {
+                Mode = UpdateNetworkMode.ManualProxy,
+                ManualProxyUrl = "http://127.0.0.1:7897",
+            });
+
+        Assert.True(handler.UseProxy);
+        var proxy = Assert.IsType<WebProxy>(handler.Proxy);
+        Assert.Equal(new Uri("http://127.0.0.1:7897/"), proxy.Address);
+        Assert.Null(proxy.Credentials);
+        Assert.False(proxy.BypassProxyOnLocal);
+    }
+
+    [Fact]
+    public void DirectTransport_DisablesProxy()
+    {
+        using var handler = GitHubReleaseUpdateService.CreateDefaultHandler(
+            new UpdateNetworkSettings { Mode = UpdateNetworkMode.Direct });
+
+        Assert.False(handler.UseProxy);
+        Assert.Null(handler.Proxy);
+    }
+
+    [Fact]
+    public void DownloadProgress_ComputesPercentageAndEstimatedRemaining()
+    {
+        var progress = new ReleaseDownloadProgress(
+            ReleaseDownloadStage.DownloadingInstaller,
+            BytesReceived: 25,
+            TotalBytes: 100,
+            BytesPerSecond: 5);
+
+        Assert.Equal(25, progress.Percentage);
+        Assert.Equal(TimeSpan.FromSeconds(15), progress.EstimatedRemaining);
     }
 
     [Fact]

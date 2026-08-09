@@ -94,15 +94,15 @@ acceptance; implemented source alone is not a released migration feature.
 The Python server, fixed `/v1` endpoints, manifest and device transactions,
 Windows bounded client, per-device credentials, listing/rename/revocation,
 tests, systemd user-unit template, and non-root
-`jkbridge-agentctl preflight/install/start/stop/status/fallback` source exist. Request and response bodies are limited to
+`jkbridge-agentctl preflight/install/upgrade/rollback/uninstall/start/stop/status/fallback` source exist. Request and response bodies are limited to
 64 KiB. Agent device records carry stable Tailscale node and login fields, and
 revocation returns a fixed receipt while warning that existing SSH sessions
 must be disconnected separately.
 
 The Agent and one-shot helper also share the SSH-writer lock, and strict
 same-key fallback conversion/reconciliation is tested. Exit still requires live
-acceptance of the implemented lifecycle plus an explicit supported
-upgrade/rollback/uninstall flow (those commands do not yet exist),
+acceptance of the implemented install/upgrade/rollback/uninstall lifecycle,
+signed package provenance,
 clean-machine end-to-end enrollment and independent-revocation acceptance, and
 stable Release assets. The frozen development contract is in
 [AGENT_PROTOCOL.md](AGENT_PROTOCOL.md).

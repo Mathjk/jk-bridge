@@ -33,6 +33,11 @@ internal sealed class AgentProtocolClientAdapter : IAgentProtocolClient
         CancellationToken cancellationToken = default) =>
         _client.EnrollAsync(request, enrollmentCredential, cancellationToken);
 
+    public Task<AgentLoopbackDiscoveryResponse> GetLoopbackDiscoveryAsync(
+        AgentCredential adminCredential,
+        CancellationToken cancellationToken = default) =>
+        _client.GetLoopbackDiscoveryAsync(adminCredential, cancellationToken);
+
     public Task<AgentServiceCatalogResponse> GetServiceCatalogAsync(
         AgentCredential deviceCredential,
         CancellationToken cancellationToken = default) =>

@@ -13,18 +13,20 @@
             <Grid Grid.Row="0" ColumnDefinitions="*,Auto">
                 <StackPanel>
                     <TextBlock Text="设备配置" Classes="page-title" />
-                    <TextBlock Text="首次配对、添加其他电脑与 Agent 高级管理都在这里；多数用户只需完成一次配对。"
+                    <TextBlock Text="新设备优先使用下方两步快速配对；Agent、多设备和迁移功能已归入高级区域。"
                                Classes="page-subtitle" Margin="0,4,0,0" />
                 </StackPanel>
                 <Border Grid.Column="1" Classes="code-chip" VerticalAlignment="Center">
-                    <TextBlock Text="AGENT · OPTIONAL" Classes="technical-strong" />
+                    <TextBlock Text="QUICK PAIR" Classes="technical-strong" />
                 </Border>
             </Grid>
 
             <ScrollViewer Grid.Row="2" HorizontalScrollBarVisibility="Disabled">
                 <Grid ColumnDefinitions="1.15*,18,*" RowDefinitions="Auto,16,Auto">
-                    <Border Grid.Row="0" Grid.Column="0" Classes="card" Padding="22">
-                        <StackPanel>
+                    <Border Grid.Row="2" Grid.Column="0" Classes="card" Padding="22">
+                        <Expander Header="高级：通过 Linux Agent 添加此电脑（多设备管理）"
+                                  IsExpanded="False">
+                        <StackPanel Margin="0,14,0,0">
                             <Grid ColumnDefinitions="Auto,*">
                                 <Border Width="38" Height="38" Classes="bridge-node info">
                                     <TextBlock Text="A" Classes="technical-strong"
@@ -37,7 +39,34 @@
                                 </StackPanel>
                             </Grid>
 
-                            <TextBlock Text="Agent 地址" Classes="body-strong" Margin="0,18,0,6" />
+                            <Border Classes="log-surface" Margin="0,18,0,0">
+                                <StackPanel>
+                                    <TextBlock Text="步骤 1：在 Linux 安装或升级 Agent"
+                                               Classes="body-strong" />
+                                    <TextBlock Text="命令随当前 Windows 版本内嵌，不访问 GitHub，不要求下载项目或进入目录；会先核验安装包，再以当前普通用户安装。"
+                                               Classes="caption" TextWrapping="Wrap" Margin="0,5,0,10" />
+                                    <Button Content="复制一行 Agent 安装/升级命令"
+                                            Classes="primary" HorizontalAlignment="Left"
+                                            Command="{Binding CopyLinuxAgentInstallCommandCommand}"
+                                            AutomationProperties.Name="复制 Linux Agent 一行安装升级命令" />
+                                    <TextBlock Text="{Binding LinuxAgentInstallFeedback}"
+                                               Classes="caption" TextWrapping="Wrap" Margin="0,8,0,0" />
+                                </StackPanel>
+                            </Border>
+
+                            <TextBlock Text="步骤 2：粘贴 Linux 输出的设置码"
+                                       Classes="body-strong" Margin="0,16,0,6" />
+                            <TextBox Text="{Binding AgentSetupCode}" Classes="field technical"
+                                     PasswordChar="●" RevealPassword="False"
+                                     PlaceholderText="JKBA1..."
+                                     AutomationProperties.Name="一次性 Agent 设置码" />
+                            <TextBlock Text="设置码同时包含 Agent 地址和一次性管理员凭据；提交时只使用一次，不写入配置、网址或日志。"
+                                       Classes="caption" TextWrapping="Wrap" Margin="0,6,0,0" />
+
+                            <Expander Header="高级：发现 Agent 或分别填写地址与恢复码"
+                                      IsExpanded="False" Margin="0,12,0,0">
+                                <StackPanel Margin="0,10,0,0">
+                            <TextBlock Text="Agent 地址" Classes="body-strong" Margin="0,0,0,6" />
                             <TextBox Text="{Binding AgentEndpoint}" Classes="field technical"
                                      PlaceholderText="http://100.64.x.x:45871"
                                      AutomationProperties.Name="Linux Agent 地址" />
@@ -96,16 +125,19 @@
                                      AutomationProperties.Name="一次性 Agent 登记码" />
                             <TextBlock Text="登记码可来自 Linux 初始化/恢复流程，也可由已登记的管理员 Windows 生成；Windows 生成的设备添加码只能登记普通 device 角色，不能授予管理员权限。登记码只随本次请求发送，不写入网址或日志；JK Bridge 不会静默添加设备。"
                                        Classes="caption" TextWrapping="Wrap" Margin="0,6,0,0" />
+                                </StackPanel>
+                            </Expander>
 
-                            <Button Content="使用 Agent 登记并连接" Classes="primary"
+                            <Button Content="使用 Agent 设置码登记并连接" Classes="primary"
                                     HorizontalAlignment="Stretch" Margin="0,20,0,0" MinHeight="44"
                                     IsEnabled="{Binding CanStartAgentEnrollment}"
                                     Command="{Binding EnrollWithAgentCommand}"
                                     AutomationProperties.Name="使用 Agent 登记并连接" />
                         </StackPanel>
+                        </Expander>
                     </Border>
 
-                    <Border Grid.Row="2" Grid.Column="0" Classes="card" Padding="22">
+                    <Border Grid.Row="0" Grid.Column="0" Classes="card" Padding="22">
                         <StackPanel>
                             <Grid ColumnDefinitions="Auto,*">
                                 <Border Width="38" Height="38" Classes="bridge-node info">
@@ -113,21 +145,47 @@
                                                HorizontalAlignment="Center" VerticalAlignment="Center" />
                                 </Border>
                                 <StackPanel Grid.Column="1" Margin="12,0,0,0">
-                                    <TextBlock Text="在 Linux 启动一次性配对" Classes="section-title" />
-                                    <TextBlock Text="脚本不安装后台服务，成功一次或十分钟超时后自动退出。请以目标 SSH 用户运行，不要使用 sudo。"
+                                    <TextBlock Text="两步快速配对（推荐）" Classes="section-title" />
+                                    <TextBlock Text="Linux 不需要预先下载项目，也不需要进入任何目录；只需 Python 3。请以目标 SSH 用户运行，不要使用 sudo。"
                                                Classes="page-subtitle" TextWrapping="Wrap" />
                                 </StackPanel>
                             </Grid>
 
                             <Border Classes="log-surface" Margin="0,18,0,0">
-                                <Grid ColumnDefinitions="Auto,*">
-                                    <TextBlock Text="$" Classes="technical-strong" Margin="0,0,9,0" />
-                                    <TextBlock Grid.Column="1" Text="python3 jkbridge-linux.py pair"
-                                               Classes="technical-strong" TextWrapping="Wrap" />
+                                <Grid RowDefinitions="Auto,10,Auto">
+                                    <Grid ColumnDefinitions="Auto,*">
+                                        <TextBlock Text="$" Classes="technical-strong" Margin="0,0,9,0" />
+                                        <TextBlock Grid.Column="1" Text="安全的一行配对命令已准备好"
+                                                   Classes="technical-strong" />
+                                    </Grid>
+                                    <Button Grid.Row="2" Content="复制一行配对命令" Classes="primary"
+                                            HorizontalAlignment="Left"
+                                            Command="{Binding CopyLinuxQuickPairCommandCommand}"
+                                            AutomationProperties.Name="复制 Linux 一行快速配对命令" />
                                 </Grid>
                             </Border>
-                            <TextBlock Text="脚本会显示以 jkbridge:// 开头的单行配对码。该配对码是十分钟有效的一次性凭据，请勿截图或转发。"
+                            <TextBlock Text="{Binding LinuxQuickPairFeedback}"
                                        Classes="caption" TextWrapping="Wrap" Margin="0,8,0,0" />
+                            <TextBlock Text="命令已包含本版软件内嵌的压缩脚本，并在执行前核验固定 SHA-256；不访问 Linux 外网，成功一次或十分钟超时后自动退出。"
+                                       Classes="caption" TextWrapping="Wrap" Margin="0,5,0,0" />
+                            <Expander Header="查看安全命令内容"
+                                      IsExpanded="False" Margin="0,10,0,0">
+                                <Border Classes="log-surface" Margin="0,8,0,0">
+                                    <TextBlock Text="{Binding LinuxQuickPairCommand}"
+                                               Classes="technical-strong"
+                                               TextWrapping="Wrap" />
+                                </Border>
+                            </Expander>
+                            <Expander Header="已经下载了 jkbridge-linux.py？查看传统命令"
+                                      IsExpanded="False" Margin="0,10,0,0">
+                                <Border Classes="log-surface" Margin="0,8,0,0">
+                                    <Grid ColumnDefinitions="Auto,*">
+                                        <TextBlock Text="$" Classes="technical-strong" Margin="0,0,9,0" />
+                                        <TextBlock Grid.Column="1" Text="python3 jkbridge-linux.py pair"
+                                                   Classes="technical-strong" TextWrapping="Wrap" />
+                                    </Grid>
+                                </Border>
+                            </Expander>
 
                             <Separator Classes="quiet" Margin="0,18" />
 
@@ -173,7 +231,8 @@
                             </StackPanel>
                         </Border>
 
-                        <Border Classes="card" Padding="20" Margin="0,16,0,0">
+                        <Border Classes="card" Padding="20" Margin="0,16,0,0"
+                                IsVisible="{Binding IsAgentEnrolling}">
                             <StackPanel>
                                 <TextBlock Text="Agent 登记进度" Classes="section-title" />
                                 <TextBlock Text="{Binding AgentEnrollmentFeedback}" Classes="page-subtitle"
@@ -453,7 +512,8 @@
                             </StackPanel>
                         </Border>
 
-                        <Border Classes="card" Padding="20" Margin="0,16,0,0">
+                        <Border Classes="card" Padding="20" Margin="0,16,0,0"
+                                IsVisible="{Binding IsPairing}">
                             <StackPanel>
                                 <TextBlock Text="配置进度" Classes="section-title" />
                                 <TextBlock Text="{Binding SetupFeedback}" Classes="page-subtitle"

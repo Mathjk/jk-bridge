@@ -1,17 +1,17 @@
 # JK Bridge Agent API V1 — experimental contract
 
 > **Advanced/experimental; not supported for routine deployment.** Stable
-> v2.2.0 packages the
-> working development Linux server (`scripts/jkbridge_agent.py`), bounded
+> v2.2.0 remains on the one-shot pairing path. The current source tree contains
+> the working development Linux server (`scripts/jkbridge_agent.py`), bounded
 > Windows client and enrollment orchestration, schema V4 persistence, strict
 > relay companion (`scripts/jkbridge_relay.py`), tests, a reviewed systemd
 > user-unit template, and a non-root lifecycle controller
 > (`packaging/linux/jkbridge-agentctl`). The API paths below are now fixed for
-> Agent protocol V1. However, the implemented install/start/stop/status/fallback
-> paths have not passed live lifecycle acceptance, there is no explicit
-> upgrade/rollback/uninstall command yet, and there is no stable Agent Release
-> asset or completed clean-machine end-to-end acceptance. Pairing Protocol V1
-> remains the supported setup and recovery path for stable v2.2.0.
+> Agent protocol V1. Install/upgrade/rollback/uninstall/start/stop/status/fallback
+> and their fail-closed package tests are implemented, but the resulting bundle
+> has not passed clean-machine live acceptance and is not yet a stable Agent
+> Release asset. Pairing Protocol V1 remains the supported setup and recovery
+> path for stable v2.2.0.
 
 The companion [AGENT_THREAT_MODEL.md](AGENT_THREAT_MODEL.md) defines release
 security requirements. Passing development tests does not convert an unchecked
@@ -28,6 +28,8 @@ preparation. It provides a narrow management plane for:
 - listing devices, revoking one selected device, and issuing an ordinary-device
   enrollment code from an enrolled administrator;
 - renaming one device label through an audited administrator-only endpoint;
+- reporting bounded, read-only candidates from current Linux
+  `127.0.0.1` TCP listeners without scanning disks or port ranges;
 - managing one explicit TCP target behind one generated Linux loopback relay;
   and
 - reporting sanitized Agent/bootstrap state.
@@ -49,7 +51,7 @@ recovery aid, not a runtime dependency.
 |---|---|---|
 | Windows config | Schema V3 | Schema V4 implemented; not released |
 | Bootstrap | One-shot Pairing Protocol V1 | Recovery-code Agent enrollment implemented; V1 fallback retained |
-| Linux management | One-shot `jkbridge-linux.py` | Development Agent, user unit, and `jkbridge-agentctl` preflight/install/start/stop/status/fallback source; live lifecycle acceptance pending |
+| Linux management | One-shot `jkbridge-linux.py` | Development Agent, user unit, and `jkbridge-agentctl` preflight/install/upgrade/rollback/uninstall/start/stop/status/fallback source; live lifecycle acceptance pending |
 | Device model | One client key/receipt per config | Multiple per-device keys, credentials, stable node/login identities, roles, and revocation records |
 | Service source | Windows config | Linux manifest/API catalog plus Windows materialization |
 | Explicit relay | Manual operator-created unit outside V2.1 | Admin plan/probe/confirm/delete API and Windows UI implemented; clean-machine acceptance pending |
@@ -122,6 +124,7 @@ credential before surfacing it.
 | `POST /v1/enroll` | `JKBridge-Enrollment <one-time-code>` plus verified peer | Code-selected `admin` or `device` | Enroll one key and return one device credential/receipt |
 | `GET /v1/me` | `Bearer <device-credential>` plus matching peer | Active device | Read only the caller's sanitized device/grant record and catalog revision |
 | `GET /v1/services` | `Bearer <device-credential>` plus matching peer | Active device | Read the service catalog |
+| `GET /v1/discovery` | `Bearer <device-credential>` plus matching peer | `admin` | Inspect bounded current `127.0.0.1` listeners without changing catalog or grants |
 | `PUT /v1/services` | `Bearer <device-credential>` plus matching peer | `admin` | Replace catalog at an expected revision and reconcile grants |
 | `GET /v1/devices` | `Bearer <device-credential>` plus matching peer | `admin` | List sanitized active/revoked records |
 | `POST /v1/devices/<32-hex-id>/rename` | `Bearer <device-credential>` plus matching peer | `admin` | Change only one device label and append an audit event |
@@ -144,7 +147,7 @@ Every request first passes the Tailscale address filter and `tailscale whois
 ```json
 {
   "protocolVersion": 1,
-  "agentVersion": "0.1.0",
+  "agentVersion": "0.2.0",
   "serverHost": "linux-box.example-tailnet.ts.net",
   "tailnetDnsSuffix": "example-tailnet.ts.net",
   "tailscaleIpv4": "100.64.0.10",
@@ -167,6 +170,16 @@ for OpenSSH. A self-reported MagicDNS name alone is not trusted.
 `GET /v1/health` returns `protocolVersion`, `agentVersion`, and `status`; status
 is `ok` only after state initialization and otherwise `needsBootstrap`.
 `GET /v1/version` returns `protocolVersion` and `agentVersion`.
+
+### Linux setup code
+
+First bootstrap prints one `JKBA1.` base64url setup code instead of asking the
+user to copy an address and secret separately. Its canonical JSON carries only
+`version: 1`, the strict Agent `endpoint`, and one 32-byte
+`enrollmentCredential`. The Windows parser rejects padding, non-canonical
+encoding, duplicate or unknown fields, wrong types, invalid endpoints, and
+invalid credentials. The input is cleared before enrollment; the code itself
+is never persisted.
 
 ### Explicit Windows discovery
 
@@ -196,6 +209,29 @@ verification before atomically changing only the saved Agent endpoint and
 observed revision. A different stable node fails closed and requires normal
 enrollment; rebind never replaces the device ID, credential reference, SSH key,
 or pinned server identity.
+
+### Linux loopback-service discovery
+
+`GET /v1/discovery` is an explicit administrator-only read. The Linux
+implementation invokes only `ss -H -ltnp` with a four-second and 512-KiB output
+bound, parses at most 64 exact IPv4 `127.0.0.1` listeners, excludes the Agent,
+SSH, common database ports, and ports already in the server catalog, and never
+walks a disk, reads command lines or environments, scans a port range, or
+examines wildcard/LAN/IPv6 listeners.
+
+For each remaining listener it may issue one bounded loopback `GET /` over
+HTTP and then HTTPS solely to recognize a likely web UI, status, and title.
+Each probe is limited to 350 ms and 16 KiB, with at most 12 workers. HTTPS
+certificate validation is deliberately disabled only for this loopback
+metadata probe and the result is marked `tlsCertificateVerified: false`; it
+does not grant trust to the service certificate. The process field contains
+only a sanitized executable basename.
+
+The response is sorted by port, rate-limited to six requests per minute per
+peer, and has scope `current-127.0.0.1-listeners`. A candidate is an in-memory
+suggestion only. Windows adds it as a disabled draft after a second user action;
+catalog and SSH authorization still require the existing diff preview and
+explicit administrator confirmation.
 
 ## Enrollment
 
@@ -794,10 +830,9 @@ Implemented and tested in the vNext source tree:
 Still unsupported and required before a stable release:
 
 - live clean-Linux acceptance of the implemented `jkbridge-agentctl` install,
-  start, stop, status, fallback, and repeated managed install across supported
-  systemd-user environments, plus design and implementation of an explicit
-  upgrade/rollback/uninstall workflow (`agentctl` has no `upgrade` or
-  `uninstall` command yet);
+  upgrade, rollback, uninstall, start, stop, status, fallback, and repeated
+  managed install across supported systemd-user environments, plus signed
+  package provenance;
 - clean Windows 11 plus Linux end-to-end installation, enrollment, reconnect,
   second-device isolation, revoke, and Agent-unavailable acceptance;
 - signed and published Windows installer/Agent Release assets;

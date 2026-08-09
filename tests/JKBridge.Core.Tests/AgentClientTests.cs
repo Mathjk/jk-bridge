@@ -175,6 +175,80 @@ public sealed class AgentClientTests
     }
 
     [Fact]
+    public async Task GetLoopbackDiscoveryAsync_RequiresBearerAndValidatesBoundedCandidates()
+    {
+        var handler = new RecordingHandler(_ => JsonResponse(new
+        {
+            protocolVersion = 1,
+            discoveredAt = DateTimeOffset.Parse("2026-08-09T12:00:00Z"),
+            scope = "current-127.0.0.1-listeners",
+            candidates = new[]
+            {
+                new
+                {
+                    port = 8384,
+                    bindAddress = "127.0.0.1",
+                    processName = "syncthing",
+                    scheme = "http",
+                    webDetected = true,
+                    statusCode = (int?)200,
+                    title = "Syncthing",
+                    healthPath = "/",
+                    suggestedTemplateId = "syncthing",
+                    tlsCertificateVerified = (bool?)null,
+                },
+            },
+            excludedKnownServiceCount = 2,
+            note = "No disks or port ranges were scanned.",
+        }));
+        using var client = CreateClient(handler);
+
+        var response = await client.GetLoopbackDiscoveryAsync(
+            AgentCredential.Parse(DeviceCredentialText));
+
+        var candidate = Assert.Single(response.Candidates);
+        Assert.Equal(8384, candidate.Port);
+        Assert.Equal("syncthing", candidate.SuggestedTemplateId);
+        Assert.Equal("/v1/discovery", handler.Request!.RequestUri!.AbsolutePath);
+        Assert.Equal("Bearer", handler.Request.Headers.Authorization?.Scheme);
+    }
+
+    [Fact]
+    public async Task GetLoopbackDiscoveryAsync_RejectsWildcardOrInconsistentMetadata()
+    {
+        var handler = new RecordingHandler(_ => JsonResponse(new
+        {
+            protocolVersion = 1,
+            discoveredAt = DateTimeOffset.Parse("2026-08-09T12:00:00Z"),
+            scope = "current-127.0.0.1-listeners",
+            candidates = new[]
+            {
+                new
+                {
+                    port = 8384,
+                    bindAddress = "0.0.0.0",
+                    processName = "syncthing",
+                    scheme = "http",
+                    webDetected = false,
+                    statusCode = (int?)200,
+                    title = "Syncthing",
+                    healthPath = "/",
+                    suggestedTemplateId = "syncthing",
+                    tlsCertificateVerified = (bool?)null,
+                },
+            },
+            excludedKnownServiceCount = 0,
+            note = "invalid fixture",
+        }));
+        using var client = CreateClient(handler);
+
+        var exception = await Assert.ThrowsAsync<AgentProtocolException>(() =>
+            client.GetLoopbackDiscoveryAsync(AgentCredential.Parse(DeviceCredentialText)));
+
+        Assert.Equal("invalid_response", exception.ErrorCode);
+    }
+
+    [Fact]
     public async Task UpdateServiceCatalogAsync_SendsExpectedRevisionAndCanonicalLoopbackShape()
     {
         var handler = new RecordingHandler(_ => JsonResponse(new

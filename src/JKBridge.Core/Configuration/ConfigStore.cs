@@ -169,7 +169,7 @@ public sealed class ConfigStore : IDisposable
                     cancellationToken)
                 .ConfigureAwait(false);
             var sourceSchema = config?.SchemaVersion;
-            var wasMigrated = sourceSchema is >= 1 and <= 5;
+            var wasMigrated = sourceSchema is >= 1 and <= 6;
             config = sourceSchema switch
             {
                 1 => config! with
@@ -192,6 +192,10 @@ public sealed class ConfigStore : IDisposable
                     SchemaVersion = AppConfig.CurrentSchemaVersion,
                 },
                 5 => config! with
+                {
+                    SchemaVersion = AppConfig.CurrentSchemaVersion,
+                },
+                6 => config! with
                 {
                     SchemaVersion = AppConfig.CurrentSchemaVersion,
                 },

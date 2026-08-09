@@ -31,6 +31,43 @@
                                TextWrapping="Wrap" />
                 </Border>
 
+                <Border Classes="card" Margin="0,0,0,16" Padding="18">
+                    <Grid ColumnDefinitions="*,Auto" RowDefinitions="Auto,8,Auto,8,Auto">
+                        <StackPanel>
+                            <TextBlock Text="连接医生" Classes="section-title" />
+                            <TextBlock Text="{Binding ConnectionDoctorProgressText}"
+                                       Classes="technical" Margin="0,3,0,0" TextWrapping="Wrap" />
+                        </StackPanel>
+                        <Border Grid.Column="1" Classes="status-pill info" VerticalAlignment="Top">
+                            <TextBlock Text="{Binding ConnectionDoctorStatus}" Classes="status-text info" />
+                        </Border>
+                        <TextBlock Grid.Row="2" Grid.ColumnSpan="2"
+                                   Text="{Binding ConnectionDoctorSummary}"
+                                   Classes="body-strong" TextWrapping="Wrap" />
+                        <Grid Grid.Row="4" Grid.ColumnSpan="2" ColumnDefinitions="*,14,*">
+                            <Border Classes="issue-banner" Padding="12">
+                                <StackPanel>
+                                    <TextBlock Text="最可能原因" Classes="eyebrow" />
+                                    <TextBlock Text="{Binding ConnectionDoctorRootCause}"
+                                               Classes="body" TextWrapping="Wrap" Margin="0,4,0,0" />
+                                </StackPanel>
+                            </Border>
+                            <Border Grid.Column="2" Classes="issue-banner info" Padding="12">
+                                <Grid ColumnDefinitions="*,Auto">
+                                    <StackPanel>
+                                        <TextBlock Text="建议下一步" Classes="eyebrow" />
+                                        <TextBlock Text="{Binding ConnectionDoctorNextStep}"
+                                                   Classes="body" TextWrapping="Wrap" Margin="0,4,10,0" />
+                                    </StackPanel>
+                                    <Button Grid.Column="1" Content="{Binding ConnectionDoctorActionLabel}"
+                                            Classes="primary" VerticalAlignment="Center"
+                                            Command="{Binding RunConnectionDoctorActionCommand}" />
+                                </Grid>
+                            </Border>
+                        </Grid>
+                    </Grid>
+                </Border>
+
                 <Grid ColumnDefinitions="*,12,*" RowDefinitions="Auto,12,Auto" Margin="0,0,0,22">
                     <Border Grid.Row="0" Grid.Column="0" Classes="card">
                         <Grid ColumnDefinitions="Auto,*">

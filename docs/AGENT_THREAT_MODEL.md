@@ -260,7 +260,7 @@ mutation disabled; it never falls back to bearer-only authorization.
 
 | Credential | Current vNext use | Storage rule |
 |---|---|---|
-| Initial bootstrap code | First administrator | Generated on Linux, expiring and one-use; verifier only on disk |
+| Initial `JKBA1.` setup code | First administrator | Contains strict endpoint plus an expiring one-use enrollment credential; verifier only on disk |
 | Linux recovery code | Recover an admin or explicitly add a device | High entropy, role-bearing, expiring and one-use; verifier only on disk |
 | Admin-issued enrollment code | Add one ordinary `device` | Returned once to the admin UI; expiring and one-use; verifier only on Linux |
 | Future step-up challenge | Not implemented | Must be actor/operation-bound, expiring, unpredictable, and one-use |
@@ -299,7 +299,9 @@ hard-coded to role `device`. The hardened approval flow pre-binds node, key,
 requested role, nonce, expiry, and service revision so changing any field
 invalidates approval.
 
-`JKBA-CRED-04` The CLI prints a secret once without echoing it back in status.
+`JKBA-CRED-04` The CLI prints the setup code once without echoing it back in
+status. Windows strictly parses the canonical envelope, clears the input before
+network use, and persists only the resulting device credential after success.
 It should warn about terminal scrollback. Secrets are not accepted on command
 lines when stdin or a protected file descriptor is possible because process
 arguments can be observed.
@@ -500,29 +502,51 @@ path and affected-device set from locked server state, require the same admin
 and hardened step-up boundary as relay mutation, include adoption in the
 journal/audit model, and never turn the primitive into directory-wide discovery.
 
+### Linux loopback-discovery boundary
+
+`JKBA-DISC-01` Service discovery is administrator-only, read-only, explicitly
+triggered, and rate limited. It reads the kernel's current TCP listener table
+through one bounded `ss -H -ltnp` invocation. It accepts only exact
+`127.0.0.1` listeners and never enumerates disks, searches configuration
+files, reads process command lines or environments, scans a port range, or
+returns wildcard, LAN, IPv6, SSH, Agent, or common database listeners.
+
+`JKBA-DISC-02` Optional web recognition probes only those already-observed
+loopback ports with bounded timeout, body size, and concurrency. Returned
+process names and page titles are sanitized. An HTTPS metadata probe may ignore
+certificate verification solely to recognize a local UI and must report that
+the certificate was not verified; the result is not a certificate trust
+decision.
+
+`JKBA-DISC-03` A result is a volatile suggestion, never authority. Windows
+creates only a disabled draft after a separate user action. No discovery or
+paste-address path can update the Linux catalog or SSH grants without the
+existing administrator diff preview and explicit confirmation.
+
 ### Linux lifecycle-controller boundary
 
 `jkbridge-agentctl` is an AI-independent, non-root lifecycle controller. Its
-current `preflight`, `install`, `start`, `stop`, `status`, and `fallback`
-commands validate the explicit home, prerequisites, source/destination
-ownership and type, private modes, and a SHA-256 manifest covering the installed
-Agent, relay helper, one-shot helper, controller, environment, and systemd user
-unit. Lifecycle commands refuse a missing, replaced, symlinked, foreign, or
-mode-broadened payload before invoking `systemctl`; fallback stops the Agent
-before handing control to the retained one-shot helper. It stores only the
-Agent port in its environment file and does not invoke `sudo` or install system
-packages.
+current `preflight`, `install`, `upgrade`, `rollback`, `uninstall`,
+`start`, `stop`, `status`, and `fallback` commands validate the explicit
+home, prerequisites, source/destination ownership and type, private modes, and
+a SHA-256 manifest covering the installed Agent, relay helper, one-shot helper,
+controller, environment, and systemd user unit. Lifecycle commands refuse a
+missing, replaced, symlinked, foreign, or mode-broadened payload before invoking
+`systemctl`; fallback stops the Agent before handing control to the retained
+one-shot helper. Upgrade saves a verified controller-owned snapshot and
+preserves the private state and custom port. Rollback accepts only a verified
+snapshot. Uninstall removes only the managed runtime/unit/env/manifest and
+preserves Agent state, credentials, rollback snapshots, and SSH grants. The
+controller stores only the Agent port in its environment file and does not
+invoke `sudo` or install system packages.
 
 Installation is atomic per file but not across the complete payload. An
 interruption can leave a partial installation which lifecycle verification
 rejects; rerunning the same reviewed install converges payload files. If only
 one private bootstrap state file exists, the controller refuses to guess or
-overwrite it and requires local inspection. Upgrade, rollback, and uninstall
-are not yet supported. Existing-file recognition during install
-still begins with an allowlisted marker check before replacing and recording
-the new digest, so installation must continue to require a reviewed delivery
-directory and explicit confirmation; it is not a general package-manager trust
-mechanism.
+overwrite it and requires local inspection. Existing-file recognition and every
+snapshot restore require the recorded digests and allowlisted managed paths;
+the controller is still not a substitute for signed package provenance.
 
 ## 9. Manifest integrity and route UX
 
@@ -731,7 +755,12 @@ Minimum release gates:
 16. Lifecycle commands verify the installed manifest, owner, regular-file
     type, no-symlink path and exact private modes before any `systemctl` action;
     tampered payloads fail without touching the live user manager.
-17. A future relay-adoption API remains disabled until it preserves the local
+17. Upgrade preserves state, credentials, SSH grants, and a custom port;
+    rollback accepts only a verified controller snapshot; uninstall preserves
+    recoverable state and grants while removing only managed runtime files.
+18. Loopback discovery ignores wildcard/LAN/IPv6/database listeners, stays
+    bounded, and cannot directly change a catalog or grant.
+19. A future relay-adoption API remains disabled until it preserves the local
     primitive's exact-name/parser/digest/diff/affected-device checks and adds
     Agent-locked authorization, audit, and hardened step-up.
 18. Diagnostic export and release checking occur only after an explicit user
@@ -801,11 +830,11 @@ That conclusion is not a stable-release approval. The following items are open:
   user-visible actions. Preserve the fixed archive allowlist, manual-only
   network contact, and no-download/no-open/no-execute boundary, and scan final
   bundles with seeded secrets before claiming release completion.
-- **P2 — Complete lifecycle packaging.** `agentctl` now authenticates installed
-  payloads with its local SHA-256 manifest before lifecycle actions, but a
-  multi-file install is only convergent and supported automatic
-  upgrade/rollback/uninstall is absent. Preserve fail-closed lifecycle checks
-  while adding those operations and stronger package provenance/signing.
+- **P2 — Strengthen lifecycle package provenance.** `agentctl` now implements
+  manifest-verified upgrade, controller-snapshot rollback, and state-preserving
+  uninstall, but a multi-file install remains convergent rather than atomic.
+  Preserve fail-closed checks while adding signed release provenance and live
+  clean-machine acceptance.
 - **P2 — Make redaction and packaging scans exhaustive.** Continue seeding every
   credential class and assert markers are absent from logs, diagnostics, CLI,
   errors, profiles, installers, and release archives.

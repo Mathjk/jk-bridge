@@ -5,6 +5,7 @@ PROGRAM="jkbridge-agentctl"
 DRY_RUN=0
 ASSUME_YES=0
 AGENT_PORT=45871
+PORT_EXPLICIT=0
 CODE_TTL=900
 SERVICES_FILE=""
 SOURCE_DIR=""
@@ -19,6 +20,9 @@ Usage: jkbridge-agentctl [options] COMMAND
 Commands:
   preflight  Check prerequisites without changing the computer
   install    Install, bootstrap, and enable the ordinary-user Agent
+  upgrade    Verify the current install, save a rollback snapshot, and upgrade
+  rollback   Restore the newest verified pre-upgrade payload snapshot
+  uninstall  Remove only verified Agent runtime files; preserve state and SSH grants
   start      Start the existing Agent user service
   stop       Stop the Agent without deleting state or SSH keys
   status     Show systemd and non-secret Agent status
@@ -74,7 +78,7 @@ while (( $# > 0 )); do
       case "$option" in
         --source-dir) SOURCE_DIR="$value" ;;
         --services-file) SERVICES_FILE="$value" ;;
-        --port) AGENT_PORT="$value" ;;
+        --port) AGENT_PORT="$value"; PORT_EXPLICIT=1 ;;
         --code-ttl) CODE_TTL="$value" ;;
         --host-key) HOST_KEY="$value" ;;
       esac
@@ -97,7 +101,7 @@ done
 [[ -n "${COMMAND:-}" ]] || { usage >&2; exit 2; }
 (( $# == 0 )) || fail "unexpected arguments after command"
 case "$COMMAND" in
-  preflight|install|start|stop|status|fallback) ;;
+  preflight|install|upgrade|rollback|uninstall|start|stop|status|fallback) ;;
   *) fail "unknown command: $COMMAND" ;;
 esac
 
@@ -137,6 +141,7 @@ ENV_DIR="$TARGET_HOME/.config/jkbridge-agent"
 STATE_DIR="$TARGET_HOME/.local/state/jkbridge-agent"
 SSH_KEYS="$TARGET_HOME/.ssh/authorized_keys"
 INSTALL_MANIFEST="$STATE_DIR/install-manifest.sha256"
+ROLLBACK_ROOT="$STATE_DIR/rollback"
 UNIT_TARGET="$UNIT_DIR/jkbridge-agent.service"
 ENV_TARGET="$ENV_DIR/agent.env"
 AGENT_TARGET="$LIB_DIR/jkbridge_agent.py"
@@ -389,6 +394,102 @@ verify_installed_payload() {
     fail "installed JK Bridge payload differs from its install manifest; rerun reviewed install before lifecycle actions"
 }
 
+snapshot_manifest_content() {
+  local directory="$1"
+  printf '%s\n' \
+    '# JK Bridge agentctl rollback snapshot v1' \
+    "jkbridge_agent.py $(sha256_file "$directory/jkbridge_agent.py")" \
+    "jkbridge_relay.py $(sha256_file "$directory/jkbridge_relay.py")" \
+    "jkbridge-linux.py $(sha256_file "$directory/jkbridge-linux.py")" \
+    "jkbridge-agentctl $(sha256_file "$directory/jkbridge-agentctl")" \
+    "jkbridge-agent.service $(sha256_file "$directory/jkbridge-agent.service")" \
+    "agent.env $(sha256_file "$directory/agent.env")" \
+    "install-manifest.sha256 $(sha256_file "$directory/install-manifest.sha256")"
+}
+
+create_rollback_snapshot() {
+  if (( DRY_RUN )); then
+    note "DRY-RUN save one verified rollback snapshot below $ROLLBACK_ROOT"
+    return
+  fi
+  install -d -m 0700 -- "$ROLLBACK_ROOT"
+  local snapshot="$ROLLBACK_ROOT/$(date -u +%Y%m%dT%H%M%SZ).$$"
+  [[ ! -e "$snapshot" ]] || fail "rollback snapshot already exists: $snapshot"
+  install -d -m 0700 -- "$snapshot"
+  install -m 0700 -- "$AGENT_TARGET" "$snapshot/jkbridge_agent.py"
+  install -m 0700 -- "$RELAY_TARGET" "$snapshot/jkbridge_relay.py"
+  install -m 0700 -- "$FALLBACK_TARGET" "$snapshot/jkbridge-linux.py"
+  install -m 0700 -- "$CONTROLLER_TARGET" "$snapshot/jkbridge-agentctl"
+  install -m 0600 -- "$UNIT_TARGET" "$snapshot/jkbridge-agent.service"
+  install -m 0600 -- "$ENV_TARGET" "$snapshot/agent.env"
+  install -m 0600 -- "$INSTALL_MANIFEST" "$snapshot/install-manifest.sha256"
+  snapshot_manifest_content "$snapshot" > "$snapshot/snapshot.sha256"
+  chmod 0600 "$snapshot/snapshot.sha256"
+  note "Rollback snapshot saved: $snapshot"
+}
+
+latest_rollback_snapshot() {
+  local candidate base latest=""
+  [[ -d "$ROLLBACK_ROOT" && ! -L "$ROLLBACK_ROOT" && -O "$ROLLBACK_ROOT" ]] || \
+    fail "no safe rollback snapshot directory is available"
+  for candidate in "$ROLLBACK_ROOT"/*; do
+    [[ -d "$candidate" && ! -L "$candidate" && -O "$candidate" ]] || continue
+    base="${candidate##*/}"
+    [[ "$base" =~ ^[0-9]{8}T[0-9]{6}Z\.[0-9]+$ ]] || continue
+    if [[ -z "$latest" || "$base" > "${latest##*/}" ]]; then
+      latest="$candidate"
+    fi
+  done
+  [[ -n "$latest" ]] || fail "no verified rollback snapshot is available"
+  printf '%s\n' "$latest"
+}
+
+verify_snapshot_file() {
+  local path="$1"
+  local expected_mode="$2"
+  assert_no_symlink_chain "$path"
+  [[ -f "$path" && ! -L "$path" && -O "$path" ]] || \
+    fail "rollback snapshot file is missing, foreign, or unsafe: $path"
+  local actual_mode
+  actual_mode="$(stat -c '%a' -- "$path")"
+  [[ "$actual_mode" == "$expected_mode" ]] || \
+    fail "rollback snapshot has unsafe mode $actual_mode (expected $expected_mode): $path"
+}
+
+verify_rollback_snapshot() {
+  local snapshot="$1"
+  verify_snapshot_file "$snapshot/jkbridge_agent.py" 700
+  verify_snapshot_file "$snapshot/jkbridge_relay.py" 700
+  verify_snapshot_file "$snapshot/jkbridge-linux.py" 700
+  verify_snapshot_file "$snapshot/jkbridge-agentctl" 700
+  verify_snapshot_file "$snapshot/jkbridge-agent.service" 600
+  verify_snapshot_file "$snapshot/agent.env" 600
+  verify_snapshot_file "$snapshot/install-manifest.sha256" 600
+  verify_snapshot_file "$snapshot/snapshot.sha256" 600
+  local expected actual
+  expected="$(snapshot_manifest_content "$snapshot")"
+  actual="$(< "$snapshot/snapshot.sha256")"
+  [[ "$actual" == "$expected" ]] || fail "rollback snapshot failed its SHA-256 manifest check"
+}
+
+restore_rollback_snapshot() {
+  local snapshot="$1"
+  verify_rollback_snapshot "$snapshot"
+  if (( DRY_RUN )); then
+    note "DRY-RUN restore verified payload from $snapshot"
+    return
+  fi
+  atomic_install "$snapshot/jkbridge_agent.py" "$AGENT_TARGET" 0700 "JK Bridge"
+  atomic_install "$snapshot/jkbridge_relay.py" "$RELAY_TARGET" 0700 "JK Bridge"
+  atomic_install "$snapshot/jkbridge-linux.py" "$FALLBACK_TARGET" 0700 "JK Bridge"
+  atomic_install "$snapshot/jkbridge-agent.service" "$UNIT_TARGET" 0600 "Description=JK Bridge"
+  atomic_install "$snapshot/agent.env" "$ENV_TARGET" 0600 "Managed by JK Bridge"
+  atomic_install "$snapshot/jkbridge-agentctl" "$CONTROLLER_TARGET" 0700 "JK Bridge"
+  atomic_install "$snapshot/install-manifest.sha256" "$INSTALL_MANIFEST" 0600 \
+    "JK Bridge agentctl install manifest v1"
+  verify_installed_payload
+}
+
 authorized_snapshot() {
   if [[ -L "$SSH_KEYS" ]]; then
     fail "authorized_keys cannot be a symbolic link"
@@ -410,18 +511,34 @@ run_systemctl() {
   fi
 }
 
-confirm_install() {
+confirm_action() {
+  local prompt="$1"
   (( DRY_RUN || ASSUME_YES )) && return
-  [[ -t 0 ]] || fail "install requires one confirmation; rerun interactively or pass --yes"
-  printf 'Install and enable JK Bridge Agent for user %s? [y/N] ' "$(id -un)" >&2
+  [[ -t 0 ]] || fail "$COMMAND requires one confirmation; rerun interactively or pass --yes"
+  printf '%s for user %s? [y/N] ' "$prompt" "$(id -un)" >&2
   read -r answer
-  [[ "$answer" == "y" || "$answer" == "Y" ]] || fail "installation cancelled"
+  [[ "$answer" == "y" || "$answer" == "Y" ]] || fail "$COMMAND cancelled"
 }
 
-install_agent() {
-  preflight
-  confirm_install
-  note "No sudo/UAC action will be attempted; the service will run as $(id -un)."
+assert_state_pair() {
+  if [[ -e "$STATE_DIR/state.json" || -e "$STATE_DIR/services.json" ]]; then
+    [[ -f "$STATE_DIR/state.json" && ! -L "$STATE_DIR/state.json" && -O "$STATE_DIR/state.json" ]] || \
+      fail "Agent state is incomplete or unsafe; refusing to guess or overwrite it"
+    [[ -f "$STATE_DIR/services.json" && ! -L "$STATE_DIR/services.json" && -O "$STATE_DIR/services.json" ]] || \
+      fail "Agent state is incomplete or unsafe; refusing to guess or overwrite it"
+  fi
+}
+
+load_installed_port_unless_explicit() {
+  (( PORT_EXPLICIT )) && return
+  local configured
+  configured="$(sed -n 's/^JKBRIDGE_AGENT_PORT=//p' "$ENV_TARGET")"
+  [[ "$configured" =~ ^[0-9]+$ ]] && (( configured >= 1 && configured <= 65535 )) || \
+    fail "installed Agent port configuration is invalid"
+  AGENT_PORT="$configured"
+}
+
+deploy_agent() {
   local before
   before="$(authorized_snapshot)"
 
@@ -432,10 +549,7 @@ install_agent() {
   assert_managed_or_absent "$UNIT_TARGET" "Description=JK Bridge"
   assert_managed_or_absent "$ENV_TARGET" "Managed by JK Bridge"
   assert_managed_or_absent "$INSTALL_MANIFEST" "JK Bridge agentctl install manifest v1"
-  if [[ -e "$STATE_DIR/state.json" || -e "$STATE_DIR/services.json" ]]; then
-    [[ -f "$STATE_DIR/state.json" && -f "$STATE_DIR/services.json" ]] || \
-      fail "Agent state is incomplete; refusing to guess or overwrite it"
-  fi
+  assert_state_pair
 
   install_directory "$TARGET_HOME/.local" 0700
   install_directory "$TARGET_HOME/.local/lib" 0700
@@ -456,34 +570,108 @@ install_agent() {
 
   if [[ ! -e "$STATE_DIR/state.json" && ! -e "$STATE_DIR/services.json" ]]; then
     if (( DRY_RUN )); then
-      note "DRY-RUN bootstrap private Agent state and issue one admin enrollment code"
+      note "DRY-RUN bootstrap private Agent state and issue one admin setup code"
     else
       bootstrap=(
         python3 "$AGENT_TARGET"
         --state-dir "$STATE_DIR"
         --authorized-keys "$SSH_KEYS"
-        bootstrap --code-ttl "$CODE_TTL"
+        bootstrap --code-ttl "$CODE_TTL" --agent-port "$AGENT_PORT"
       )
       if [[ -n "$SERVICES_FILE" ]]; then
         bootstrap+=(--services-file "$SERVICES_FILE")
       fi
       "${bootstrap[@]}"
     fi
-  elif [[ -f "$STATE_DIR/state.json" && -f "$STATE_DIR/services.json" ]]; then
-    note "Existing Agent state was preserved; no new enrollment code was issued."
   else
-    fail "Agent state is incomplete; refusing to guess or overwrite it"
+    assert_state_pair
+    note "Existing Agent state was preserved; no new setup code was issued."
   fi
   local after
   after="$(authorized_snapshot)"
-  [[ "$before" == "$after" ]] || fail "authorized_keys changed during installation; service was not enabled"
+  [[ "$before" == "$after" ]] || fail "authorized_keys changed while deploying the Agent"
   write_install_manifest
   if (( ! DRY_RUN )); then
     verify_installed_payload
   fi
   run_systemctl daemon-reload
   run_systemctl enable --now jkbridge-agent.service
+}
+
+install_agent() {
+  if [[ -e "$INSTALL_MANIFEST" ]]; then
+    note "An existing verified installation was found; treating install as an upgrade."
+    upgrade_agent
+    return
+  fi
+  preflight
+  confirm_action "Install and enable JK Bridge Agent"
+  note "No sudo/UAC action will be attempted; the service will run as $(id -un)."
+  deploy_agent
   note "JK Bridge Agent installation completed. authorized_keys was not changed."
+}
+
+upgrade_agent() {
+  preflight
+  verify_installed_payload
+  load_installed_port_unless_explicit
+  confirm_action "Upgrade JK Bridge Agent and retain one rollback snapshot"
+  note "Verified current payload; Agent state, credentials, and SSH grants will be preserved."
+  local before
+  before="$(authorized_snapshot)"
+  create_rollback_snapshot
+  deploy_agent
+  local after
+  after="$(authorized_snapshot)"
+  [[ "$before" == "$after" ]] || fail "authorized_keys changed during upgrade"
+  note "JK Bridge Agent upgrade completed. The previous verified payload can be restored with rollback."
+}
+
+rollback_agent() {
+  require_command systemctl "systemd user-service support"
+  require_command sha256sum "SHA-256 payload verification"
+  verify_installed_payload
+  local snapshot
+  snapshot="$(latest_rollback_snapshot)"
+  verify_rollback_snapshot "$snapshot"
+  confirm_action "Stop the Agent and restore snapshot ${snapshot##*/}"
+  local before
+  before="$(authorized_snapshot)"
+  run_systemctl stop jkbridge-agent.service
+  restore_rollback_snapshot "$snapshot"
+  run_systemctl daemon-reload
+  run_systemctl start jkbridge-agent.service
+  local after
+  after="$(authorized_snapshot)"
+  [[ "$before" == "$after" ]] || fail "authorized_keys changed during rollback"
+  note "JK Bridge Agent rollback completed from $snapshot. State and SSH grants were preserved."
+}
+
+uninstall_agent() {
+  require_command systemctl "systemd user-service support"
+  require_command sha256sum "SHA-256 payload verification"
+  verify_installed_payload
+  confirm_action "Disable the Agent and remove only its verified runtime files"
+  local before
+  before="$(authorized_snapshot)"
+  run_systemctl disable --now jkbridge-agent.service
+  if (( DRY_RUN )); then
+    note "DRY-RUN remove verified Agent runtime files and install manifest"
+  else
+    rm -f -- \
+      "$AGENT_TARGET" \
+      "$RELAY_TARGET" \
+      "$FALLBACK_TARGET" \
+      "$UNIT_TARGET" \
+      "$ENV_TARGET" \
+      "$INSTALL_MANIFEST" \
+      "$CONTROLLER_TARGET"
+  fi
+  run_systemctl daemon-reload
+  local after
+  after="$(authorized_snapshot)"
+  [[ "$before" == "$after" ]] || fail "authorized_keys changed during uninstall"
+  note "Agent runtime removed. Device state, credentials, rollback snapshots, and SSH grants were preserved."
 }
 
 agent_status() {
@@ -503,6 +691,15 @@ case "$COMMAND" in
     ;;
   install)
     install_agent
+    ;;
+  upgrade)
+    upgrade_agent
+    ;;
+  rollback)
+    rollback_agent
+    ;;
+  uninstall)
+    uninstall_agent
     ;;
   start)
     require_command systemctl "systemd user-service support"

@@ -1,3 +1,4 @@
+using System.Diagnostics;
 using System.Globalization;
 using System.Net;
 using System.Net.Http.Headers;
@@ -5,6 +6,8 @@ using System.Security.Cryptography;
 using System.Text;
 using System.Text.Json;
 using System.Text.RegularExpressions;
+using JKBridge.Core.Configuration;
+using JKBridge.Core.Models;
 
 namespace JKBridge.Core.Updates;
 
@@ -29,11 +32,17 @@ public interface IReleaseUpdateChecker
         DownloadInstallerAsync(installer, destinationDirectory, cancellationToken);
 }
 
+public interface IReleaseUpdateNetworkConfigurator
+{
+    void ConfigureNetwork(UpdateNetworkSettings settings);
+}
+
 /// <summary>
 /// Checks the fixed official JK Bridge GitHub Releases endpoints and validates
 /// installer asset metadata before it is exposed to the desktop application.
 /// </summary>
-public sealed partial class GitHubReleaseUpdateService : IReleaseUpdateChecker, IDisposable
+public sealed partial class GitHubReleaseUpdateService :
+    IReleaseUpdateChecker, IReleaseUpdateNetworkConfigurator, IDisposable
 {
     public const int MaximumResponseBytes = 256 * 1024;
     public const int MaximumChecksumBytes = 4 * 1024;
@@ -48,39 +57,64 @@ public sealed partial class GitHubReleaseUpdateService : IReleaseUpdateChecker, 
     private static readonly MediaTypeWithQualityHeaderValue GitHubJson = new(
         "application/vnd.github+json");
 
-    private readonly HttpClient _httpClient;
-    private readonly bool _ownsHttpClient;
+    private readonly HttpClient? _injectedHttpClient;
     private readonly TimeSpan _requestTimeout;
     private readonly TimeSpan _downloadTimeout;
+    private UpdateNetworkSettings _networkSettings;
 
     public GitHubReleaseUpdateService(
         TimeSpan? requestTimeout = null,
-        TimeSpan? downloadTimeout = null)
+        TimeSpan? downloadTimeout = null,
+        UpdateNetworkSettings? networkSettings = null)
     {
         _requestTimeout = ValidateTimeout(requestTimeout ?? TimeSpan.FromSeconds(15));
-        _downloadTimeout = ValidateDownloadTimeout(downloadTimeout ?? TimeSpan.FromMinutes(5));
-        var handler = CreateDefaultHandler();
-        _httpClient = new HttpClient(handler)
-        {
-            Timeout = Timeout.InfiniteTimeSpan,
-        };
-        _ownsHttpClient = true;
+        _downloadTimeout = ValidateDownloadTimeout(downloadTimeout ?? TimeSpan.FromMinutes(30));
+        _networkSettings = NormalizeNetworkSettings(networkSettings ?? new UpdateNetworkSettings());
     }
 
-    internal static SocketsHttpHandler CreateDefaultHandler() => new()
+    internal static SocketsHttpHandler CreateDefaultHandler(
+        UpdateNetworkSettings? networkSettings = null)
     {
-        AllowAutoRedirect = false,
-        AutomaticDecompression = DecompressionMethods.None,
-        ConnectTimeout = TimeSpan.FromSeconds(5),
-        Credentials = null,
-        MaxConnectionsPerServer = 2,
-        MaxResponseHeadersLength = 32,
-        PreAuthenticate = false,
-        PooledConnectionLifetime = TimeSpan.FromMinutes(5),
-        UseCookies = false,
-        Proxy = HttpClient.DefaultProxy,
-        UseProxy = true,
-    };
+        var settings = NormalizeNetworkSettings(networkSettings ?? new UpdateNetworkSettings());
+        var handler = new SocketsHttpHandler
+        {
+            AllowAutoRedirect = false,
+            AutomaticDecompression = DecompressionMethods.None,
+            ConnectTimeout = TimeSpan.FromSeconds(10),
+            Credentials = null,
+            EnableMultipleHttp2Connections = true,
+            MaxConnectionsPerServer = 4,
+            MaxResponseHeadersLength = 32,
+            PreAuthenticate = false,
+            PooledConnectionLifetime = TimeSpan.FromMinutes(5),
+            UseCookies = false,
+        };
+
+        switch (settings.Mode)
+        {
+            case UpdateNetworkMode.Direct:
+                handler.Proxy = null;
+                handler.UseProxy = false;
+                break;
+            case UpdateNetworkMode.ManualProxy:
+                _ = ConfigValidator.TryParseLoopbackHttpProxy(
+                    settings.ManualProxyUrl,
+                    out var proxyUri);
+                handler.Proxy = new WebProxy(proxyUri)
+                {
+                    BypassProxyOnLocal = false,
+                    Credentials = null,
+                };
+                handler.UseProxy = true;
+                break;
+            default:
+                handler.Proxy = HttpClient.DefaultProxy;
+                handler.UseProxy = true;
+                break;
+        }
+
+        return handler;
+    }
 
     /// <summary>
     /// Test/host injection point. Production callers should use the default
@@ -92,10 +126,47 @@ public sealed partial class GitHubReleaseUpdateService : IReleaseUpdateChecker, 
         TimeSpan? requestTimeout = null,
         TimeSpan? downloadTimeout = null)
     {
-        _httpClient = httpClient ?? throw new ArgumentNullException(nameof(httpClient));
+        _injectedHttpClient = httpClient ?? throw new ArgumentNullException(nameof(httpClient));
         _requestTimeout = ValidateTimeout(requestTimeout ?? TimeSpan.FromSeconds(15));
-        _downloadTimeout = ValidateDownloadTimeout(downloadTimeout ?? TimeSpan.FromMinutes(5));
+        _downloadTimeout = ValidateDownloadTimeout(downloadTimeout ?? TimeSpan.FromMinutes(30));
+        _networkSettings = new UpdateNetworkSettings();
     }
+
+    public void ConfigureNetwork(UpdateNetworkSettings settings) =>
+        _networkSettings = NormalizeNetworkSettings(settings);
+
+    private static UpdateNetworkSettings NormalizeNetworkSettings(UpdateNetworkSettings settings)
+    {
+        ArgumentNullException.ThrowIfNull(settings);
+        if (!Enum.IsDefined(settings.Mode))
+        {
+            throw new ArgumentException("Update network mode is invalid.", nameof(settings));
+        }
+
+        if (settings.Mode == UpdateNetworkMode.ManualProxy)
+        {
+            if (!ConfigValidator.TryParseLoopbackHttpProxy(
+                    settings.ManualProxyUrl,
+                    out var proxyUri))
+            {
+                throw new ArgumentException("Manual update proxy is invalid.", nameof(settings));
+            }
+
+            return settings with { ManualProxyUrl = proxyUri.AbsoluteUri.TrimEnd('/') };
+        }
+
+        return settings with { ManualProxyUrl = string.Empty };
+    }
+
+    private HttpClient? CreateOperationClient() =>
+        _injectedHttpClient is null
+            ? new HttpClient(CreateDefaultHandler(_networkSettings))
+            {
+                Timeout = Timeout.InfiniteTimeSpan,
+                DefaultRequestVersion = HttpVersion.Version20,
+                DefaultVersionPolicy = HttpVersionPolicy.RequestVersionOrLower,
+            }
+            : null;
 
     public async Task<ReleaseInstallerDownload> DownloadInstallerAsync(
         ReleaseInstallerAsset installer,
@@ -125,6 +196,8 @@ public sealed partial class GitHubReleaseUpdateService : IReleaseUpdateChecker, 
                     nameof(destinationDirectory))
                 : destinationDirectory);
 
+        using var operationClient = CreateOperationClient();
+        var httpClient = _injectedHttpClient ?? operationClient!;
         using var timeout = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
         timeout.CancelAfter(_downloadTimeout);
         string? stagingDirectory = null;
@@ -133,6 +206,7 @@ public sealed partial class GitHubReleaseUpdateService : IReleaseUpdateChecker, 
             progress?.Report(new ReleaseDownloadProgress(
                 ReleaseDownloadStage.FetchingChecksum));
             var checksumBytes = await DownloadSmallAssetAsync(
+                    httpClient,
                     validated.ChecksumUri,
                     MaximumChecksumBytes,
                     timeout.Token)
@@ -155,6 +229,7 @@ public sealed partial class GitHubReleaseUpdateService : IReleaseUpdateChecker, 
             progress?.Report(new ReleaseDownloadProgress(
                 ReleaseDownloadStage.DownloadingInstaller));
             var actualHash = await DownloadInstallerFileAsync(
+                    httpClient,
                     validated.DownloadUri,
                     installerPath,
                     progress,
@@ -206,12 +281,14 @@ public sealed partial class GitHubReleaseUpdateService : IReleaseUpdateChecker, 
         request.Headers.UserAgent.ParseAdd("JKBridge-Update-Check/1");
         request.Headers.TryAddWithoutValidation("X-GitHub-Api-Version", "2022-11-28");
 
+        using var operationClient = CreateOperationClient();
+        var httpClient = _injectedHttpClient ?? operationClient!;
         using var timeout = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
         timeout.CancelAfter(_requestTimeout);
         HttpResponseMessage response;
         try
         {
-            response = await _httpClient
+            response = await httpClient
                 .SendAsync(request, HttpCompletionOption.ResponseHeadersRead, timeout.Token)
                 .ConfigureAwait(false);
         }
@@ -245,13 +322,7 @@ public sealed partial class GitHubReleaseUpdateService : IReleaseUpdateChecker, 
         }
     }
 
-    public void Dispose()
-    {
-        if (_ownsHttpClient)
-        {
-            _httpClient.Dispose();
-        }
-    }
+    public void Dispose() { }
 
     private static TimeSpan ValidateTimeout(TimeSpan timeout)
     {
@@ -267,34 +338,36 @@ public sealed partial class GitHubReleaseUpdateService : IReleaseUpdateChecker, 
 
     private static TimeSpan ValidateDownloadTimeout(TimeSpan timeout)
     {
-        if (timeout <= TimeSpan.Zero || timeout > TimeSpan.FromMinutes(10))
+        if (timeout <= TimeSpan.Zero || timeout > TimeSpan.FromMinutes(60))
         {
             throw new ArgumentOutOfRangeException(
                 nameof(timeout),
-                "Release download timeout must be between zero and ten minutes.");
+                "Release download timeout must be between zero and sixty minutes.");
         }
 
         return timeout;
     }
 
     private async Task<byte[]> DownloadSmallAssetAsync(
+        HttpClient httpClient,
         Uri uri,
         int maximumBytes,
         CancellationToken cancellationToken)
     {
-        using var response = await SendAssetRequestAsync(uri, cancellationToken).ConfigureAwait(false);
+        using var response = await SendAssetRequestAsync(httpClient, uri, cancellationToken).ConfigureAwait(false);
         ValidateAssetResponse(response, maximumBytes);
         return await ReadBoundedAssetAsync(response.Content, maximumBytes, cancellationToken)
             .ConfigureAwait(false);
     }
 
     private async Task<string> DownloadInstallerFileAsync(
+        HttpClient httpClient,
         Uri uri,
         string destinationPath,
         IProgress<ReleaseDownloadProgress>? progress,
         CancellationToken cancellationToken)
     {
-        using var response = await SendAssetRequestAsync(uri, cancellationToken).ConfigureAwait(false);
+        using var response = await SendAssetRequestAsync(httpClient, uri, cancellationToken).ConfigureAwait(false);
         ValidateAssetResponse(response, MaximumInstallerBytes);
         var expectedBytes = response.Content.Headers.ContentLength;
         progress?.Report(new ReleaseDownloadProgress(
@@ -307,15 +380,20 @@ public sealed partial class GitHubReleaseUpdateService : IReleaseUpdateChecker, 
             FileMode.CreateNew,
             FileAccess.Write,
             FileShare.None,
-            64 * 1024,
+            256 * 1024,
             FileOptions.Asynchronous | FileOptions.SequentialScan);
         using var hash = IncrementalHash.CreateHash(HashAlgorithmName.SHA256);
-        var buffer = new byte[64 * 1024];
+        var buffer = new byte[256 * 1024];
+        var stopwatch = Stopwatch.StartNew();
         long total = 0;
-        long nextProgressReport = 256 * 1024;
+        long nextProgressReport = 512 * 1024;
         while (true)
         {
-            var read = await input.ReadAsync(buffer, cancellationToken).ConfigureAwait(false);
+            var read = await ReadInstallerChunkAsync(
+                    input,
+                    buffer,
+                    cancellationToken)
+                .ConfigureAwait(false);
             if (read == 0)
             {
                 break;
@@ -332,11 +410,15 @@ public sealed partial class GitHubReleaseUpdateService : IReleaseUpdateChecker, 
             if (total >= nextProgressReport ||
                 (expectedBytes.HasValue && total >= expectedBytes.Value))
             {
+                double? bytesPerSecond = stopwatch.Elapsed.TotalSeconds >= 0.25
+                    ? total / stopwatch.Elapsed.TotalSeconds
+                    : null;
                 progress?.Report(new ReleaseDownloadProgress(
                     ReleaseDownloadStage.DownloadingInstaller,
                     total,
-                    expectedBytes));
-                nextProgressReport = total + (256 * 1024);
+                    expectedBytes,
+                    bytesPerSecond));
+                nextProgressReport = total + (512 * 1024);
             }
         }
 
@@ -344,11 +426,34 @@ public sealed partial class GitHubReleaseUpdateService : IReleaseUpdateChecker, 
         progress?.Report(new ReleaseDownloadProgress(
             ReleaseDownloadStage.DownloadingInstaller,
             total,
-            expectedBytes));
+            expectedBytes,
+            stopwatch.Elapsed.TotalSeconds > 0
+                ? total / stopwatch.Elapsed.TotalSeconds
+                : null));
         return Convert.ToHexString(hash.GetHashAndReset()).ToLowerInvariant();
     }
 
+    private static async ValueTask<int> ReadInstallerChunkAsync(
+        Stream input,
+        Memory<byte> buffer,
+        CancellationToken cancellationToken)
+    {
+        using var idle = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
+        idle.CancelAfter(TimeSpan.FromSeconds(90));
+        try
+        {
+            return await input.ReadAsync(buffer, idle.Token).ConfigureAwait(false);
+        }
+        catch (OperationCanceledException) when (
+            !cancellationToken.IsCancellationRequested && idle.IsCancellationRequested)
+        {
+            throw new ReleaseUpdateException(
+                "The installer download received no data for 90 seconds.");
+        }
+    }
+
     private async Task<HttpResponseMessage> SendAssetRequestAsync(
+        HttpClient httpClient,
         Uri initialUri,
         CancellationToken cancellationToken)
     {
@@ -358,7 +463,7 @@ public sealed partial class GitHubReleaseUpdateService : IReleaseUpdateChecker, 
             using var request = new HttpRequestMessage(HttpMethod.Get, currentUri);
             request.Headers.Accept.Add(new MediaTypeWithQualityHeaderValue("application/octet-stream"));
             request.Headers.UserAgent.ParseAdd("JKBridge-Update-Download/1");
-            var response = await _httpClient
+            var response = await httpClient
                 .SendAsync(request, HttpCompletionOption.ResponseHeadersRead, cancellationToken)
                 .ConfigureAwait(false);
             if (response.RequestMessage?.RequestUri != currentUri)
@@ -892,11 +997,18 @@ public enum ReleaseDownloadStage
 public sealed record ReleaseDownloadProgress(
     ReleaseDownloadStage Stage,
     long BytesReceived = 0,
-    long? TotalBytes = null)
+    long? TotalBytes = null,
+    double? BytesPerSecond = null)
 {
     public double? Percentage =>
         TotalBytes is > 0
             ? Math.Clamp(BytesReceived * 100d / TotalBytes.Value, 0d, 100d)
+            : null;
+
+    public TimeSpan? EstimatedRemaining =>
+        TotalBytes is > 0 && BytesPerSecond is > 0 && BytesReceived < TotalBytes
+            ? TimeSpan.FromSeconds(
+                Math.Max(0d, (TotalBytes.Value - BytesReceived) / BytesPerSecond.Value))
             : null;
 }
 

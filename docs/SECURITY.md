@@ -92,6 +92,14 @@ restrict,port-forwarding,command="/usr/bin/false",from="100.64.0.0/10,fd7a:115c:
 
 脚本不会生成任意端口通配规则。新增远端端口时必须重新配对，脚本只更新同一托管公钥的精确白名单。
 
+设备配置页的一行快速配对不依赖 Linux 预先存在项目文件。Windows 构建内固定
+官方仓库的完整来源提交 ID，并把该版本的助手作为压缩资源嵌入程序。生成命令前
+.NET 先核验资源 SHA-256；Linux 上的 Python 标准库解压后再次核验摘要，之后才
+执行 `pair`。摘要不匹配时失败关闭。命令不使用 Linux 外网、`sudo` 或滚动
+分支内容，也不含配对令牌。已经手动取得助手的用户仍可使用
+`python3 jkbridge-linux.py pair`。每次修改助手后必须在后续 Windows 构建中
+同时更新嵌入资源、来源提交和摘要。
+
 schema v3 在 Windows 配置中保存配对响应里的客户端公钥指纹和精确 `permitPorts` 集合。应用不会因为本地服务列表被编辑，就假定 Linux 的 `authorized_keys` 也同步改变。每次启动 SSH 前都会比较已启用路由与这份记录：缺少端口或旧版授权未知时阻断并要求重新配对；记录中仍有未使用端口时允许连接，但建议重新配对收紧权限。v1/v2 升级因此需要一次性重新配对来建立可信基线。
 
 vNext schema v4 继续把授权回执视为“从 Linux 观察到的事实”，而不是用户配置
@@ -137,12 +145,14 @@ Agent 增加的是管理面，不替代 OpenSSH 数据面。当前源码约束�
 - 不因 Agent 停止而删除现有 OpenSSH 授权或中断已经建立的隧道；
 - 保留 `jkbridge-linux.py pair/status/remove` 作为无 Agent 安装和故障恢复路径。
 
-`jkbridge-agentctl` 拒绝 root/sudo，提供 preflight、一次确认的 install、start、
-stop、status 和 fallback。安装前检查依赖和文件，安装时保留已有完整状态并验证
+`jkbridge-agentctl` 拒绝 root/sudo，提供 preflight、一次确认的 install、
+upgrade、rollback、uninstall、start、stop、status 和 fallback。安装前检查
+依赖和文件，升级与回滚校验清单/快照，保留已有状态、凭据、自定义端口和 SSH
+授权；卸载只删除受管运行文件与 unit，保留可恢复状态和授权。安装时还会验证
 `authorized_keys` 未改变。`fallback` 只停 Agent，保留状态、凭据 verifier、
-所有 SSH 条目和 helper；已有 SSH 会话仍须从 Windows 另行停止。源码尚未完成
-真实 Linux 生命周期验收，也没有 `upgrade`、`rollback` 或 `uninstall` 命令，
-因此不能称为已支持的包管理流程。
+所有 SSH 条目和 helper；已有 SSH 会话仍须从 Windows 另行停止。源码仍未完成
+真实 Linux 干净机生命周期验收和签名包溯源，因此还不能称为稳定支持的包管理
+流程。
 
 ### 每台设备独立身份
 
@@ -365,25 +375,28 @@ Tailscale 撤销该节点。Windows setup 页面已提供清理后设备列表�
 发布脚本先运行隐私扫描、Agent package contract 和测试，再生成 Windows ZIP、
 外部 ZIP SHA-256 与包内 `SHA256SUMS`。vNext staging ZIP 已包含开发版 Agent
 脚本、中继 companion 和 Linux user-unit/env/controller 资产，但“文件存在且不含秘密”
-不等于已经安装 `socat`、具备受支持的安装流程或补齐尚不存在的显式
-upgrade/rollback/uninstall 命令，也不等于完成真实 systemd user 验收。当前便携 EXE 未签名，SmartScreen 的未知发布者提示既不能
+不等于已经安装 `socat`、完成真实 systemd user 生命周期验收或具备签名的
+Agent 包溯源。当前便携 EXE 未签名，SmartScreen 的未知发布者提示既不能
 证明恶意，也不能替代哈希核验。正式广泛分发前应完成干净机验收，并增加受
 保护的代码签名证书和时间戳。
 
 设置页的 Release 检查仅在用户点击后访问固定的官方 GitHub API。稳定构建使用
 `api.github.com/repos/Mathjk/jk-bridge/releases/latest`；带 prerelease 版本标识的
 Preview 构建使用固定、最多 20 条的 Releases 列表，因此不会误降级到更旧稳定版。
-元数据与资产请求使用 Windows/.NET 系统代理，以兼容本机代理或受管网络；仍禁用
-自动重定向、Cookie、目标站凭据和预认证，并限制超时、响应头与正文。代理只改变
-网络到达路径，不改变应用层信任边界：程序仍验证 HTTPS、精确 GitHub 主机和请求
-URI，并拒绝 draft、非法 SemVer、不精确匹配官方 Release 页面或安装器下载路径的
-内容。
+元数据与资产请求可使用 Windows/.NET 系统代理、用户明确选择的直连，或仅限
+`localhost`、`127.0.0.1`、`::1` 且带明确端口的本机 HTTP 代理。配置拒绝
+代理凭据、路径、查询、片段、局域网/公网地址，并且该代理只用于更新模块，不进入
+SSH、配对或健康检查。三种方式都禁用自动重定向、Cookie、目标站凭据和预认证，
+限制连接、整体下载和无数据等待时间、响应头与正文。代理只改变网络到达路径，不
+改变应用层信任边界：程序仍验证 HTTPS、精确 GitHub 主机和请求 URI，并拒绝
+draft、非法 SemVer、不精确匹配官方 Release 页面或安装器下载路径的内容。
 
 只有用户点击“下载并校验更新”，且同一 Release 同时存在精确命名的 Windows
 安装器与 `.sha256` 时才会下载。下载最多接受一次从精确 `github.com` 资产地址到
 `release-assets.githubusercontent.com` 的 HTTPS 跳转，限制安装器为 256 MiB，
-在受管更新目录逐块计算 SHA-256，并用固定时间比较核验；界面显示实际字节进度并
-允许取消。不匹配、取消或失败会删除该次暂存目录且不启动任何程序。校验通过只把
+在受管更新目录逐块计算 SHA-256，并用固定时间比较核验；界面显示实际字节进度、
+平均速度与预计剩余时间，允许取消，并提供已经验证的官方 Release 浏览器兜底。
+不匹配、取消或失败会删除该次暂存目录且不启动任何程序。校验通过只把
 确切 EXE 标记为“待安装”，不会自动启动或退出主程序。只有用户再次点击“开始安装”
 后才把该路径交给普通可见的 Windows 安装向导，不附加静默或提权参数；确认安装器
 进程创建成功后，应用才通过显式生命周期执行安全退出，启动失败则保持运行。该流程

@@ -2,6 +2,56 @@
 
 All notable changes are documented here. The project follows semantic versioning after the first public release.
 
+## Unreleased
+
+### Added
+
+- Added a dedicated update-network module with three explicit modes: Windows
+  system proxy, a manually entered loopback HTTP proxy, or direct GitHub
+  access. Manual proxy URLs are restricted to `localhost`, `127.0.0.1`, or
+  `::1` with an explicit port and no credentials or path.
+- Added average download speed and estimated time remaining to the visible
+  installer download progress, plus a one-click browser fallback to the exact
+  validated official Release page.
+- Added a copyable one-line Linux quick-pair command. It carries a compressed
+  helper embedded in the Windows build and verifies its pinned SHA-256 before
+  execution, without requiring Linux internet access, a clone, project
+  directory, `curl`, or `wget`.
+- Added a self-contained one-line Linux Agent install command and strict
+  `JKBA1.` setup code, reducing a clean Agent enrollment to one terminal
+  command and one paste.
+- Added an administrator-only Linux pending-services inbox backed by bounded,
+  read-only inspection of current exact `127.0.0.1` listeners; it does not
+  scan disks or unopened port ranges.
+- Added strict paste-to-draft support for Linux loopback URLs, removing query
+  strings and fragments before storage and never changing Linux authorization
+  automatically.
+- Added recognition templates for Syncthing, JupyterLab, Grafana, Ollama,
+  ComfyUI, Stable Diffusion WebUI, Overleaf, and Sub2API.
+- Added a four-layer Connection Doctor with specific causes, next steps, and
+  contextual actions for Tailscale, SSH, tunnel, and service-health failures.
+- Added manifest-verified Linux Agent upgrade, controller-snapshot rollback,
+  and state-preserving uninstall lifecycle commands.
+
+### Changed
+
+- Reorganized Settings into daily behavior, appearance, update network,
+  software update, advanced connection identity, and local data sections.
+- Made two-step one-shot pairing the first Device setup path and collapsed the
+  optional Agent enrollment form into an advanced multi-device section.
+- Promoted the Agent source-build setup to a two-step command-and-code flow;
+  manual endpoint, discovery, and recovery inputs remain in the advanced area.
+- Running the same Agent install command on an existing managed installation
+  now performs a verified upgrade while preserving enrollment state, custom
+  port, credentials, SSH grants, and the retained one-shot fallback.
+- Linux discovery and pasted addresses create disabled Windows drafts only;
+  catalog and SSH-grant changes still require the existing explicit diff review.
+- Configuration schema V7 persists the isolated updater network preference;
+  V1–V6 migrations default safely to the Windows system proxy mode.
+- Update downloads now use HTTP/2 when available, a larger streaming buffer, a
+  30-minute bounded operation timeout, and a 90-second no-data timeout while
+  retaining exact-host, redirect, size, and detached SHA-256 checks.
+
 ## 2.2.0 - 2026-08-09
 
 This stable release consolidates the tested Preview line into the first

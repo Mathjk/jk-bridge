@@ -16,6 +16,11 @@ public interface IAgentProtocolClient : IDisposable
         AgentCredential enrollmentCredential,
         CancellationToken cancellationToken = default);
 
+    Task<AgentLoopbackDiscoveryResponse> GetLoopbackDiscoveryAsync(
+        AgentCredential adminCredential,
+        CancellationToken cancellationToken = default) =>
+        Task.FromException<AgentLoopbackDiscoveryResponse>(new NotSupportedException());
+
     Task<AgentServiceCatalogResponse> GetServiceCatalogAsync(
         AgentCredential deviceCredential,
         CancellationToken cancellationToken = default);

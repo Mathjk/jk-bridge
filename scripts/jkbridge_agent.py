@@ -13,6 +13,7 @@ from __future__ import annotations
 
 import argparse
 import base64
+import concurrent.futures
 import binascii
 import calendar
 import contextlib
@@ -20,6 +21,7 @@ import dataclasses
 import fcntl
 import hashlib
 import hmac
+import http.client
 import http.server
 import importlib.util
 import ipaddress
@@ -30,6 +32,7 @@ import re
 import secrets
 import shutil
 import socket
+import ssl
 import stat
 import subprocess
 import sys
@@ -42,7 +45,7 @@ from pathlib import Path
 from typing import Any, Dict, Iterator, List, Mapping, MutableMapping, Optional, Sequence, Tuple
 
 
-AGENT_VERSION = "0.1.0"
+AGENT_VERSION = "0.2.0"
 PROTOCOL_VERSION = 1
 DEFAULT_PORT = 45871
 MAX_REQUEST_BYTES = 64 * 1024
@@ -277,6 +280,27 @@ def _secret_hash(kind: str, secret: str) -> str:
 
 def _new_secret() -> str:
     return secrets.token_urlsafe(32)
+
+
+def encode_setup_code(endpoint: str, enrollment_code: str) -> str:
+    """Return one opaque copy/paste value without placing a secret in a URL."""
+
+    try:
+        decoded = base64.urlsafe_b64decode(enrollment_code + "=")
+    except (binascii.Error, ValueError) as exc:
+        raise AgentError(
+            "The enrollment code is invalid.", code="invalid_enrollment_code"
+        ) from exc
+    if (
+        len(enrollment_code) != 43
+        or len(decoded) != 32
+        or not re.fullmatch(r"[A-Za-z0-9_-]{43}", enrollment_code)
+    ):
+        raise AgentError("The enrollment code is invalid.", code="invalid_enrollment_code")
+    payload = _canonical_json(
+        {"endpoint": endpoint, "enrollmentCode": enrollment_code, "version": 1}
+    ).encode("utf-8")
+    return "JKBA1." + base64.urlsafe_b64encode(payload).decode("ascii").rstrip("=")
 
 
 def normalize_ed25519_key(value: str) -> Tuple[str, str]:
@@ -1151,13 +1175,172 @@ def _public_device(device: Mapping[str, Any]) -> Dict[str, Any]:
     }
 
 
+def _suggest_service_template(process_name: str, title: str, port: int) -> str:
+    haystack = f"{process_name} {title}".lower()
+    rules = (
+        ("syncthing", "syncthing"),
+        ("jupyter", "jupyter"),
+        ("overleaf", "overleaf"),
+        ("sub2api", "sub2api"),
+        ("ollama", "ollama"),
+        ("grafana", "grafana"),
+        ("comfyui", "comfyui"),
+        ("automatic1111", "stable-diffusion-webui"),
+        ("stable diffusion", "stable-diffusion-webui"),
+    )
+    for needle, template_id in rules:
+        if needle in haystack:
+            return template_id
+    if port in (80, 8080, 8000, 3000, 5000, 8888):
+        return "generic-http"
+    return "generic-local-web"
+
+
+def _probe_loopback_http(address: str, port: int, process_name: str) -> Dict[str, Any]:
+    for scheme in ("http", "https"):
+        connection: Any = None
+        try:
+            if scheme == "https":
+                connection = http.client.HTTPSConnection(
+                    address,
+                    port,
+                    timeout=0.35,
+                    context=ssl._create_unverified_context(),
+                )
+            else:
+                connection = http.client.HTTPConnection(address, port, timeout=0.35)
+            connection.request(
+                "GET",
+                "/",
+                headers={
+                    "Accept": "text/html,application/xhtml+xml,*/*;q=0.1",
+                    "Connection": "close",
+                    "User-Agent": "JKBridge-Agent-Discovery/1",
+                },
+            )
+            response = connection.getresponse()
+            body = response.read(16 * 1024)
+            title = ""
+            content_type = str(response.getheader("Content-Type") or "").lower()
+            if "html" in content_type or body.lstrip().startswith((b"<!DOCTYPE", b"<html", b"<HTML")):
+                text = body.decode("utf-8", errors="replace")
+                match = re.search(r"<title[^>]*>(.*?)</title>", text, re.IGNORECASE | re.DOTALL)
+                if match:
+                    title = re.sub(r"\s+", " ", match.group(1)).strip()
+                    title = "".join(char for char in title if char.isprintable())[:120]
+            display = title or process_name or f"Local service on {port}"
+            return {
+                "port": port,
+                "bindAddress": address,
+                "processName": process_name,
+                "scheme": scheme,
+                "webDetected": True,
+                "statusCode": int(response.status),
+                "title": display,
+                "healthPath": "/",
+                "suggestedTemplateId": _suggest_service_template(
+                    process_name, title, port
+                ),
+                "tlsCertificateVerified": False if scheme == "https" else None,
+            }
+        except (OSError, TimeoutError, http.client.HTTPException, ssl.SSLError):
+            pass
+        finally:
+            if connection is not None:
+                with contextlib.suppress(Exception):
+                    connection.close()
+    return {
+        "port": port,
+        "bindAddress": address,
+        "processName": process_name,
+        "scheme": "tcp",
+        "webDetected": False,
+        "statusCode": None,
+        "title": process_name or f"Local listener on {port}",
+        "healthPath": "/",
+        "suggestedTemplateId": _suggest_service_template(process_name, "", port),
+        "tlsCertificateVerified": None,
+    }
+
+
+def discover_loopback_services() -> List[Dict[str, Any]]:
+    """Inspect current loopback listeners; never scan ports, processes, or disks."""
+
+    executable = shutil.which("ss")
+    if not executable:
+        raise AgentError(
+            "The ss utility is required for loopback service discovery.",
+            status=503,
+            code="discovery_unavailable",
+        )
+    completed = subprocess.run(
+        [executable, "-H", "-ltnp"],
+        check=False,
+        stdout=subprocess.PIPE,
+        stderr=subprocess.PIPE,
+        text=True,
+        timeout=4,
+    )
+    if completed.returncode != 0 or len(completed.stdout) > 512 * 1024:
+        raise AgentError(
+            "Loopback listener discovery failed safely.",
+            status=503,
+            code="discovery_unavailable",
+        )
+
+    listeners: Dict[int, str] = {}
+    for line in completed.stdout.splitlines():
+        fields = line.split()
+        if len(fields) < 4:
+            continue
+        local = fields[3]
+        host, separator, port_text = local.rpartition(":")
+        if not separator or host != "127.0.0.1" or not port_text.isdigit():
+            continue
+        port = int(port_text)
+        if port < 1 or port > 65535 or port in (
+            22,
+            DEFAULT_PORT,
+            3306,
+            5432,
+            6379,
+            27017,
+        ):
+            continue
+        process_match = re.search(r'users:\(\("([^"\\]{1,128})"', line)
+        process_name = ""
+        if process_match:
+            candidate = Path(process_match.group(1)).name
+            if re.fullmatch(r"[A-Za-z0-9_.+-]{1,64}", candidate):
+                process_name = candidate
+        listeners.setdefault(port, process_name)
+        if len(listeners) >= 64:
+            break
+
+    if not listeners:
+        return []
+    with concurrent.futures.ThreadPoolExecutor(max_workers=12) as executor:
+        futures = [
+            executor.submit(_probe_loopback_http, "127.0.0.1", port, process)
+            for port, process in sorted(listeners.items())
+        ]
+        return [future.result() for future in futures]
+
+
 class AgentApplication:
     """Protocol core independent of sockets for deterministic unit tests."""
 
-    def __init__(self, store: AgentStore, context: ServerContext, relay_manager: Any = None) -> None:
+    def __init__(
+        self,
+        store: AgentStore,
+        context: ServerContext,
+        relay_manager: Any = None,
+        discovery_provider: Any = None,
+    ) -> None:
         self.store = store
         self.context = context
         self.relay_manager = relay_manager
+        self.discovery_provider = discovery_provider or discover_loopback_services
 
     def _server_payload(self) -> Dict[str, Any]:
         identity = self.context.identity
@@ -1332,6 +1515,77 @@ class AgentApplication:
                 "permitPorts": ports,
                 "servicesRevision": manifest["revision"],
             }
+
+    def discovery_get(
+        self, headers: Mapping[str, str], peer: PeerIdentity
+    ) -> Dict[str, Any]:
+        with self.store.locked():
+            state, manifest = self.store.load_unlocked()
+            device = self._authenticate_device_unlocked(
+                state, headers, peer, admin=True
+            )
+            self._best_effort_touch_last_seen_unlocked(state, device)
+            known_ports = {
+                int(service["remotePort"]) for service in manifest["services"]
+            }
+
+        discovered = self.discovery_provider()
+        if not isinstance(discovered, list):
+            raise AgentError(
+                "Loopback discovery returned an invalid result.",
+                status=503,
+                code="discovery_unavailable",
+            )
+        candidates: List[Dict[str, Any]] = []
+        excluded_known = 0
+        for item in discovered[:64]:
+            if not isinstance(item, dict):
+                continue
+            port = item.get("port")
+            if isinstance(port, bool) or not isinstance(port, int) or not 1 <= port <= 65535:
+                continue
+            if port in known_ports:
+                excluded_known += 1
+                continue
+            process_name = str(item.get("processName") or "")
+            if not re.fullmatch(r"[A-Za-z0-9_.+-]{0,64}", process_name):
+                process_name = ""
+            scheme = str(item.get("scheme") or "tcp")
+            if scheme not in ("http", "https", "tcp"):
+                scheme = "tcp"
+            title = "".join(
+                char for char in str(item.get("title") or "") if char.isprintable()
+            )[:120]
+            template_id = str(item.get("suggestedTemplateId") or "generic-local-web")
+            if not SERVICE_ID_PATTERN.fullmatch(template_id):
+                template_id = "generic-local-web"
+            status_code = item.get("statusCode")
+            if isinstance(status_code, bool) or not isinstance(status_code, int):
+                status_code = None
+            candidates.append(
+                {
+                    "port": port,
+                    "bindAddress": "127.0.0.1",
+                    "processName": process_name,
+                    "scheme": scheme,
+                    "webDetected": bool(item.get("webDetected")),
+                    "statusCode": status_code,
+                    "title": title or process_name or f"Local listener on {port}",
+                    "healthPath": "/",
+                    "suggestedTemplateId": template_id,
+                    "tlsCertificateVerified": (
+                        False if scheme == "https" else None
+                    ),
+                }
+            )
+        return {
+            "protocolVersion": PROTOCOL_VERSION,
+            "discoveredAt": utc_now(),
+            "scope": "current-127.0.0.1-listeners",
+            "candidates": sorted(candidates, key=lambda item: int(item["port"])),
+            "excludedKnownServiceCount": excluded_known,
+            "note": "No disks or port ranges were scanned. Nothing was added or authorized.",
+        }
 
     def services_get(self, headers: Mapping[str, str], peer: PeerIdentity) -> Dict[str, Any]:
         with self.store.locked():
@@ -2000,6 +2254,8 @@ class AgentApplication:
             return 201, self.enroll(payload, headers, peer)
         if method == "GET" and path == "/v1/services":
             return 200, self.services_get(headers, peer)
+        if method == "GET" and path == "/v1/discovery":
+            return 200, self.discovery_get(headers, peer)
         if method == "GET" and path == "/v1/me":
             return 200, self.me_get(headers, peer)
         if method == "PUT" and path == "/v1/services":
@@ -2141,6 +2397,10 @@ class AgentRequestHandler(http.server.BaseHTTPRequestHandler):
                 address, "relay", 20, 60.0
             ):
                 raise AgentError("Relay operations are temporarily rate limited.", status=429, code="rate_limited")
+            if parsed_path.path == "/v1/discovery" and not self.server.rate_limiter.allow(
+                address, "discovery", 6, 60.0
+            ):
+                raise AgentError("Discovery is temporarily rate limited.", status=429, code="rate_limited")
             if parsed_path.path == "/v1/enrollment-codes" and (
                 not self.server.rate_limiter.allow(address, "enrollment-code", 5, 600.0)
                 or not self.server.rate_limiter.allow("__global__", "enrollment-code", 20, 600.0)
@@ -2254,15 +2514,20 @@ def _paths_from_args(args: argparse.Namespace, home: Path) -> AgentPaths:
 
 
 def run_bootstrap(args: argparse.Namespace) -> int:
+    if args.agent_port not in range(1, 65536):
+        raise AgentError("The Agent port must be between 1 and 65535.", code="invalid_port")
     _user, home = current_user()
     paths = _paths_from_args(args, home)
     services = _load_services_file(Path(args.services_file)) if args.services_file else None
+    identity = tailscale_identity()
     code, recovery = _make_recovery("admin", args.code_ttl)
     AgentStore(paths).initialize(_initial_state(recovery), _initial_manifest(services))
+    setup_code = encode_setup_code(f"http://{identity.ipv4}:{args.agent_port}/", code)
     print("JK Bridge Agent initialized.")
-    print("One-time administrator enrollment code (expires in {} seconds):".format(args.code_ttl))
-    print(code)
-    print("This code is not stored in plaintext. Do not save it in notes or logs.")
+    print("Copy this one-time setup code to JK Bridge for Windows (expires in {} seconds):".format(args.code_ttl))
+    print(setup_code)
+    print("It contains the Agent address and one-time administrator credential.")
+    print("The credential is not stored in plaintext. Do not save the setup code in notes or logs.")
     return 0
 
 
@@ -2387,6 +2652,7 @@ def build_parser() -> argparse.ArgumentParser:
     bootstrap = subparsers.add_parser("bootstrap", help="initialize state and issue the first admin code")
     bootstrap.add_argument("--services-file", help="JSON service list or manifest to import")
     bootstrap.add_argument("--code-ttl", type=int, default=900)
+    bootstrap.add_argument("--agent-port", type=int, default=DEFAULT_PORT)
     bootstrap.set_defaults(handler=run_bootstrap)
 
     recovery = subparsers.add_parser("recovery-code", help="issue one expiring one-use enrollment code")

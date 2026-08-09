@@ -304,6 +304,68 @@ public sealed class ConfigValidatorTests
         AssertIssue(result, "agent.invalidCatalogRevision", "agent.catalogRevision");
     }
 
+    [Theory]
+    [InlineData("http://127.0.0.1:7897")]
+    [InlineData("http://localhost:8080")]
+    [InlineData("http://[::1]:3128")]
+    public void Validate_AllowsExplicitLoopbackUpdateProxy(string proxyUrl)
+    {
+        var defaults = AppConfig.CreateDefault();
+        var config = defaults with
+        {
+            UpdateNetwork = new UpdateNetworkSettings
+            {
+                Mode = UpdateNetworkMode.ManualProxy,
+                ManualProxyUrl = proxyUrl,
+            },
+        };
+
+        Assert.True(ConfigValidator.Validate(config).IsValid);
+    }
+
+    [Theory]
+    [InlineData("")]
+    [InlineData("https://127.0.0.1:7897")]
+    [InlineData("http://127.0.0.1")]
+    [InlineData("http://192.168.1.5:7897")]
+    [InlineData("http://user:password@127.0.0.1:7897")]
+    [InlineData("http://127.0.0.1:7897/proxy")]
+    public void Validate_RejectsUnsafeOrAmbiguousUpdateProxy(string proxyUrl)
+    {
+        var defaults = AppConfig.CreateDefault();
+        var config = defaults with
+        {
+            UpdateNetwork = new UpdateNetworkSettings
+            {
+                Mode = UpdateNetworkMode.ManualProxy,
+                ManualProxyUrl = proxyUrl,
+            },
+        };
+
+        var result = ConfigValidator.Validate(config);
+
+        AssertIssue(result, "updateNetwork.invalidProxy", "updateNetwork.manualProxyUrl");
+    }
+
+    [Fact]
+    public void Validate_RejectsStoredProxyOutsideManualMode()
+    {
+        var defaults = AppConfig.CreateDefault();
+        var config = defaults with
+        {
+            UpdateNetwork = new UpdateNetworkSettings
+            {
+                Mode = UpdateNetworkMode.System,
+                ManualProxyUrl = "http://127.0.0.1:7897",
+            },
+        };
+
+        AssertIssue(
+            ConfigValidator.Validate(config),
+            "updateNetwork.unusedProxy",
+            "updateNetwork.manualProxyUrl");
+    }
+
     [Fact]
     public void EnsureValid_ThrowsWithAllIssues()
     {

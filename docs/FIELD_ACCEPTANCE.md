@@ -39,7 +39,7 @@ but application availability was correctly distinct from tunnel authorization.
 - reboot, login persistence, suspend/resume, and network-recovery coverage;
 - a second independent Windows device, ordinary-device code enrollment,
   administrator replacement, revocation, and immediate session cutoff;
-- supported Agent upgrade, rollback, and uninstall commands; and
+- live clean-machine acceptance of the implemented Agent upgrade, rollback, and uninstall commands; and
 - live Windows-managed relay create/update/delete and legacy-relay remote
   adoption.
 

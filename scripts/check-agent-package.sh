@@ -48,7 +48,7 @@ for command in bootstrap recovery-code serve status; do
 done
 
 controller_help="$("$ROOT/packaging/linux/jkbridge-agentctl" --help)"
-for command in preflight install start stop status fallback; do
+for command in preflight install upgrade rollback uninstall start stop status fallback; do
   if [[ "$controller_help" != *"$command"* ]]; then
     printf 'Agent controller help does not expose required lifecycle command: %s\n' "$command" >&2
     failed=1

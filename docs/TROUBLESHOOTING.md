@@ -56,11 +56,18 @@ The executable is currently unsigned, so SmartScreen may show an unknown publish
   download times out on a proxy-dependent network, manually install Preview 6
   once. Preview 6 uses the Windows/.NET system proxy while retaining exact-host,
   redirect, size, and SHA-256 validation.
+- In **Settings → Update network**, select Windows system proxy (default), a
+  manual loopback HTTP proxy, or direct GitHub access, then save. A manual value
+  such as `http://127.0.0.1:7897` must not contain credentials or a path and
+  cannot point to a LAN or public host.
 - Run **Check official Release** first. **Download and verify update** appears
   only when the selected Release has the exact EXE and `.sha256` pair.
-- Download bytes, percentage, and verification stage are visible, and the
-  operation can be cancelled. A checksum mismatch, untrusted redirect,
-  cancellation, or timeout never starts setup or exits JK Bridge.
+- Download bytes, percentage, average speed, estimated remaining time, and
+  verification stage are visible, and the operation can be cancelled. A checksum
+  mismatch, untrusted redirect, cancellation, or timeout never starts setup or
+  exits JK Bridge.
+- If the in-app route remains slow, use **Open in browser** to download from the
+  already validated official Release page through the browser's own network path.
 - After verification, select **Start installation (JK Bridge will exit)**.
   JK Bridge exits only after the normal visible setup wizard starts
   successfully; the wizard displays real installation progress. A launch

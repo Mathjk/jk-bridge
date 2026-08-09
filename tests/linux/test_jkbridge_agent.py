@@ -235,6 +235,47 @@ class AgentAuthorizationTests(unittest.TestCase):
             jkbridge_agent.validate_services(services)
 
 
+class LoopbackDiscoveryTests(unittest.TestCase):
+    def test_listener_inventory_uses_only_existing_exact_ipv4_loopback_sockets(self):
+        output = (
+            'LISTEN 0 4096 127.0.0.1:8384 0.0.0.0:* users:(("syncthing",pid=4,fd=8))\n'
+            'LISTEN 0 4096 0.0.0.0:9000 0.0.0.0:* users:(("public",pid=5,fd=8))\n'
+            'LISTEN 0 4096 [::1]:8888 [::]:* users:(("jupyter",pid=6,fd=8))\n'
+            'LISTEN 0 4096 127.0.0.1:5432 0.0.0.0:* users:(("postgres",pid=7,fd=8))\n'
+        )
+        completed = mock.Mock(returncode=0, stdout=output, stderr="")
+        probe = mock.Mock(
+            return_value={
+                "port": 8384,
+                "bindAddress": "127.0.0.1",
+                "processName": "syncthing",
+                "scheme": "http",
+                "webDetected": True,
+                "statusCode": 200,
+                "title": "Syncthing",
+                "healthPath": "/",
+                "suggestedTemplateId": "syncthing",
+                "tlsCertificateVerified": None,
+            }
+        )
+
+        with mock.patch.object(jkbridge_agent.shutil, "which", return_value="/usr/bin/ss"), \
+             mock.patch.object(jkbridge_agent.subprocess, "run", return_value=completed) as runner, \
+             mock.patch.object(jkbridge_agent, "_probe_loopback_http", probe):
+            candidates = jkbridge_agent.discover_loopback_services()
+
+        self.assertEqual([8384], [item["port"] for item in candidates])
+        runner.assert_called_once_with(
+            ["/usr/bin/ss", "-H", "-ltnp"],
+            check=False,
+            stdout=jkbridge_agent.subprocess.PIPE,
+            stderr=jkbridge_agent.subprocess.PIPE,
+            text=True,
+            timeout=4,
+        )
+        probe.assert_called_once_with("127.0.0.1", 8384, "syncthing")
+
+
 class AgentApplicationTests(unittest.TestCase):
     def setUp(self):
         self.temporary = tempfile.TemporaryDirectory()
@@ -318,6 +359,57 @@ class AgentApplicationTests(unittest.TestCase):
         self.assertEqual(receipt["deviceId"], response["device"]["deviceId"])
         self.assertEqual(receipt["permitPorts"], response["device"]["permitPorts"])
         self.assertEqual(1, response["servicesRevision"])
+
+    def test_admin_discovery_is_read_only_excludes_catalog_ports_and_never_auto_adds(self):
+        receipt = self.fixture.enroll(self.fixture.bootstrap())
+        headers = {"authorization": "Bearer " + receipt["deviceCredential"]}
+        self.fixture.app.discovery_provider = lambda: [
+            {
+                "port": 80,
+                "bindAddress": "127.0.0.1",
+                "processName": "existing",
+                "scheme": "http",
+                "webDetected": True,
+                "statusCode": 200,
+                "title": "Existing",
+                "suggestedTemplateId": "generic-http",
+            },
+            {
+                "port": 8384,
+                "bindAddress": "127.0.0.1",
+                "processName": "syncthing",
+                "scheme": "http",
+                "webDetected": True,
+                "statusCode": 200,
+                "title": "Syncthing",
+                "suggestedTemplateId": "syncthing",
+            },
+        ]
+        before_state, before_manifest = self.fixture.store.load()
+
+        response = self.fixture.app.discovery_get(headers, self.fixture.peer)
+
+        self.assertEqual("current-127.0.0.1-listeners", response["scope"])
+        self.assertEqual([8384], [item["port"] for item in response["candidates"]])
+        self.assertEqual(1, response["excludedKnownServiceCount"])
+        after_state, after_manifest = self.fixture.store.load()
+        self.assertEqual(before_state["devices"][0]["serviceIds"], after_state["devices"][0]["serviceIds"])
+        self.assertEqual(before_state["devices"][0]["permitPorts"], after_state["devices"][0]["permitPorts"])
+        self.assertEqual(before_manifest, after_manifest)
+
+    def test_non_admin_discovery_is_rejected_before_listener_inventory_runs(self):
+        receipt = self.fixture.enroll(self.fixture.bootstrap(role="device"))
+        provider = mock.Mock(return_value=[])
+        self.fixture.app.discovery_provider = provider
+
+        with self.assertRaises(jkbridge_agent.AgentError) as denied:
+            self.fixture.app.discovery_get(
+                {"authorization": "Bearer " + receipt["deviceCredential"]},
+                self.fixture.peer,
+            )
+
+        self.assertEqual("admin_required", denied.exception.code)
+        provider.assert_not_called()
 
     def test_non_admin_cannot_list_devices_or_update_catalog(self):
         code = self.fixture.bootstrap(role="device")

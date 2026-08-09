@@ -5,8 +5,9 @@ device enrollment, exact SSH authorization, service-catalog synchronization,
 and device revocation. `scripts/jkbridge-linux.py` remains the no-daemon,
 one-shot fallback.
 
-Nothing in this directory installs or starts a service automatically. Review
-the files before performing the one-time setup.
+Nothing happens merely by unpacking these files. Installation starts only after
+the user invokes the reviewed controller (directly or through the command
+embedded in the Windows app).
 
 ## Prerequisites
 
@@ -14,6 +15,7 @@ the files before performing the one-time setup.
 - Python 3.9 or newer
 - Tailscale running and logged in, including `tailscale whois --json`
 - OpenSSH Server with an Ed25519 host public key
+- `socat`, `ss`, and a working systemd user manager
 - the final services listening only on Linux loopback
 
 Run the Agent as the ordinary SSH user, never with `sudo`. The service does not
@@ -67,9 +69,11 @@ packaging/linux/jkbridge-agentctl \
 The controller replaces each Agent, relay companion, retained one-shot helper,
 controller, unit, and non-secret environment file atomically and backs up an
 older managed copy. It then initializes private state, prints one short-lived
-administrator enrollment code, verifies that `authorized_keys` did not change,
-writes a SHA-256 install manifest, and enables the systemd user service. SSH
-authorization changes only after an enrolled administrator approves a device.
+administrator setup code beginning with `JKBA1.`, verifies that
+`authorized_keys` did not change, writes a SHA-256 install manifest, and
+enables the systemd user service. The setup code contains the exact Agent
+endpoint and one-time enrollment credential, so Windows needs only that one
+paste. SSH authorization changes only after the enrollment succeeds.
 
 Before `start`, `stop`, `status`, or `fallback`, the installed controller checks
 every path component, regular-file type, owner, exact private mode, and the
@@ -82,20 +86,32 @@ rerun the same reviewed `install` command to converge the payload files.
 Per-file backups are retained for manual recovery. If interruption leaves only
 one of `state.json` and `services.json`, the controller refuses to overwrite or
 guess at private enrollment state; inspect that incomplete first-bootstrap
-state locally before retrying. A supported automatic
-upgrade/rollback/uninstall workflow is not implemented yet; do not describe
-this development controller as a Linux package manager.
+state locally before retrying. `upgrade` first verifies the current install,
+preserves the custom Agent port and private state, and saves one verified
+rollback snapshot before replacement. `rollback` accepts only that controller-
+created snapshot. `uninstall` removes managed runtime files and the user unit
+but deliberately preserves Agent state, credentials, rollback snapshots, and
+SSH grants for an explicit later recovery or reinstall.
 
 Lifecycle commands do not require a terminal workflow on both computers:
 
 ```bash
+~/.local/bin/jkbridge-agentctl upgrade
+~/.local/bin/jkbridge-agentctl rollback
+~/.local/bin/jkbridge-agentctl uninstall
 ~/.local/bin/jkbridge-agentctl status
 ~/.local/bin/jkbridge-agentctl stop
 ~/.local/bin/jkbridge-agentctl start
 ~/.local/bin/jkbridge-agentctl fallback
 ```
 
-`stop` and `fallback` preserve Agent state, credentials, every SSH key, and the
+`install` on an already managed installation converges through the same
+verified upgrade path. Therefore the one-line command copied from Windows can
+also be rerun for an upgrade: it preserves the enrolled identity and does not
+require another Windows code paste. Use `rollback` for the newest controller-
+created snapshot.
+
+`stop`, `fallback`, and `uninstall` preserve Agent state, credentials, every SSH key, and the
 old one-shot pairing helper. Stopping the Agent does not terminate an already
 established Windows SSH tunnel; stop that tunnel separately when immediate
 cutoff is intended. Changing or expanding Linux remote ports while in fallback
@@ -117,9 +133,11 @@ python3 ~/.local/lib/jkbridge/jkbridge_agent.py \
   bootstrap
 ```
 
-Bootstrap prints one short-lived administrator enrollment code. Only its
-SHA-256 verifier is stored. Paste the code directly into JK Bridge for Windows;
-do not save it in a note, configuration file, shell script, or screenshot.
+Bootstrap prints one short-lived `JKBA1.` setup code containing the exact
+endpoint and administrator enrollment credential. Only the credential's
+SHA-256 verifier is stored. Paste the setup code directly into JK Bridge for
+Windows; do not save it in a note, configuration file, shell script, or
+screenshot.
 
 The built-in development catalog contains Overleaf, Sub2API, GPU Dashboard,
 and Investment News. Before enrolling a device, deployments with additional
@@ -201,6 +219,7 @@ GET  /v1/bootstrap
 POST /v1/enroll
 GET  /v1/me
 GET  /v1/services
+GET  /v1/discovery                 # administrator, read-only
 PUT  /v1/services                 # administrator
 GET  /v1/devices                  # administrator
 POST /v1/devices/<id>/rename      # administrator; label only, audited

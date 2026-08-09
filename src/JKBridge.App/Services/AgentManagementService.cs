@@ -44,6 +44,11 @@ public interface IAgentManagementService
         AgentManagementRequest request,
         CancellationToken cancellationToken = default);
 
+    Task<AgentLoopbackDiscoveryResponse> DiscoverLoopbackServicesAsync(
+        AgentManagementRequest request,
+        CancellationToken cancellationToken = default) =>
+        Task.FromException<AgentLoopbackDiscoveryResponse>(new NotSupportedException());
+
     Task<AgentDeviceRevocationResponse> RevokeDeviceAsync(
         AgentManagementRequest request,
         string deviceId,
@@ -250,6 +255,15 @@ public sealed class AgentManagementService : IAgentManagementService
         string.Equals(listed.TailscaleLogin, current.TailscaleLogin, StringComparison.Ordinal) &&
         listed.ServiceIds.SequenceEqual(current.ServiceIds, StringComparer.Ordinal) &&
         listed.PermitPorts.Order().SequenceEqual(current.PermitPorts.Order());
+
+    public Task<AgentLoopbackDiscoveryResponse> DiscoverLoopbackServicesAsync(
+        AgentManagementRequest request,
+        CancellationToken cancellationToken = default) =>
+        RunAdminOperationAsync(
+            request,
+            (client, credential, token) =>
+                client.GetLoopbackDiscoveryAsync(credential, token),
+            cancellationToken);
 
     public async Task<AgentDeviceRevocationResponse> RevokeDeviceAsync(
         AgentManagementRequest request,

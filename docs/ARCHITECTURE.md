@@ -1,8 +1,9 @@
 # JK Bridge Architecture
 
 > **Release boundary:** JK Bridge v2.2.0 is the latest stable desktop release
-> and uses configuration schema V6 with the one-shot Linux helper as the
-> recommended setup/recovery path. Stable desktop scope includes Windows-local
+> and uses configuration schema V6. The current development branch adds schema
+> V7 update-network preferences and verified one-line quick pairing. The one-shot
+> Linux helper remains the recommended setup/recovery path. Stable desktop scope includes Windows-local
 > discovery, service editing and profiles, diagnostic export, the installer,
 > manual updater, appearance persistence, categorized navigation, and the
 > first-run tutorial. The package also contains an optional persistent Linux
@@ -27,10 +28,10 @@
 | Route integrity | One validated route object derives SSH, browser, health, and authorization endpoints |
 | Authorization state | Schema V3 stores the paired client fingerprint and exact granted remote-port set |
 | Persistence | Atomic JSON config, backup recovery, rotating redacted logs |
-| Stable configuration | Schema V6 migrates V1–V5 profiles, persists Windows-local services, and records tutorial completion |
+| Configuration | Schema V7 migrates V1–V6 profiles, persists updater network mode, Windows-local services, and tutorial completion |
 | Tests | Unit/integration tests for config, protocol, runtime, view model, Linux file mutation, and packaging |
 | Optional Agent configuration | Schema V4 introduced non-secret Agent registration/catalog state while preserving V3 routes and receipts |
-| vNext Linux management | Development non-root Agent/API over Tailscale plus `jkbridge-agentctl` install/start/stop/status/fallback source; one deployed install/bootstrap/start/restart/status and first-admin enrollment completed, but no supported upgrade/uninstall command or complete clean-machine lifecycle yet; V1 helper remains fallback |
+| vNext Linux management | Development non-root Agent/API over Tailscale plus `jkbridge-agentctl` install/upgrade/rollback/uninstall/start/stop/status/fallback source; one deployed install/bootstrap/start/restart/status and first-admin enrollment completed, but full clean-machine lifecycle acceptance is still open; V1 helper remains fallback |
 | vNext device identity | One dedicated Ed25519 identity and independently revocable authorization per Windows device |
 | Stable service migration | Native JSON export/import UI; bounded non-secret profile, read-only diff, explicit confirmation, atomic save |
 | vNext explicit relay | One exact DNS/IPv4 TCP target behind one Linux `127.0.0.1` `socat` user unit; read-only plan/probe before confirmed apply/delete |
@@ -110,6 +111,14 @@ credential itself is not in JSON. Schema V5 adds persisted Windows-local service
 definitions. Schema V6 adds the non-secret tutorial-completion behavior flag.
 Loading any V1–V5 profile supplies safe defaults for later fields, bumps the
 schema, and otherwise preserves server, services, behavior, and authorization.
+
+### Schema V7 migration — current development branch
+
+Schema V7 adds an isolated `updateNetwork` object. Existing V1–V6 profiles
+default to Windows system-proxy mode. Manual mode stores only a loopback HTTP
+proxy URL with an explicit port and no credentials or path; direct mode stores
+no proxy value. The preference is applied only to future update checks and
+downloads and does not change tunnel, pairing, discovery, or health traffic.
 
 The migration and Agent catalog materialization preserve these boundaries:
 
@@ -302,20 +311,25 @@ on that Linux node's detected Tailscale IPv4, and owns a small management plane:
   `authorized_keys` mutation;
 - report sanitized health/bootstrap state without starting or stopping
   application services.
+- inspect only current exact Linux `127.0.0.1` listeners through a bounded,
+  administrator-only read and return disabled-draft suggestions without
+  mutating the catalog or grants.
 
 The non-root controller implements prerequisite preflight, one-confirmation
-install, start, stop, status, and state-preserving fallback. Install copies all
-three Python helpers, environment, and user unit, bootstraps private state only
-when absent, verifies that `authorized_keys` did not change, and enables the
-user service. It never invokes `sudo` or installs OS packages. These paths have
-not passed live acceptance, and there is no explicit upgrade/rollback/uninstall
-command yet. The relay source requires the companion file beside
+install, manifest-verified upgrade, controller-snapshot rollback,
+state-preserving uninstall, start, stop, status, and fallback. Install copies
+all three Python helpers, environment, and user unit, bootstraps private state
+only when absent, verifies that `authorized_keys` did not change, and enables
+the user service. Upgrade preserves private state, credentials, SSH grants, and
+a custom port. Uninstall removes managed runtime files while preserving state
+and grants. It never invokes `sudo` or installs OS packages. These paths have
+not passed full live clean-machine acceptance. The relay source requires the companion file beside
 `jkbridge_agent.py`, executable
 `/usr/bin/socat`, a working systemd user instance, and write access to the
 reviewed per-user unit directory. One deployed pair has exercised
 install/bootstrap/start/restart/status and first-admin enrollment; see the
 [field acceptance record](FIELD_ACCEPTANCE.md). That evidence does not close
-the remaining clean-machine, upgrade, rollback, or uninstall gates.
+the remaining clean-machine upgrade, rollback, or uninstall acceptance gates.
 
 Every Windows device generates its own Ed25519 key. The Agent stores the public
 key, fingerprint, device metadata, and authorization state, never the private
@@ -456,7 +470,7 @@ separately role-gated. See
   acceptance. Approval of a replacement/old device, credential rotation, and
   background catalog synchronization are not present.
 - Managed relay source exists, but supported dependency installation, per-user
-  systemd lifecycle, explicit upgrade/uninstall commands, legacy-relay adoption
+  systemd lifecycle acceptance, signed package provenance, legacy-relay adoption
   integration, and clean-machine/TLS acceptance remain release gates.
 
 ## Logging and privacy
@@ -473,10 +487,12 @@ separately role-gated. See
 - The Settings page checks for updates only on user action. Stable builds use
   the fixed latest-release endpoint; prerelease builds use a bounded official
   release list and retain their Preview channel. A second explicit action
-  downloads an exact official installer/checksum pair, accepts only GitHub's
-  release-asset CDN redirect, streams a bounded EXE into the managed update
-  directory, reports byte/percentage and verification progress, supports
-  cancellation, and verifies SHA-256. Success only stages the EXE. A third
+  downloads an exact official installer/checksum pair using system proxy,
+  loopback manual HTTP proxy, or direct mode. It accepts only GitHub's
+  release-asset CDN redirect, uses HTTP/2 when negotiated, streams a bounded EXE
+  into the managed update directory, reports bytes, percentage, average speed,
+  estimated remaining time and verification progress, supports cancellation,
+  and verifies SHA-256. Success only stages the EXE. A third
   explicit action revalidates the managed path, starts the normal visible
   installer without silent flags, and requests controlled shutdown only after
   process creation succeeds. It never performs a background check, download, or
@@ -484,4 +500,4 @@ separately role-gated. See
 
 ## Publishing
 
-The release script runs privacy checks, Python tests, .NET Release tests, and self-contained Windows publish before producing a staging directory. One payload array is the source of truth for both `SHA256SUMS` and ZIP creation. The vNext staging package also carries the development Agent and relay companion scripts, Linux user-unit/environment/controller assets, and their manual review notes. A package-contract check proves those assets are present, executable, colocatable, and non-secret; it does not install `socat`, add the missing upgrade/uninstall workflow, or replace clean-machine Agent/relay acceptance. Detached SHA-256 files cover the ZIP and installer. The explicit in-app overlay-install workflow does not promote the `v2.2.0` Preview line to stable.
+The release script runs privacy checks, Python tests, .NET Release tests, and self-contained Windows publish before producing a staging directory. One payload array is the source of truth for both `SHA256SUMS` and ZIP creation. The vNext staging package also carries the development Agent and relay companion scripts, Linux user-unit/environment/controller assets, and their manual review notes. A package-contract check proves those assets are present, executable, colocatable, lifecycle-command complete, and non-secret; it does not install `socat`, provide signed Agent provenance, or replace clean-machine Agent/relay acceptance. Detached SHA-256 files cover the ZIP and installer. The explicit in-app overlay-install workflow does not promote the `v2.2.0` Preview line to stable.

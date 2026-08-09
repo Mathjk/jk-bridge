@@ -114,6 +114,26 @@ public sealed record AgentServiceCatalogResponse(
     public string Revision => ServicesRevision;
 }
 
+public sealed record AgentLoopbackDiscoveryResponse(
+    int ProtocolVersion,
+    DateTimeOffset DiscoveredAt,
+    string Scope,
+    IReadOnlyList<AgentLoopbackServiceCandidate> Candidates,
+    int ExcludedKnownServiceCount,
+    string Note);
+
+public sealed record AgentLoopbackServiceCandidate(
+    int Port,
+    string BindAddress,
+    string ProcessName,
+    string Scheme,
+    bool WebDetected,
+    int? StatusCode,
+    string Title,
+    string HealthPath,
+    string SuggestedTemplateId,
+    bool? TlsCertificateVerified);
+
 /// <summary>
 /// A server-owned service template. SuggestedLocalPort remains a Windows-local
 /// preference; RemoteHost and RemotePort are the exact SSH permitopen target.

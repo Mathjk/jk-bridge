@@ -75,6 +75,7 @@ public static class ConfigValidator
             ValidateServer(config.Server, expectedSuffix, issues);
         }
         ValidateBehavior(config.Behavior, issues);
+        ValidateUpdateNetwork(config.UpdateNetwork, issues);
         ValidateAuthorization(config.Authorization, issues);
         ValidateAgent(config.Agent, issues);
         ValidateServices(config.Services, issues);
@@ -175,6 +176,80 @@ public static class ConfigValidator
         {
             issues.Add(new("behavior.theme", "behavior.invalidTheme", "Theme preference is invalid."));
         }
+    }
+
+    private static void ValidateUpdateNetwork(
+        UpdateNetworkSettings? settings,
+        ICollection<ConfigValidationIssue> issues)
+    {
+        if (settings is null)
+        {
+            issues.Add(new(
+                "updateNetwork",
+                "updateNetwork.required",
+                "Update network settings are required."));
+            return;
+        }
+
+        if (!Enum.IsDefined(settings.Mode))
+        {
+            issues.Add(new(
+                "updateNetwork.mode",
+                "updateNetwork.invalidMode",
+                "Update network mode is invalid."));
+            return;
+        }
+
+        var proxy = settings.ManualProxyUrl?.Trim() ?? string.Empty;
+        if (settings.Mode != UpdateNetworkMode.ManualProxy)
+        {
+            if (proxy.Length > 0)
+            {
+                issues.Add(new(
+                    "updateNetwork.manualProxyUrl",
+                    "updateNetwork.unusedProxy",
+                    "A manual update proxy can be stored only in manual-proxy mode."));
+            }
+            return;
+        }
+
+        if (!TryParseLoopbackHttpProxy(proxy, out _))
+        {
+            issues.Add(new(
+                "updateNetwork.manualProxyUrl",
+                "updateNetwork.invalidProxy",
+                "Manual update proxy must be an HTTP URL for 127.0.0.1, localhost, or ::1 with an explicit port and no credentials or path."));
+        }
+    }
+
+    public static bool TryParseLoopbackHttpProxy(string? value, out Uri proxyUri)
+    {
+        proxyUri = null!;
+        if (string.IsNullOrWhiteSpace(value) ||
+            value.Length > 256 ||
+            ContainsControlCharacters(value) ||
+            !Uri.TryCreate(value.Trim(), UriKind.Absolute, out var parsed) ||
+            !parsed.Scheme.Equals(Uri.UriSchemeHttp, StringComparison.OrdinalIgnoreCase) ||
+            parsed.IsDefaultPort ||
+            !string.IsNullOrEmpty(parsed.UserInfo) ||
+            parsed.AbsolutePath != "/" ||
+            !string.IsNullOrEmpty(parsed.Query) ||
+            !string.IsNullOrEmpty(parsed.Fragment))
+        {
+            return false;
+        }
+
+        var normalizedHost = parsed.Host.Trim('[', ']');
+        var loopback = normalizedHost.Equals("localhost", StringComparison.OrdinalIgnoreCase) ||
+                       normalizedHost.Equals("127.0.0.1", StringComparison.OrdinalIgnoreCase) ||
+                       normalizedHost.Equals("::1", StringComparison.OrdinalIgnoreCase);
+        if (!loopback)
+        {
+            return false;
+        }
+
+        proxyUri = parsed;
+        return true;
     }
 
     private static void ValidateAuthorization(

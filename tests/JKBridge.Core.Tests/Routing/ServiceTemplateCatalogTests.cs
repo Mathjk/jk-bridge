@@ -15,6 +15,12 @@ public sealed class ServiceTemplateCatalogTests
             [
                 ServiceTemplateCatalog.Overleaf,
                 ServiceTemplateCatalog.Sub2Api,
+                ServiceTemplateCatalog.Syncthing,
+                ServiceTemplateCatalog.Jupyter,
+                ServiceTemplateCatalog.Grafana,
+                ServiceTemplateCatalog.Ollama,
+                ServiceTemplateCatalog.ComfyUi,
+                ServiceTemplateCatalog.StableDiffusionWebUi,
                 ServiceTemplateCatalog.GenericHttp,
                 ServiceTemplateCatalog.GenericHttps,
             ],
@@ -32,6 +38,21 @@ public sealed class ServiceTemplateCatalogTests
         Assert.Equal(8081, sub2Api.LocalPort);
         Assert.Equal(8081, sub2Api.RemotePort);
         Assert.Equal("http://127.0.0.1:8081/", sub2Api.OpenUrl);
+    }
+
+    [Theory]
+    [InlineData("syncthing", "", 9000, ServiceTemplateCatalog.Syncthing)]
+    [InlineData("python", "JupyterLab", 9000, ServiceTemplateCatalog.Jupyter)]
+    [InlineData("", "", 11434, ServiceTemplateCatalog.Ollama)]
+    [InlineData("python", "Stable Diffusion WebUI", 7860, ServiceTemplateCatalog.StableDiffusionWebUi)]
+    [InlineData("unknown", "Local tool", 4567, ServiceTemplateCatalog.GenericHttp)]
+    public void Recognize_UsesStableNamesTitlesAndPorts(
+        string processName,
+        string title,
+        int port,
+        string expected)
+    {
+        Assert.Equal(expected, ServiceTemplateCatalog.Recognize(processName, title, port));
     }
 
     [Fact]

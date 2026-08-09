@@ -287,6 +287,30 @@ public sealed class ConfigStoreTests
         Assert.Equal(legacy.Agent, result.Config.Agent);
     }
 
+    [Fact]
+    public async Task LoadWithResultAsync_MigratesVersionSixWithSafeUpdateNetworkDefault()
+    {
+        using var directory = new TemporaryDirectory();
+        using var store = new ConfigStore(directory.File("config.json"));
+        var legacy = TestConfigs.CreateConfigured() with
+        {
+            SchemaVersion = 6,
+            Behavior = TestConfigs.CreateConfigured().Behavior with { WelcomeTutorialCompleted = true },
+        };
+        var json = JsonNode.Parse(JsonSerializer.Serialize(legacy))!.AsObject();
+        Assert.True(json.Remove("UpdateNetwork"));
+        Directory.CreateDirectory(directory.Path);
+        await File.WriteAllTextAsync(store.ConfigPath, json.ToJsonString());
+
+        var result = await store.LoadWithResultAsync();
+
+        Assert.True(result.WasMigrated);
+        Assert.Equal(AppConfig.CurrentSchemaVersion, result.Config.SchemaVersion);
+        Assert.Equal(UpdateNetworkMode.System, result.Config.UpdateNetwork.Mode);
+        Assert.Empty(result.Config.UpdateNetwork.ManualProxyUrl);
+        Assert.True(result.Config.Behavior.WelcomeTutorialCompleted);
+    }
+
     private static AppConfig WithDisplayName(string displayName)
     {
         var defaults = AppConfig.CreateDefault();

@@ -13,54 +13,19 @@
             <Grid Grid.Row="0" ColumnDefinitions="*,Auto">
                 <StackPanel>
                     <TextBlock Text="设置" Classes="page-title" />
-                    <TextBlock Text="管理连接行为、外观与版本更新；除外观即时预览外，更改后请点击“保存设置”。"
+                    <TextBlock Text="常用选项、软件更新和高级连接配置已经分区；更改后请点击“保存设置”。"
                                Classes="page-subtitle" Margin="0,4,0,0" />
                 </StackPanel>
-                <Button Grid.Column="1" Content="保存设置" Classes="primary"
+                <Button Grid.Column="1" Content="保存全部设置" Classes="primary"
                         Command="{Binding SaveSettingsCommand}" VerticalAlignment="Center" />
             </Grid>
 
             <ScrollViewer Grid.Row="2" HorizontalScrollBarVisibility="Disabled">
-                <Grid ColumnDefinitions="*,16,*" RowDefinitions="Auto,16,Auto">
+                <Grid ColumnDefinitions="*,16,*" RowDefinitions="Auto,16,Auto,16,Auto">
                     <Border Grid.Row="0" Grid.Column="0" Classes="card" Padding="20">
                         <StackPanel>
-                            <TextBlock Text="Linux 连接" Classes="section-title" />
-                            <TextBlock Text="使用 MagicDNS 名称定位主机，不保存易变化的 Tailscale IP。"
-                                       Classes="page-subtitle" TextWrapping="Wrap" Margin="0,2,0,18" />
-
-                            <TextBlock Text="主机 / MagicDNS" Classes="body-strong" Margin="0,0,0,6" />
-                            <TextBox Text="{Binding LinuxHost}" Classes="field technical" />
-
-                            <Grid ColumnDefinitions="*,12,116" Margin="0,14,0,0">
-                                <StackPanel>
-                                    <TextBlock Text="Linux 用户" Classes="body-strong" Margin="0,0,0,6" />
-                                    <TextBox Text="{Binding LinuxUser}" Classes="field technical" />
-                                </StackPanel>
-                                <StackPanel Grid.Column="2">
-                                    <TextBlock Text="SSH 端口" Classes="body-strong" Margin="0,0,0,6" />
-                                    <TextBox Text="{Binding SshPort}" Classes="field technical" />
-                                </StackPanel>
-                            </Grid>
-
-                            <TextBlock Text="专用私钥" Classes="body-strong" Margin="0,14,0,6" />
-                            <TextBox Text="{Binding IdentityFile}" Classes="field technical" />
-                            <TextBlock Text="推荐使用仅允许本机端口转发、不可登录 Shell 的专用密钥。"
-                                       Classes="caption" TextWrapping="Wrap" Margin="0,5,0,0" />
-
-                            <Button Content="打开设备配置 / 重新配对" Classes="secondary"
-                                    HorizontalAlignment="Left" Margin="0,14,0,0"
-                                    Command="{Binding ShowSetupCommand}" />
-
-                            <TextBlock Text="固定主机公钥" Classes="body-strong" Margin="0,14,0,6" />
-                            <TextBox Text="{Binding PinnedHostKey}" Classes="field technical"
-                                     AcceptsReturn="True" MinHeight="70" TextWrapping="Wrap" />
-                        </StackPanel>
-                    </Border>
-
-                    <Border Grid.Row="0" Grid.Column="2" Classes="card" Padding="20">
-                        <StackPanel>
-                            <TextBlock Text="运行方式" Classes="section-title" />
-                            <TextBlock Text="让连接保持安静，需要处理时再提醒你。"
+                            <TextBlock Text="日常运行" Classes="section-title" />
+                            <TextBlock Text="这些选项决定 JK Bridge 何时连接以及关闭窗口后的行为。"
                                        Classes="page-subtitle" Margin="0,2,0,12" />
 
                             <Grid ColumnDefinitions="*,Auto" Margin="0,8">
@@ -94,20 +59,14 @@
                                 </StackPanel>
                                 <ToggleSwitch Grid.Column="1" IsChecked="{Binding StartWithWindows}" VerticalAlignment="Center" />
                             </Grid>
-
-                            <Border Classes="issue-banner warning" Margin="0,14,0,0">
-                                <TextBlock Text="更改主机、用户、端口或密钥后，活动连接会重新建立一次。"
-                                           Classes="body" TextWrapping="Wrap" />
-                            </Border>
                         </StackPanel>
                     </Border>
 
-                    <Border Grid.Row="2" Grid.Column="0" Classes="card" Padding="20">
+                    <Border Grid.Row="0" Grid.Column="2" Classes="card" Padding="20">
                         <StackPanel>
                             <TextBlock Text="外观" Classes="section-title" />
                             <TextBlock Text="选择后立即预览；保存后会在下次启动继续使用。"
                                        Classes="page-subtitle" Margin="0,2,0,16" />
-
                             <TextBlock Text="颜色模式" Classes="body-strong" Margin="0,0,0,6" />
                             <ComboBox SelectedIndex="{Binding ThemeIndex}" Classes="field">
                                 <ComboBoxItem Content="跟随系统" />
@@ -116,67 +75,149 @@
                             </ComboBox>
                             <TextBlock Text="{Binding ThemePreviewText}" Classes="caption"
                                        TextWrapping="Wrap" Margin="0,8,0,0" />
+                            <Separator Classes="quiet" Margin="0,18,0,12" />
+                            <TextBlock Text="使用提示" Classes="body-strong" />
+                            <TextBlock Text="第一次启动会显示入门教程；以后可从左下角“重新打开教程”再次查看。"
+                                       Classes="caption" TextWrapping="Wrap" Margin="0,5,0,0" />
                         </StackPanel>
                     </Border>
 
-                    <Border Grid.Row="2" Grid.Column="2" Classes="card" Padding="20">
+                    <Border Grid.Row="2" Grid.ColumnSpan="3" Classes="card" Padding="20">
+                        <Grid ColumnDefinitions="0.92*,20,1.08*">
+                            <StackPanel>
+                                <TextBlock Text="更新网络" Classes="section-title" />
+                                <TextBlock Text="只影响版本检查和安装包下载，不会改变 SSH、Tailscale 或本机服务。"
+                                           Classes="page-subtitle" TextWrapping="Wrap" Margin="0,2,0,14" />
+                                <TextBlock Text="连接方式" Classes="body-strong" Margin="0,0,0,6" />
+                                <ComboBox SelectedIndex="{Binding UpdateNetworkModeIndex}" Classes="field">
+                                    <ComboBoxItem Content="跟随 Windows 系统代理（推荐）" />
+                                    <ComboBoxItem Content="使用本机 HTTP 代理" />
+                                    <ComboBoxItem Content="直接连接 GitHub" />
+                                </ComboBox>
+                                <TextBlock Text="{Binding UpdateNetworkModeDescription}" Classes="caption"
+                                           TextWrapping="Wrap" Margin="0,7,0,0" />
+
+                                <StackPanel IsVisible="{Binding IsManualUpdateProxy}" Margin="0,14,0,0">
+                                    <TextBlock Text="本机 HTTP 代理地址" Classes="body-strong" Margin="0,0,0,6" />
+                                    <TextBox Text="{Binding UpdateManualProxyUrl}" Classes="field technical"
+                                             PlaceholderText="http://127.0.0.1:7897"
+                                             AutomationProperties.Name="更新下载本机代理地址" />
+                                    <TextBlock Text="为避免凭据泄露，只允许 localhost、127.0.0.1 或 ::1，并且必须填写端口；不接受用户名、密码和路径。"
+                                               Classes="caption" TextWrapping="Wrap" Margin="0,6,0,0" />
+                                </StackPanel>
+
+                                <Border Classes="issue-banner warning" Margin="0,14,0,0">
+                                    <TextBlock Text="切换连接方式后请先保存，再检查或下载更新。下载不动时可取消，并在浏览器中打开官方 Release。"
+                                               Classes="body" TextWrapping="Wrap" />
+                                </Border>
+                            </StackPanel>
+
+                            <StackPanel Grid.Column="2">
+                                <TextBlock Text="软件更新" Classes="section-title" />
+                                <TextBlock Text="{Binding ApplicationVersionText}" Classes="body-strong"
+                                           Margin="0,4,0,0" />
+                                <TextBlock Text="{Binding UpdateCheckFeedback}" Classes="caption"
+                                           TextWrapping="Wrap" Margin="0,6,0,0" />
+                                <TextBlock Text="{Binding UpdateReleaseUrl}" Classes="technical"
+                                           TextWrapping="Wrap" Margin="0,6,0,0"
+                                           IsVisible="{Binding HasUpdateReleaseInfo}" />
+
+                                <StackPanel Orientation="Horizontal" Margin="0,12,0,0">
+                                    <Button Content="检查官方 Release" Classes="secondary"
+                                            Command="{Binding CheckForUpdatesCommand}"
+                                            IsEnabled="{Binding CanCheckForUpdates}" />
+                                    <Button Content="在浏览器中打开" Classes="secondary" Margin="8,0,0,0"
+                                            Command="{Binding OpenReleasePageCommand}"
+                                            IsVisible="{Binding HasUpdateReleaseInfo}" />
+                                </StackPanel>
+
+                                <StackPanel Margin="0,12,0,0"
+                                            IsVisible="{Binding IsUpdateProgressVisible}">
+                                    <TextBlock Text="{Binding UpdateStageText}" Classes="body-strong" />
+                                    <ProgressBar Minimum="0" Maximum="100"
+                                                 Value="{Binding UpdateProgressPercent}"
+                                                 IsIndeterminate="{Binding IsUpdateProgressIndeterminate}"
+                                                 Height="8" Margin="0,6,0,0" />
+                                    <TextBlock Text="{Binding UpdateProgressText}" Classes="caption"
+                                               TextWrapping="Wrap" Margin="0,5,0,0" />
+                                </StackPanel>
+
+                                <Button Content="取消当前更新操作" Classes="secondary"
+                                        HorizontalAlignment="Left" Margin="0,9,0,0"
+                                        Command="{Binding CancelReleaseUpdateCommand}"
+                                        IsVisible="{Binding CanCancelReleaseUpdate}" />
+                                <Button Content="下载并校验更新" Classes="primary"
+                                        HorizontalAlignment="Left" Margin="0,9,0,0"
+                                        Command="{Binding InstallCheckedReleaseCommand}"
+                                        IsVisible="{Binding HasUpdateInstaller}"
+                                        IsEnabled="{Binding CanInstallUpdate}" />
+                                <Button Content="开始安装（将退出 JK Bridge）" Classes="primary"
+                                        HorizontalAlignment="Left" Margin="0,9,0,0"
+                                        Command="{Binding LaunchDownloadedReleaseInstallerCommand}"
+                                        IsVisible="{Binding IsUpdateReadyToInstall}"
+                                        IsEnabled="{Binding CanLaunchDownloadedReleaseInstaller}" />
+                                <TextBlock Text="下载阶段显示进度、平均速度和预计剩余时间，并在本机核验官方 SHA-256。只有点击“开始安装”且安装向导成功启动后，JK Bridge 才会退出。"
+                                           Classes="caption" TextWrapping="Wrap" Margin="0,7,0,0" />
+                            </StackPanel>
+                        </Grid>
+                    </Border>
+
+                    <Border Grid.Row="4" Grid.Column="0" Classes="card" Padding="20">
+                        <StackPanel>
+                            <TextBlock Text="连接与身份（高级）" Classes="section-title" />
+                            <TextBlock Text="首次使用或更换 Linux 主机时，请优先从“设备配置”完成引导式配对。"
+                                       Classes="page-subtitle" TextWrapping="Wrap" Margin="0,2,0,14" />
+                            <Button Content="打开设备配置 / 重新配对" Classes="primary"
+                                    HorizontalAlignment="Left"
+                                    Command="{Binding ShowSetupCommand}" />
+
+                            <Expander Header="手动编辑 SSH 连接参数" IsExpanded="False" Margin="0,12,0,0">
+                                <StackPanel Margin="0,10,0,0">
+                                    <TextBlock Text="主机 / MagicDNS" Classes="body-strong" Margin="0,0,0,6" />
+                                    <TextBox Text="{Binding LinuxHost}" Classes="field technical" />
+                                    <Grid ColumnDefinitions="*,12,116" Margin="0,12,0,0">
+                                        <StackPanel>
+                                            <TextBlock Text="Linux 用户" Classes="body-strong" Margin="0,0,0,6" />
+                                            <TextBox Text="{Binding LinuxUser}" Classes="field technical" />
+                                        </StackPanel>
+                                        <StackPanel Grid.Column="2">
+                                            <TextBlock Text="SSH 端口" Classes="body-strong" Margin="0,0,0,6" />
+                                            <TextBox Text="{Binding SshPort}" Classes="field technical" />
+                                        </StackPanel>
+                                    </Grid>
+                                    <TextBlock Text="专用私钥" Classes="body-strong" Margin="0,12,0,6" />
+                                    <TextBox Text="{Binding IdentityFile}" Classes="field technical" />
+                                    <TextBlock Text="固定主机公钥" Classes="body-strong" Margin="0,12,0,6" />
+                                    <TextBox Text="{Binding PinnedHostKey}" Classes="field technical"
+                                             AcceptsReturn="True" MinHeight="70" TextWrapping="Wrap" />
+                                    <TextBlock Text="手动更改身份后活动连接会重建，端口授权可能需要重新配对。"
+                                               Classes="caption" TextWrapping="Wrap" Margin="0,6,0,0" />
+                                </StackPanel>
+                            </Expander>
+                        </StackPanel>
+                    </Border>
+
+                    <Border Grid.Row="4" Grid.Column="2" Classes="card" Padding="20">
                         <StackPanel>
                             <TextBlock Text="关于与数据" Classes="section-title" />
                             <TextBlock Text="JK Bridge 仅在本机保存配置与脱敏日志。"
-                                       Classes="page-subtitle" Margin="0,2,0,16" />
-                            <Grid ColumnDefinitions="140,*" Margin="0,3">
-                                <TextBlock Text="产品" Classes="muted" />
+                                       Classes="page-subtitle" Margin="0,2,0,14" />
+                            <Grid ColumnDefinitions="120,*" Margin="0,3">
+                                <TextBlock Text="版本" Classes="muted" />
                                 <TextBlock Grid.Column="1" Text="{Binding ApplicationVersionText}" Classes="body-strong" />
                             </Grid>
-                            <Grid ColumnDefinitions="140,*" Margin="0,3">
+                            <Grid ColumnDefinitions="120,*" Margin="0,3">
                                 <TextBlock Text="配置目录" Classes="muted" />
                                 <TextBlock Grid.Column="1" Text="%LOCALAPPDATA%\JKBridge" Classes="technical-strong" />
                             </Grid>
-                            <Grid ColumnDefinitions="140,*" Margin="0,3">
+                            <Grid ColumnDefinitions="120,*" Margin="0,3">
                                 <TextBlock Text="远程暴露" Classes="muted" />
                                 <TextBlock Grid.Column="1" Text="无 · 仅 127.0.0.1" Classes="body-strong" />
                             </Grid>
-                            <Separator Classes="quiet" />
-                            <TextBlock Text="{Binding SettingsFeedback}" Classes="caption" TextWrapping="Wrap" />
                             <Separator Classes="quiet" Margin="0,12,0,10" />
-                            <TextBlock Text="版本检查" Classes="body-strong" />
-                            <TextBlock Text="{Binding UpdateCheckFeedback}" Classes="caption"
-                                       TextWrapping="Wrap" Margin="0,4,0,0" />
-                            <TextBlock Text="{Binding UpdateReleaseUrl}" Classes="technical"
-                                       TextWrapping="Wrap" Margin="0,6,0,0"
-                                       IsVisible="{Binding HasUpdateReleaseInfo}" />
-                            <Button Content="手动检查官方 Release" Classes="secondary"
-                                    HorizontalAlignment="Left" Margin="0,10,0,0"
-                                    Command="{Binding CheckForUpdatesCommand}"
-                                    IsEnabled="{Binding CanCheckForUpdates}" />
-                            <StackPanel Margin="0,10,0,0"
-                                        IsVisible="{Binding IsUpdateProgressVisible}">
-                                <TextBlock Text="{Binding UpdateStageText}" Classes="body-strong" />
-                                <ProgressBar Minimum="0" Maximum="100"
-                                             Value="{Binding UpdateProgressPercent}"
-                                             IsIndeterminate="{Binding IsUpdateProgressIndeterminate}"
-                                             Height="8" Margin="0,6,0,0" />
-                                <TextBlock Text="{Binding UpdateProgressText}" Classes="caption"
-                                           TextWrapping="Wrap" Margin="0,5,0,0" />
-                            </StackPanel>
-                            <Button Content="取消当前更新操作" Classes="secondary"
-                                    HorizontalAlignment="Left" Margin="0,8,0,0"
-                                    Command="{Binding CancelReleaseUpdateCommand}"
-                                    IsVisible="{Binding CanCancelReleaseUpdate}" />
-                            <Button Content="下载并校验更新" Classes="primary"
-                                    HorizontalAlignment="Left" Margin="0,8,0,0"
-                                    Command="{Binding InstallCheckedReleaseCommand}"
-                                    IsVisible="{Binding HasUpdateInstaller}"
-                                    IsEnabled="{Binding CanInstallUpdate}" />
-                            <Button Content="开始安装（将退出 JK Bridge）" Classes="primary"
-                                    HorizontalAlignment="Left" Margin="0,8,0,0"
-                                    Command="{Binding LaunchDownloadedReleaseInstallerCommand}"
-                                    IsVisible="{Binding IsUpdateReadyToInstall}"
-                                    IsEnabled="{Binding CanLaunchDownloadedReleaseInstaller}" />
-                            <TextBlock Text="不会后台检查或静默安装。第一步只从固定官方 Release 下载 EXE 与 SHA-256 并校验，主程序不会退出；第二步确认安装后才启动普通 Windows 安装向导，并在向导成功启动后安全退出。真实安装进度由安装向导显示。当前安装包未代码签名，Windows 可能显示 SmartScreen 提示。"
-                                       Classes="caption" TextWrapping="Wrap" Margin="0,5,0,0" />
+                            <TextBlock Text="{Binding SettingsFeedback}" Classes="caption" TextWrapping="Wrap" />
                             <Button Content="打开诊断与日志" Classes="secondary" HorizontalAlignment="Left"
-                                    Margin="0,14,0,0" Command="{Binding ShowDiagnosticsCommand}" />
+                                    Margin="0,12,0,0" Command="{Binding ShowDiagnosticsCommand}" />
                         </StackPanel>
                     </Border>
                 </Grid>

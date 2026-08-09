@@ -44,6 +44,7 @@ public sealed class AppControllerSupportActionsTests
 
             Assert.Equal(0, picker.Calls);
             Assert.Equal(0, updateChecker.Calls);
+            Assert.Equal(UpdateNetworkMode.System, updateChecker.ConfiguredNetwork?.Mode);
 
             await controller.ExportDiagnosticBundleAsync();
 
@@ -409,14 +410,18 @@ public sealed class AppControllerSupportActionsTests
         string latestVersion = "2.3.0",
         ReleaseInstallerAsset? installer = null,
         string? downloadedInstallerPath = null,
-        bool waitForCancellation = false) : IReleaseUpdateChecker
+        bool waitForCancellation = false) : IReleaseUpdateChecker, IReleaseUpdateNetworkConfigurator
     {
         public int Calls { get; private set; }
         public int DownloadCalls { get; private set; }
         public string? CurrentVersion { get; private set; }
         public bool CancellationObserved { get; private set; }
+        public UpdateNetworkSettings? ConfiguredNetwork { get; private set; }
         public TaskCompletionSource<bool> DownloadStarted { get; } =
             new(TaskCreationOptions.RunContinuationsAsynchronously);
+
+        public void ConfigureNetwork(UpdateNetworkSettings settings) =>
+            ConfiguredNetwork = settings;
 
         public Task<ReleaseUpdateCheckResult> CheckAsync(
             string currentVersion,
