@@ -233,7 +233,13 @@ verification stages, can be cancelled, and leaves JK Bridge running. Only the
 separate **Start installation (JK Bridge will exit)** action starts the normal
 visible Windows setup wizard. JK Bridge requests a controlled shutdown only
 after setup process creation succeeds; the setup wizard then displays the real
-installation progress. The flow does not check in the background, install
+installation progress.
+Preview 6 uses the Windows/.NET system proxy for GitHub metadata and assets
+while retaining exact-host, redirect, size, and SHA-256 validation. Preview 4/5
+forced direct connections; a proxy-dependent machine must manually install
+Preview 6 once before later in-app downloads can use its system proxy.
+
+The flow does not check in the background, install
 silently, or bypass SmartScreen. Configuration, device credentials, and SSH keys
 live outside the installation directory and are retained by a normal same-user
 overlay install. Preview 1 has no update control. If the old one-step action in

@@ -59,19 +59,7 @@ public sealed partial class GitHubReleaseUpdateService : IReleaseUpdateChecker, 
     {
         _requestTimeout = ValidateTimeout(requestTimeout ?? TimeSpan.FromSeconds(15));
         _downloadTimeout = ValidateDownloadTimeout(downloadTimeout ?? TimeSpan.FromMinutes(5));
-        var handler = new SocketsHttpHandler
-        {
-            AllowAutoRedirect = false,
-            AutomaticDecompression = DecompressionMethods.None,
-            ConnectTimeout = TimeSpan.FromSeconds(5),
-            Credentials = null,
-            MaxConnectionsPerServer = 2,
-            MaxResponseHeadersLength = 32,
-            PreAuthenticate = false,
-            PooledConnectionLifetime = TimeSpan.FromMinutes(5),
-            UseCookies = false,
-            UseProxy = false,
-        };
+        var handler = CreateDefaultHandler();
         _httpClient = new HttpClient(handler)
         {
             Timeout = Timeout.InfiniteTimeSpan,
@@ -79,9 +67,24 @@ public sealed partial class GitHubReleaseUpdateService : IReleaseUpdateChecker, 
         _ownsHttpClient = true;
     }
 
+    internal static SocketsHttpHandler CreateDefaultHandler() => new()
+    {
+        AllowAutoRedirect = false,
+        AutomaticDecompression = DecompressionMethods.None,
+        ConnectTimeout = TimeSpan.FromSeconds(5),
+        Credentials = null,
+        MaxConnectionsPerServer = 2,
+        MaxResponseHeadersLength = 32,
+        PreAuthenticate = false,
+        PooledConnectionLifetime = TimeSpan.FromMinutes(5),
+        UseCookies = false,
+        Proxy = HttpClient.DefaultProxy,
+        UseProxy = true,
+    };
+
     /// <summary>
     /// Test/host injection point. Production callers should use the default
-    /// constructor so proxy, redirect, cookie, and credential behavior is fixed.
+    /// constructor so system-proxy, redirect, cookie, and credential behavior is fixed.
     /// Response validation remains active for injected transports.
     /// </summary>
     public GitHubReleaseUpdateService(

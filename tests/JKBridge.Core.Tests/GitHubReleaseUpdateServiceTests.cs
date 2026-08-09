@@ -10,6 +10,21 @@ namespace JKBridge.Core.Tests;
 public sealed class GitHubReleaseUpdateServiceTests
 {
     [Fact]
+    public void DefaultTransport_UsesSystemProxyWithoutRelaxingRequestBoundaries()
+    {
+        using var handler = GitHubReleaseUpdateService.CreateDefaultHandler();
+
+        Assert.True(handler.UseProxy);
+        Assert.Same(HttpClient.DefaultProxy, handler.Proxy);
+        Assert.False(handler.AllowAutoRedirect);
+        Assert.False(handler.UseCookies);
+        Assert.False(handler.PreAuthenticate);
+        Assert.Null(handler.Credentials);
+        Assert.Equal(2, handler.MaxConnectionsPerServer);
+        Assert.Equal(32, handler.MaxResponseHeadersLength);
+    }
+
+    [Fact]
     public async Task Check_UsesOnlyFixedOfficialMetadataEndpointAndReportsUpdate()
     {
         var handler = new RecordingHandler(request => JsonResponse(new

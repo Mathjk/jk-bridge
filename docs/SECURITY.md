@@ -373,8 +373,11 @@ upgrade/rollback/uninstall 命令，也不等于完成真实 systemd user 验收
 设置页的 Release 检查仅在用户点击后访问固定的官方 GitHub API。稳定构建使用
 `api.github.com/repos/Mathjk/jk-bridge/releases/latest`；带 prerelease 版本标识的
 Preview 构建使用固定、最多 20 条的 Releases 列表，因此不会误降级到更旧稳定版。
-元数据请求禁用代理、自动重定向、Cookie 和环境凭据，并限制超时、响应头与正文。
-程序拒绝 draft、非法 SemVer、不精确匹配官方 Release 页面或安装器下载路径的内容。
+元数据与资产请求使用 Windows/.NET 系统代理，以兼容本机代理或受管网络；仍禁用
+自动重定向、Cookie、目标站凭据和预认证，并限制超时、响应头与正文。代理只改变
+网络到达路径，不改变应用层信任边界：程序仍验证 HTTPS、精确 GitHub 主机和请求
+URI，并拒绝 draft、非法 SemVer、不精确匹配官方 Release 页面或安装器下载路径的
+内容。
 
 只有用户点击“下载并校验更新”，且同一 Release 同时存在精确命名的 Windows
 安装器与 `.sha256` 时才会下载。下载最多接受一次从精确 `github.com` 资产地址到

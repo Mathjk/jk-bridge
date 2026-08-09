@@ -2,6 +2,27 @@
 
 All notable changes are documented here. The project follows semantic versioning after the first public release.
 
+## 2.2.0-preview.6 - 2026-08-09
+
+This prerelease supersedes Preview 5 after its Windows acceptance run exposed a
+proxy-dependent GitHub download path. It retains the Appearance fixes from
+Preview 5.
+
+### Fixed
+
+- Release metadata and installer downloads now use the Windows/.NET system
+  proxy instead of forcing a direct connection, so local or managed proxy
+  environments can reach GitHub Release assets.
+- Proxy compatibility does not relax the update trust boundary: automatic
+  redirects, cookies, target credentials, and preauthentication remain disabled;
+  exact HTTPS hosts, the single approved CDN redirect, size limits, and
+  SHA-256 verification remain mandatory.
+
+### Testing
+
+- Windows acceptance reproduced the forced-direct timeout and confirmed that
+  the same official Preview 5 asset succeeds through the default system path.
+
 ## 2.2.0-preview.5 - 2026-08-09
 
 This prerelease keeps the v2.2.0 development line explicitly in Preview while

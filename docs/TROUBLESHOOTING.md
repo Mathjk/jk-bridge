@@ -52,6 +52,10 @@ The executable is currently unsigned, so SmartScreen may show an unknown publish
   2/3 stalls, manually download the official Preview 4 installer and
   `.sha256`, or explicitly exit the old tray process before running its already
   verified installer.
+- Preview 4/5 force direct GitHub connections. If Release checks work but asset
+  download times out on a proxy-dependent network, manually install Preview 6
+  once. Preview 6 uses the Windows/.NET system proxy while retaining exact-host,
+  redirect, size, and SHA-256 validation.
 - Run **Check official Release** first. **Download and verify update** appears
   only when the selected Release has the exact EXE and `.sha256` pair.
 - Download bytes, percentage, and verification stage are visible, and the
