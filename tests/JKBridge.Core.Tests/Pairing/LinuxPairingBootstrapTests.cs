@@ -46,7 +46,7 @@ public sealed class LinuxPairingBootstrapTests
     }
 
     [Fact]
-    public async Task PairCommandPayload_RunsReadOnlyStatusWithoutNetwork()
+    public async Task PairCommandPayload_RunsHelpWithoutNetworkOrHostDependencies()
     {
         if (OperatingSystem.IsWindows())
         {
@@ -65,7 +65,7 @@ public sealed class LinuxPairingBootstrapTests
         };
         startInfo.ArgumentList.Add("-c");
         startInfo.ArgumentList.Add(pythonCode);
-        startInfo.ArgumentList.Add("status");
+        startInfo.ArgumentList.Add("--help");
         using var process = Process.Start(startInfo);
         Assert.NotNull(process);
         using var timeout = new CancellationTokenSource(TimeSpan.FromSeconds(10));
@@ -76,7 +76,8 @@ public sealed class LinuxPairingBootstrapTests
 
         Assert.True(
             process.ExitCode == 0,
-            $"Embedded helper status failed. stdout: {standardOutput}; stderr: {standardError}");
+            $"Embedded helper help failed. stdout: {standardOutput}; stderr: {standardError}");
+        Assert.Contains("pair", standardOutput, StringComparison.Ordinal);
     }
 
     [Fact]
