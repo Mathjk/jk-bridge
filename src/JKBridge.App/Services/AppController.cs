@@ -2374,6 +2374,16 @@ public sealed partial class AppController : IBridgeUiActions, IAsyncDisposable
         }
     }
 
+    public void PreviewTheme(ThemePreference theme)
+    {
+        if (Volatile.Read(ref _disposed) != 0)
+        {
+            return;
+        }
+
+        RunOnUi(() => ApplyTheme(theme));
+    }
+
     public async Task SaveSettingsAsync(SettingsDraft settings)
     {
         if (Volatile.Read(ref _disposed) != 0)
@@ -3097,6 +3107,7 @@ public sealed partial class AppController : IBridgeUiActions, IAsyncDisposable
             ThemePreference.Dark => 2,
             _ => 0,
         };
+        ViewModel.MarkThemeSaved(_config.Behavior.Theme);
         ViewModel.ApplySetupState(
             _config.SetupCompleted,
             _config.SetupCompleted

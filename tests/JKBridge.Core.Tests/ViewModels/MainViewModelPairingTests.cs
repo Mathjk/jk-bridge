@@ -1,5 +1,6 @@
 using JKBridge.App.Services;
 using JKBridge.App.ViewModels;
+using JKBridge.Core.Models;
 
 namespace JKBridge.Core.Tests.ViewModels;
 
@@ -284,6 +285,28 @@ public sealed class MainViewModelPairingTests
         Assert.Equal(1, actions.InvalidateTransientCalls);
     }
 
+    [Fact]
+    public void ThemeSelection_PreviewsImmediatelyAndDistinguishesUnsavedState()
+    {
+        var actions = new RecordingActions();
+        var viewModel = new MainViewModel(actions);
+
+        viewModel.ThemeIndex = 1;
+        viewModel.ThemeIndex = 2;
+        viewModel.ThemeIndex = 0;
+
+        Assert.Equal(
+            [ThemePreference.Light, ThemePreference.Dark, ThemePreference.System],
+            actions.ThemePreviews);
+        Assert.Contains("跟随系统", viewModel.ThemePreviewText);
+        Assert.Contains("尚未保存", viewModel.ThemePreviewText);
+
+        viewModel.MarkThemeSaved(ThemePreference.System);
+
+        Assert.Contains("已保存", viewModel.ThemePreviewText);
+        Assert.DoesNotContain("尚未保存", viewModel.ThemePreviewText);
+    }
+
     private sealed class RecordingActions : IBridgeUiActions
     {
         public PairingDraft? Pairing { get; private set; }
@@ -299,6 +322,7 @@ public sealed class MainViewModelPairingTests
         public string? ReboundEndpoint { get; private set; }
         public bool RebindConfirmed { get; private set; }
         public int InvalidateTransientCalls { get; private set; }
+        public List<ThemePreference> ThemePreviews { get; } = [];
 
         public Task PairDeviceAsync(PairingDraft pairing)
         {
@@ -350,6 +374,8 @@ public sealed class MainViewModelPairingTests
         }
 
         public void InvalidateTransientSetupState() => InvalidateTransientCalls++;
+
+        public void PreviewTheme(ThemePreference theme) => ThemePreviews.Add(theme);
 
         public Task ConnectAsync() => Task.CompletedTask;
         public Task DisconnectAsync() => Task.CompletedTask;

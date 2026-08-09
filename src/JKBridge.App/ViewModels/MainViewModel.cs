@@ -102,6 +102,9 @@ public partial class MainViewModel : ViewModelBase
     [ObservableProperty] private bool _closeToTray = true;
     [ObservableProperty] private bool _startWithWindows;
     [ObservableProperty] private int _themeIndex;
+    [ObservableProperty]
+    private string _themePreviewText =
+        "当前：跟随系统（已保存）。选择其他模式会立即预览。";
     [ObservableProperty] private string _settingsFeedback = "设置保存在当前 Windows 用户的应用数据目录。";
     [ObservableProperty] private bool _isUpdateChecking;
     [ObservableProperty] private bool _hasUpdateReleaseInfo;
@@ -293,6 +296,18 @@ public partial class MainViewModel : ViewModelBase
             AgentEndpointRebindConfirmed = false;
         }
     }
+
+    partial void OnThemeIndexChanged(int value)
+    {
+        var theme = ThemeFromIndex(value);
+        ThemePreviewText =
+            $"正在预览：{ThemeDisplayName(theme)}（尚未保存）。点击页面顶部“保存设置”后长期使用。";
+        _actions.PreviewTheme(theme);
+    }
+
+    public void MarkThemeSaved(ThemePreference theme) =>
+        ThemePreviewText =
+            $"当前：{ThemeDisplayName(theme)}（已保存）。选择其他模式会立即预览。";
 
     partial void OnIsConnectedChanged(bool value) => OnPropertyChanged(nameof(IsStopped));
     partial void OnIsConnectingChanged(bool value) => OnPropertyChanged(nameof(IsStopped));
@@ -714,6 +729,22 @@ public partial class MainViewModel : ViewModelBase
 
         await _actions.SaveSettingsAsync(draft);
     }
+
+    private static ThemePreference ThemeFromIndex(int index) =>
+        index switch
+        {
+            1 => ThemePreference.Light,
+            2 => ThemePreference.Dark,
+            _ => ThemePreference.System,
+        };
+
+    private static string ThemeDisplayName(ThemePreference theme) =>
+        theme switch
+        {
+            ThemePreference.Light => "浅色",
+            ThemePreference.Dark => "深色",
+            _ => "跟随系统",
+        };
 
     [RelayCommand]
     private Task AddServiceAsync() => _actions.AddServiceAsync();

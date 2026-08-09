@@ -56,7 +56,7 @@ public sealed class AppControllerSupportActionsTests
             await controller.CheckForUpdatesAsync();
 
             Assert.Equal(1, updateChecker.Calls);
-            Assert.Equal("2.2.0-preview.4", updateChecker.CurrentVersion);
+            Assert.Equal("2.2.0-preview.5", updateChecker.CurrentVersion);
             Assert.True(controller.ViewModel.HasUpdateReleaseInfo);
             Assert.Equal(
                 "https://github.com/Mathjk/jk-bridge/releases/tag/v2.3.0",

@@ -105,7 +105,8 @@
                     <Border Grid.Row="2" Grid.Column="0" Classes="card" Padding="20">
                         <StackPanel>
                             <TextBlock Text="外观" Classes="section-title" />
-                            <TextBlock Text="默认跟随 Windows 主题。" Classes="page-subtitle" Margin="0,2,0,16" />
+                            <TextBlock Text="选择后立即预览；保存后会在下次启动继续使用。"
+                                       Classes="page-subtitle" Margin="0,2,0,16" />
 
                             <TextBlock Text="颜色模式" Classes="body-strong" Margin="0,0,0,6" />
                             <ComboBox SelectedIndex="{Binding ThemeIndex}" Classes="field">
@@ -113,7 +114,8 @@
                                 <ComboBoxItem Content="浅色" />
                                 <ComboBoxItem Content="深色" />
                             </ComboBox>
-
+                            <TextBlock Text="{Binding ThemePreviewText}" Classes="caption"
+                                       TextWrapping="Wrap" Margin="0,8,0,0" />
                         </StackPanel>
                     </Border>
 

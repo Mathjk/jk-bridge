@@ -2,6 +2,25 @@
 
 All notable changes are documented here. The project follows semantic versioning after the first public release.
 
+## 2.2.0-preview.5 - 2026-08-09
+
+This prerelease keeps the v2.2.0 development line explicitly in Preview while
+providing a small, visible update target for end-to-end acceptance of the
+Preview 4 updater.
+
+### Fixed
+
+- The Appearance selector now previews System, Light, and Dark modes immediately
+  instead of appearing inert until the separate Save action.
+- The saved theme remains the startup source of truth and is visibly identified
+  after configuration load or save; an unsaved preview falls back to the saved
+  choice on the next launch.
+
+### Changed
+
+- Settings now explains the preview-versus-save behavior and reports whether the
+  displayed theme is a temporary preview or the persisted preference.
+
 ## 2.2.0-preview.4 - 2026-08-09
 
 This prerelease records source still under development. It does not change the

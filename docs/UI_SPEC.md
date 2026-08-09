@@ -125,7 +125,9 @@ The page uses four summary cards followed by expandable recent-log entries:
 
 - Linux profile: paired host/FQDN, user, SSH port, key path, pinned host public key, and a visible re-pair action.
 - Behavior: auto-connect, auto-reconnect, close to tray, start with Windows.
-- Appearance: System/Light/Dark.
+- Appearance: System/Light/Dark. Selection previews the complete Fluent and
+  JK Bridge token palette immediately; Save persists the preference, and
+  startup reapplies it before normal runtime presentation.
 - About/data: product version, configuration directory, loopback-only exposure statement, and an action that opens Diagnostics; the log-folder action is available there.
 
 Changing server identity or any forwarding field clearly warns that the active bridge will reconnect.

@@ -186,6 +186,9 @@ public interface IBridgeUiActions
     {
     }
     Task LaunchDownloadedReleaseInstallerAsync() => Task.CompletedTask;
+    void PreviewTheme(ThemePreference theme)
+    {
+    }
     Task SaveSettingsAsync(SettingsDraft settings);
     Task PairDeviceAsync(PairingDraft pairing);
 
