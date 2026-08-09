@@ -169,7 +169,7 @@ public sealed class ConfigStore : IDisposable
                     cancellationToken)
                 .ConfigureAwait(false);
             var sourceSchema = config?.SchemaVersion;
-            var wasMigrated = sourceSchema is 1 or 2 or 3;
+            var wasMigrated = sourceSchema is >= 1 and <= 4;
             config = sourceSchema switch
             {
                 1 => config! with
@@ -184,6 +184,10 @@ public sealed class ConfigStore : IDisposable
                     Authorization = new ForwardAuthorizationGrant(),
                 },
                 3 => config! with
+                {
+                    SchemaVersion = AppConfig.CurrentSchemaVersion,
+                },
+                4 => config! with
                 {
                     SchemaVersion = AppConfig.CurrentSchemaVersion,
                 },

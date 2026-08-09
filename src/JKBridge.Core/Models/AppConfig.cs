@@ -2,7 +2,7 @@ namespace JKBridge.Core.Models;
 
 public sealed record AppConfig
 {
-    public const int CurrentSchemaVersion = 4;
+    public const int CurrentSchemaVersion = 5;
 
     public int SchemaVersion { get; init; } = CurrentSchemaVersion;
 
@@ -19,6 +19,8 @@ public sealed record AppConfig
     public AgentRegistration Agent { get; init; } = new();
 
     public List<ServiceDefinition> Services { get; init; } = CreateDefaultServices();
+
+    public List<WindowsLocalServiceDefinition> WindowsLocalServices { get; init; } = [];
 
     public static AppConfig CreateDefault() => new();
 

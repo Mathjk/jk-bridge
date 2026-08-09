@@ -1,0 +1,208 @@
+<UserControl xmlns="https://github.com/avaloniaui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:vm="using:JKBridge.App.ViewModels"
+             xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
+             xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
+             mc:Ignorable="d"
+             d:DesignWidth="888"
+             d:DesignHeight="760"
+             x:Name="WindowsLocalRoot"
+             x:Class="JKBridge.App.Views.Pages.WindowsLocalServicesPanel"
+             x:DataType="vm:MainViewModel">
+    <Grid ColumnDefinitions="1.08*,18,0.92*">
+        <ScrollViewer Grid.Column="0" HorizontalScrollBarVisibility="Disabled">
+            <StackPanel>
+                <Grid ColumnDefinitions="*,Auto">
+                    <StackPanel>
+                        <TextBlock Text="已保存的本机服务" Classes="section-title" />
+                        <TextBlock Text="只保存访问入口；JK Bridge 不会启动或停止对应程序。"
+                                   Classes="caption" Margin="0,3,0,0" />
+                    </StackPanel>
+                    <Button Grid.Column="1" Content="＋ 手动添加" Classes="ghost"
+                            Command="{Binding AddWindowsLocalServiceCommand}" />
+                </Grid>
+
+                <ItemsControl ItemsSource="{Binding WindowsLocalServices}" Margin="0,12,0,0">
+                    <ItemsControl.ItemTemplate>
+                        <DataTemplate x:DataType="vm:WindowsLocalServiceCardViewModel">
+                            <Border Classes="card" Padding="16" Margin="0,0,0,12">
+                                <StackPanel>
+                                    <Grid ColumnDefinitions="*,Auto,Auto">
+                                        <TextBox Text="{Binding Name}" Classes="field"
+                                                 PlaceholderText="服务名称" Margin="0,0,12,0" />
+                                        <Border Grid.Column="1" Classes="status-pill"
+                                                Classes.connected="{Binding IsAvailable}"
+                                                Classes.warning="{Binding HasWarning}"
+                                                VerticalAlignment="Center">
+                                            <TextBlock Text="{Binding Status}" Classes="status-text"
+                                                       Classes.connected="{Binding IsAvailable}"
+                                                       Classes.warning="{Binding HasWarning}" />
+                                        </Border>
+                                        <ToggleSwitch Grid.Column="2" IsChecked="{Binding IsEnabled}"
+                                                      Margin="12,0,0,0" VerticalAlignment="Center" />
+                                    </Grid>
+
+                                    <TextBox Text="{Binding Description}" Classes="field"
+                                             PlaceholderText="说明" Margin="0,10,0,0" />
+
+                                    <Grid ColumnDefinitions="0.8*,12,0.7*,12,*" Margin="0,10,0,0">
+                                        <StackPanel>
+                                            <TextBlock Text="监听地址" Classes="caption" />
+                                            <ComboBox SelectedIndex="{Binding HostIndex}" Classes="field">
+                                                <ComboBoxItem Content="127.0.0.1" />
+                                                <ComboBoxItem Content="::1" />
+                                            </ComboBox>
+                                        </StackPanel>
+                                        <StackPanel Grid.Column="2">
+                                            <TextBlock Text="端口" Classes="caption" />
+                                            <TextBox Text="{Binding PortText}" Classes="field technical" />
+                                        </StackPanel>
+                                        <StackPanel Grid.Column="4">
+                                            <TextBlock Text="协议" Classes="caption" />
+                                            <ComboBox SelectedIndex="{Binding SchemeIndex}" Classes="field">
+                                                <ComboBoxItem Content="HTTP" />
+                                                <ComboBoxItem Content="HTTPS" />
+                                            </ComboBox>
+                                        </StackPanel>
+                                    </Grid>
+
+                                    <TextBlock Text="打开路径" Classes="caption" Margin="0,10,0,0" />
+                                    <TextBox Text="{Binding LaunchPath}" Classes="field technical"
+                                             PlaceholderText="/" />
+
+                                    <Border Classes="code-chip" Padding="10,8" Margin="0,10,0,0">
+                                        <Grid ColumnDefinitions="*,Auto">
+                                            <TextBlock Text="{Binding LocalUrlPreview}"
+                                                       Classes="technical-strong"
+                                                       TextWrapping="Wrap" VerticalAlignment="Center" />
+                                            <Button Grid.Column="1" Content="复制" Classes="ghost"
+                                                    Command="{Binding CopyCommand}" Margin="8,0,0,0" />
+                                        </Grid>
+                                    </Border>
+
+                                    <Grid ColumnDefinitions="*,12,*" Margin="0,10,0,0">
+                                        <StackPanel>
+                                            <TextBlock Text="状态依据" Classes="caption" />
+                                            <ComboBox SelectedIndex="{Binding HealthModeIndex}" Classes="field">
+                                                <ComboBoxItem Content="TCP 监听" />
+                                                <ComboBoxItem Content="HTTP 状态" />
+                                                <ComboBoxItem Content="JSON ok=true" />
+                                            </ComboBox>
+                                        </StackPanel>
+                                        <StackPanel Grid.Column="2">
+                                            <TextBlock Text="{Binding ProcessText}" Classes="caption"
+                                                       Margin="0,2,0,0" TextWrapping="Wrap" />
+                                            <TextBlock Text="{Binding Detail}" Classes="caption"
+                                                       Margin="0,4,0,0" TextWrapping="Wrap" />
+                                        </StackPanel>
+                                    </Grid>
+
+                                    <Grid ColumnDefinitions="Auto,Auto,*,Auto,Auto" Margin="0,12,0,0">
+                                        <Button Content="删除" Classes="ghost"
+                                                Foreground="{DynamicResource JkErrorBrush}"
+                                                Command="{Binding RemoveCommand}" />
+                                        <Button Grid.Column="1" Content="检查" Classes="ghost"
+                                                Command="{Binding RetryCommand}" />
+                                        <Button Grid.Column="3" Content="打开 ↗" Classes="ghost"
+                                                IsEnabled="{Binding CanOpen}"
+                                                Command="{Binding OpenCommand}" />
+                                        <Button Grid.Column="4" Content="保存更改" Classes="primary"
+                                                Command="{Binding SaveCommand}" Margin="8,0,0,0" />
+                                    </Grid>
+                                </StackPanel>
+                            </Border>
+                        </DataTemplate>
+                    </ItemsControl.ItemTemplate>
+                </ItemsControl>
+            </StackPanel>
+        </ScrollViewer>
+        <Border Grid.Column="2" Classes="card" Padding="18">
+            <ScrollViewer HorizontalScrollBarVisibility="Disabled">
+                <StackPanel>
+                    <TextBlock Text="扫描当前本机服务" Classes="section-title" />
+                    <TextBlock Text="读取 Windows 当前正在监听的 127.0.0.1 / ::1 端口，再用短时 HEAD 请求识别网页。不会扫描磁盘，也不会遍历 1–65535 端口。"
+                               Classes="page-subtitle" Margin="0,3,0,12" TextWrapping="Wrap" />
+
+                    <Grid ColumnDefinitions="*,Auto,Auto">
+                        <StackPanel>
+                            <TextBlock Text="{Binding WindowsLocalSummaryText}"
+                                       Classes="body-strong" />
+                            <TextBlock Text="{Binding WindowsLocalScanFeedback}"
+                                       Classes="caption" Margin="0,3,10,0" TextWrapping="Wrap" />
+                        </StackPanel>
+                        <Button Grid.Column="1" Content="取消" Classes="ghost"
+                                IsVisible="{Binding IsWindowsLocalServiceScanning}"
+                                Command="{Binding CancelWindowsLocalServiceScanCommand}" />
+                        <Button Grid.Column="2" Content="扫描本机" Classes="primary"
+                                IsEnabled="{Binding CanScanWindowsLocalServices}"
+                                Command="{Binding ScanWindowsLocalServicesCommand}"
+                                Margin="8,0,0,0" />
+                    </Grid>
+
+                    <ProgressBar IsIndeterminate="True"
+                                 IsVisible="{Binding IsWindowsLocalServiceScanning}"
+                                 Margin="0,12,0,0" />
+
+                    <Border Classes="issue-banner" Padding="12,10" Margin="0,12,0,0">
+                        <StackPanel>
+                            <TextBlock Text="识别边界" Classes="body-strong" />
+                            <TextBlock Text="“仅 TCP”不等于网页；现有 Linux 隧道只标记、不重复保存。HTTPS 自签名证书会明确提示，扫描不会跟随跳转或下载页面正文。"
+                                       Classes="caption" Margin="0,2,0,0" TextWrapping="Wrap" />
+                        </StackPanel>
+                    </Border>
+
+                    <ItemsControl ItemsSource="{Binding DiscoveredWindowsLocalServices}"
+                                  Margin="0,12,0,0">
+                        <ItemsControl.ItemTemplate>
+                            <DataTemplate x:DataType="vm:DiscoveredWindowsLocalServiceViewModel">
+                                <Border Classes="card interactive" Padding="13" Margin="0,0,0,10">
+                                    <StackPanel>
+                                        <Grid ColumnDefinitions="*,Auto">
+                                            <StackPanel>
+                                                <TextBlock Text="{Binding DisplayName}"
+                                                           Classes="body-strong" />
+                                                <TextBlock Text="{Binding Address}"
+                                                           Classes="technical" />
+                                            </StackPanel>
+                                            <Border Grid.Column="1" Classes="status-pill"
+                                                    Classes.connected="{Binding IsWeb}"
+                                                    Classes.warning="{Binding CertificateUnverified}">
+                                                <TextBlock Text="{Binding TypeText}"
+                                                           Classes="status-text"
+                                                           Classes.connected="{Binding IsWeb}"
+                                                           Classes.warning="{Binding CertificateUnverified}" />
+                                            </Border>
+                                        </Grid>
+
+                                        <TextBlock Text="{Binding ProcessText}" Classes="caption"
+                                                   Margin="0,7,0,0" TextWrapping="Wrap" />
+                                        <TextBlock Text="{Binding Status}" Classes="body-strong"
+                                                   Margin="0,7,0,0" />
+                                        <TextBlock Text="{Binding Detail}" Classes="caption"
+                                                   Margin="0,2,0,0" TextWrapping="Wrap" />
+                                        <TextBlock Text="{Binding OpenUrl}" Classes="technical"
+                                                   Margin="0,7,0,0" TextWrapping="Wrap"
+                                                   IsVisible="{Binding IsWeb}" />
+
+                                        <Grid ColumnDefinitions="Auto,Auto,*,Auto" Margin="0,10,0,0">
+                                            <Button Content="复制" Classes="ghost"
+                                                    IsEnabled="{Binding CanOpen}"
+                                                    Command="{Binding CopyCommand}" />
+                                            <Button Grid.Column="1" Content="打开 ↗" Classes="ghost"
+                                                    IsEnabled="{Binding CanOpen}"
+                                                    Command="{Binding OpenCommand}" />
+                                            <Button Grid.Column="3" Content="保存到本机服务"
+                                                    Classes="primary"
+                                                    IsEnabled="{Binding CanSave}"
+                                                    Command="{Binding SaveCommand}" />
+                                        </Grid>
+                                    </StackPanel>
+                                </Border>
+                            </DataTemplate>
+                        </ItemsControl.ItemTemplate>
+                    </ItemsControl>
+                </StackPanel>
+            </ScrollViewer>
+        </Border>
+    </Grid>
+</UserControl>

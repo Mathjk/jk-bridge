@@ -179,6 +179,75 @@
                     </ItemsControl.ItemTemplate>
                 </ItemsControl>
 
+                <Grid ColumnDefinitions="*,Auto" Margin="0,12,0,12">
+                    <StackPanel>
+                        <TextBlock Text="Windows 本机服务" Classes="section-title" />
+                        <TextBlock Text="来自这台电脑的回环网页；状态由手动扫描更新。"
+                                   Classes="page-subtitle" />
+                    </StackPanel>
+                    <Button Grid.Column="1" Content="管理与扫描" Classes="ghost"
+                            Command="{Binding ShowWindowsLocalServicesCommand}"
+                            VerticalAlignment="Center" />
+                </Grid>
+
+                <ItemsControl ItemsSource="{Binding WindowsLocalServices}">
+                    <ItemsControl.ItemsPanel>
+                        <ItemsPanelTemplate>
+                            <UniformGrid Columns="2" />
+                        </ItemsPanelTemplate>
+                    </ItemsControl.ItemsPanel>
+                    <ItemsControl.ItemTemplate>
+                        <DataTemplate x:DataType="vm:WindowsLocalServiceCardViewModel">
+                            <Border Classes="card service-card interactive" Margin="0,0,12,12">
+                                <Grid RowDefinitions="Auto,Auto,Auto">
+                                    <Grid ColumnDefinitions="Auto,*,Auto">
+                                        <Border Width="42" Height="42" CornerRadius="8"
+                                                Background="{DynamicResource JkIrisSurfaceBrush}"
+                                                BorderBrush="{DynamicResource JkIrisBorderBrush}"
+                                                BorderThickness="1">
+                                            <TextBlock Text="{Binding ShortCode}"
+                                                       Classes="technical-strong"
+                                                       Foreground="{DynamicResource JkIrisBrush}"
+                                                       HorizontalAlignment="Center"
+                                                       VerticalAlignment="Center" />
+                                        </Border>
+                                        <StackPanel Grid.Column="1" Margin="12,0,8,0">
+                                            <TextBlock Text="{Binding Name}" Classes="card-title" />
+                                            <TextBlock Text="{Binding Description}" Classes="caption"
+                                                       TextTrimming="CharacterEllipsis" />
+                                        </StackPanel>
+                                        <Border Grid.Column="2" Classes="status-pill"
+                                                Classes.connected="{Binding IsAvailable}"
+                                                Classes.warning="{Binding HasWarning}">
+                                            <TextBlock Text="{Binding Status}" Classes="status-text"
+                                                       Classes.connected="{Binding IsAvailable}"
+                                                       Classes.warning="{Binding HasWarning}" />
+                                        </Border>
+                                    </Grid>
+                                    <StackPanel Grid.Row="1" Margin="0,12,0,10">
+                                        <TextBlock Text="{Binding LocalUrlPreview}"
+                                                   Classes="technical-strong"
+                                                   TextTrimming="CharacterEllipsis" />
+                                        <TextBlock Text="{Binding ProcessText}" Classes="caption"
+                                                   Margin="0,3,0,0" />
+                                    </StackPanel>
+                                    <Grid Grid.Row="2" ColumnDefinitions="*,Auto,8,Auto">
+                                        <Button Content="复制地址" Classes="ghost"
+                                                HorizontalAlignment="Left"
+                                                Command="{Binding CopyCommand}" />
+                                        <Button Grid.Column="1" Content="检查" Classes="ghost"
+                                                Command="{Binding RetryCommand}" />
+                                        <Button Grid.Column="3" Content="打开 ↗"
+                                                Classes="primary service-open"
+                                                IsEnabled="{Binding CanOpen}"
+                                                Command="{Binding OpenCommand}" />
+                                    </Grid>
+                                </Grid>
+                            </Border>
+                        </DataTemplate>
+                    </ItemsControl.ItemTemplate>
+                </ItemsControl>
+
                 <Grid ColumnDefinitions="*,Auto" Margin="0,12,0,10">
                     <TextBlock Text="最近活动" Classes="section-title" />
                     <Button Grid.Column="1" Content="全部诊断" Classes="ghost" Command="{Binding ShowDiagnosticsCommand}" />

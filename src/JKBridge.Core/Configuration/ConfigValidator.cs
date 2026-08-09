@@ -9,6 +9,7 @@ namespace JKBridge.Core.Configuration;
 public static class ConfigValidator
 {
     private const int MaximumServices = 64;
+    private const int MaximumWindowsLocalServices = 128;
 
     private static readonly Regex ServiceIdPattern = new(
         "^[a-z0-9](?:[a-z0-9-]{0,62}[a-z0-9])?$",
@@ -77,6 +78,7 @@ public static class ConfigValidator
         ValidateAuthorization(config.Authorization, issues);
         ValidateAgent(config.Agent, issues);
         ValidateServices(config.Services, issues);
+        ValidateWindowsLocalServices(config.WindowsLocalServices, config.Services, issues);
 
         return new(issues);
     }
@@ -418,6 +420,112 @@ public static class ConfigValidator
                     $"{path}.healthKind",
                     "service.invalidHealthKind",
                     "Health-check kind is invalid."));
+            }
+        }
+    }
+
+    private static void ValidateWindowsLocalServices(
+        List<WindowsLocalServiceDefinition>? localServices,
+        List<ServiceDefinition>? tunnelServices,
+        ICollection<ConfigValidationIssue> issues)
+    {
+        if (localServices is null)
+        {
+            issues.Add(new(
+                "windowsLocalServices",
+                "windowsLocalServices.required",
+                "Windows-local services collection is required."));
+            return;
+        }
+
+        if (localServices.Count > MaximumWindowsLocalServices)
+        {
+            issues.Add(new(
+                "windowsLocalServices",
+                "windowsLocalServices.tooMany",
+                $"No more than {MaximumWindowsLocalServices} Windows-local services are allowed."));
+        }
+
+        var ids = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+        var urls = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+        var enabledTunnelPorts = tunnelServices?
+            .Where(service => service is { Enabled: true, LocalPort: >= 1 and <= 65535 })
+            .Select(service => service.LocalPort)
+            .ToHashSet() ?? [];
+
+        for (var index = 0; index < localServices.Count; index++)
+        {
+            var service = localServices[index];
+            var path = $"windowsLocalServices[{index}]";
+            if (service is null)
+            {
+                issues.Add(new(path, "windowsLocalService.required", "Service definition is required."));
+                continue;
+            }
+
+            if (string.IsNullOrWhiteSpace(service.Id) || !ServiceIdPattern.IsMatch(service.Id))
+            {
+                issues.Add(new(
+                    $"{path}.id",
+                    "windowsLocalService.invalidId",
+                    "Service id must be a lowercase ASCII slug."));
+            }
+            else if (!ids.Add(service.Id))
+            {
+                issues.Add(new(
+                    $"{path}.id",
+                    "windowsLocalService.duplicateId",
+                    "Service id must be unique."));
+            }
+
+            ValidateRequiredText(service.Name, $"{path}.name", 80, issues);
+            ValidateOptionalText(service.Description, $"{path}.description", 160, issues);
+            ValidateRequiredText(service.Icon, $"{path}.icon", 40, issues);
+            ValidateOptionalText(service.ProcessNameHint, $"{path}.processNameHint", 80, issues);
+            ValidatePort(service.Port, $"{path}.port", issues);
+
+            if (!WindowsLocalServiceUrl.IsLoopbackHost(service.Host))
+            {
+                issues.Add(new(
+                    $"{path}.host",
+                    "windowsLocalService.notLoopback",
+                    "Host must be exactly 127.0.0.1 or ::1."));
+            }
+
+            if (!WindowsLocalServiceUrl.TryBuild(
+                    service.Host,
+                    service.Scheme,
+                    service.Port,
+                    service.LaunchPath,
+                    out var url))
+            {
+                issues.Add(new(
+                    $"{path}.launchPath",
+                    "windowsLocalService.invalidUrl",
+                    "URL must be canonical HTTP(S) on 127.0.0.1 or ::1 with a safe launch path."));
+            }
+            else if (!urls.Add(url))
+            {
+                issues.Add(new(
+                    $"{path}.launchPath",
+                    "windowsLocalService.duplicateUrl",
+                    "Windows-local service URLs must be unique."));
+            }
+
+            if (!Enum.IsDefined(service.HealthKind))
+            {
+                issues.Add(new(
+                    $"{path}.healthKind",
+                    "windowsLocalService.invalidHealthKind",
+                    "Health-check kind is invalid."));
+            }
+
+            if (service.Enabled && enabledTunnelPorts.Contains(service.Port))
+            {
+                issues.Add(new(
+                    $"{path}.port",
+                    "windowsLocalService.tunnelPortConflict",
+                    "An enabled Windows-local service cannot share a port with an enabled SSH tunnel."));
             }
         }
     }

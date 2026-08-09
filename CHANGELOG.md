@@ -2,15 +2,20 @@
 
 All notable changes are documented here. The project follows semantic versioning after the first public release.
 
-## Unreleased — v2.2.0 / Preview 2 development
+## Unreleased — v2.2.0 / Preview 3 development
 
 This section records source currently under development. It does not change the
 contents or support boundary of the published v2.1.0 stable Release. Preview 1
-is published only for development acceptance; Preview 2 builds identify
-themselves as `2.2.0-preview.2` and remain prereleases rather than stable v2.2.0.
+and Preview 2 were published only for development acceptance; Preview 3 builds
+identify themselves as `2.2.0-preview.3` and remain prereleases rather than
+stable v2.2.0.
 
 ### Added
 
+- Added bounded Windows-local service discovery that enumerates only active
+  `127.0.0.1` / `::1` TCP listeners, attributes owning processes when
+  available, uses header-only proxy-free HTTP(S) probes, and lets users save,
+  edit, check, copy, open, or remove independent local-service cards.
 - Added a strict loopback URL builder/parser and an in-development simple/advanced service editor that separates the Windows access port, Linux service port, protocol, launch path, and custom URL.
 - Added core service templates for Overleaf, Sub2API, generic HTTP, and generic HTTPS routes.
 - Added a versioned, non-secret Service Profile model, strict serialization/validation, import change analysis, native file pickers, atomic export, and read-only preview plus explicit-confirmation import UI. The importer can also validate an exact v2.1/schema-v3 legacy config and project only its Services while discarding all device-specific state.
@@ -37,6 +42,9 @@ themselves as `2.2.0-preview.2` and remain prereleases rather than stable v2.2.0
 
 ### Security
 
+- Windows-local discovery never scans disks or unopened port ranges, does not
+  follow redirects or read response bodies, excludes existing SSH-forward
+  ports from saving, and accepts browser targets only on literal loopback.
 - Generated and custom browser URLs remain exact HTTP(S) loopback targets; service profiles reject unknown or secret-bearing fields and never import authorization state.
 - Agent client requests reject proxies, redirects, non-Tailscale endpoints, oversized or unknown responses, peer-identity mismatches, and port/catalog inconsistencies.
 - Release installation accepts only exact `Mathjk/jk-bridge` asset URLs, one approved GitHub release-asset CDN redirect, a bounded installer, and a matching detached SHA-256; failed downloads are not launched and their staging directory is removed.

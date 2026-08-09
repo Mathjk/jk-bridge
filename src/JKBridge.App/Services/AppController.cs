@@ -26,7 +26,7 @@ namespace JKBridge.App.Services;
 /// Composes persistence, the connection runtime, platform actions, and the presentation model.
 /// All process/network work remains outside the view model; UI updates are marshalled to Avalonia.
 /// </summary>
-public sealed class AppController : IBridgeUiActions, IAsyncDisposable
+public sealed partial class AppController : IBridgeUiActions, IAsyncDisposable
 {
     private sealed record PendingAgentRelayPlan(
         AgentRelayPlanRequest? InstallRequest,
@@ -93,7 +93,8 @@ public sealed class AppController : IBridgeUiActions, IAsyncDisposable
         Action<Action>? dispatchUi = null,
         DiagnosticBundleService? diagnosticBundleService = null,
         IReleaseUpdateChecker? releaseUpdateChecker = null,
-        Action<string>? installerLauncher = null)
+        Action<string>? installerLauncher = null,
+        IWindowsLocalServiceDiscovery? windowsLocalDiscovery = null)
     {
         _configStore = configStore ?? throw new ArgumentNullException(nameof(configStore));
         _logger = logger ?? throw new ArgumentNullException(nameof(logger));
@@ -120,6 +121,17 @@ public sealed class AppController : IBridgeUiActions, IAsyncDisposable
             new AvaloniaDiagnosticBundlePathPicker(_getWindow));
         _releaseUpdateChecker = releaseUpdateChecker ?? new GitHubReleaseUpdateService();
         _ownsReleaseUpdateChecker = releaseUpdateChecker is null;
+        if (windowsLocalDiscovery is null)
+        {
+            _windowsLocalDiscovery = new WindowsLocalServiceDiscoveryService(
+                new WindowsTcpListenerSource(),
+                new LocalWebProbe());
+            _ownsWindowsLocalDiscovery = true;
+        }
+        else
+        {
+            _windowsLocalDiscovery = windowsLocalDiscovery;
+        }
         _installerLauncher = installerLauncher ?? LaunchInstaller;
         _updateDirectory = Path.Combine(
             Path.GetDirectoryName(_logDirectory) ?? _logDirectory,
@@ -1622,6 +1634,7 @@ public sealed class AppController : IBridgeUiActions, IAsyncDisposable
         },
         Agent = config.Agent with { },
         Services = config.Services.Select(service => service with { }).ToList(),
+        WindowsLocalServices = config.WindowsLocalServices.Select(service => service with { }).ToList(),
     };
 
     private static string FormatProfilePreview(ServiceProfileImportPreview preview)
@@ -2184,12 +2197,33 @@ public sealed class AppController : IBridgeUiActions, IAsyncDisposable
             .FirstOrDefault(candidate =>
                 candidate is not null &&
                 candidate.OpenUri.Equals(requestedUri));
-        if (route is null)
+        if (route is not null)
         {
+            await SetClipboardTextAsync(route.OpenUri.AbsoluteUri);
             return;
         }
 
-        await SetClipboardTextAsync(route.OpenUri.AbsoluteUri);
+        var savedWindowsLocalUrl = _config.WindowsLocalServices
+            .Select(service => WindowsLocalServiceUrl.TryBuild(
+                service.Host,
+                service.Scheme,
+                service.Port,
+                service.LaunchPath,
+                out var url)
+                ? url
+                : null)
+            .FirstOrDefault(url =>
+                string.Equals(url, requestedUri.AbsoluteUri, StringComparison.Ordinal));
+        var discoveredWindowsLocalUrl = _lastWindowsLocalDiscovery
+            .Where(service => service.CanSave)
+            .Select(service => service.OpenUrl)
+            .FirstOrDefault(url =>
+                string.Equals(url, requestedUri.AbsoluteUri, StringComparison.Ordinal));
+        var allowedUrl = savedWindowsLocalUrl ?? discoveredWindowsLocalUrl;
+        if (allowedUrl is not null)
+        {
+            await SetClipboardTextAsync(allowedUrl);
+        }
     }
 
     public async Task SetServiceEnabledAsync(string serviceId, bool enabled)
@@ -2762,6 +2796,9 @@ public sealed class AppController : IBridgeUiActions, IAsyncDisposable
         var releaseUpdateCancellation = Interlocked.Exchange(ref _releaseUpdateCancellation, null);
         releaseUpdateCancellation?.Cancel();
         releaseUpdateCancellation?.Dispose();
+        var windowsDiscoveryCancellation = Interlocked.Exchange(ref _windowsLocalDiscoveryCancellation, null);
+        windowsDiscoveryCancellation?.Cancel();
+        windowsDiscoveryCancellation?.Dispose();
 
         await _configGate.WaitAsync().ConfigureAwait(false);
         try
@@ -2774,6 +2811,10 @@ public sealed class AppController : IBridgeUiActions, IAsyncDisposable
             if (_ownsReleaseUpdateChecker && _releaseUpdateChecker is IDisposable disposableUpdateChecker)
             {
                 disposableUpdateChecker.Dispose();
+            }
+            if (_ownsWindowsLocalDiscovery && _windowsLocalDiscovery is IDisposable disposableDiscovery)
+            {
+                disposableDiscovery.Dispose();
             }
         }
         finally
@@ -2802,7 +2843,8 @@ public sealed class AppController : IBridgeUiActions, IAsyncDisposable
 
     private async Task<bool> SaveConfigAsync(
         Func<AppConfig, AppConfig> createNext,
-        string successMessage)
+        string successMessage,
+        bool refreshRuntime = true)
     {
         if (Volatile.Read(ref _disposed) != 0)
         {
@@ -2840,13 +2882,16 @@ public sealed class AppController : IBridgeUiActions, IAsyncDisposable
             });
 
             await SafeLogAsync(DiagnosticSeverity.Information, "Config", effectiveSuccessMessage).ConfigureAwait(false);
-            if (_config.SetupCompleted)
+            if (refreshRuntime)
             {
-                await _runtime.RefreshAsync(_config).ConfigureAwait(false);
-            }
-            else
-            {
-                await _runtime.StopAsync().ConfigureAwait(false);
+                if (_config.SetupCompleted)
+                {
+                    await _runtime.RefreshAsync(_config).ConfigureAwait(false);
+                }
+                else
+                {
+                    await _runtime.StopAsync().ConfigureAwait(false);
+                }
             }
 
             return true;
@@ -3005,6 +3050,7 @@ public sealed class AppController : IBridgeUiActions, IAsyncDisposable
                 service.Id,
                 service.Name,
                 service.Enabled ? ServicePhase.WaitingForTunnel : ServicePhase.Disabled))));
+        RefreshWindowsLocalPresentation();
     }
 
     private void RefreshDiagnostics() =>

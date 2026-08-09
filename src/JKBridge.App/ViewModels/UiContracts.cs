@@ -34,6 +34,47 @@ public sealed record ServiceUiState(
     HealthCheckKind HealthKind,
     string HealthPath = "/");
 
+public sealed record WindowsLocalServiceUiState(
+    string Id,
+    string Name,
+    string Description,
+    string Host,
+    int Port,
+    string Scheme,
+    string LaunchPath,
+    string ProcessName,
+    string Status,
+    string Detail,
+    bool IsEnabled,
+    bool IsAvailable,
+    bool HasWarning,
+    bool CanOpen,
+    HealthCheckKind HealthKind)
+{
+    public string LocalUrl =>
+        JKBridge.Core.Routing.WindowsLocalServiceUrl.Build(Host, Scheme, Port, LaunchPath);
+}
+
+public sealed record DiscoveredWindowsLocalServiceUiState(
+    string Key,
+    string Host,
+    int Port,
+    string ProcessName,
+    string Protocol,
+    string OpenUrl,
+    string Status,
+    string Detail,
+    bool IsWeb,
+    bool CanSave,
+    bool IsExistingTunnel,
+    bool CertificateUnverified)
+{
+    public string Address => Host == "::1" ? $"[::1]:{Port}" : $"{Host}:{Port}";
+
+    public string DisplayName =>
+        string.IsNullOrWhiteSpace(ProcessName) ? $"本机端口 {Port}" : ProcessName;
+}
+
 public sealed record DiagnosticUiState(
     string Time,
     string Level,
@@ -121,6 +162,20 @@ public interface IBridgeUiActions
     Task AddServiceAsync();
     Task SaveServiceAsync(ServiceUiState service);
     Task RemoveServiceAsync(string serviceId);
+    Task ScanWindowsLocalServicesAsync() => Task.CompletedTask;
+    void CancelWindowsLocalServiceScan()
+    {
+    }
+    Task AddWindowsLocalServiceAsync() => Task.CompletedTask;
+    Task SaveDiscoveredWindowsLocalServiceAsync(
+        DiscoveredWindowsLocalServiceUiState service) => Task.CompletedTask;
+    Task OpenDiscoveredWindowsLocalServiceAsync(
+        DiscoveredWindowsLocalServiceUiState service) => Task.CompletedTask;
+    Task SaveWindowsLocalServiceAsync(
+        WindowsLocalServiceUiState service) => Task.CompletedTask;
+    Task RemoveWindowsLocalServiceAsync(string serviceId) => Task.CompletedTask;
+    Task OpenWindowsLocalServiceAsync(string serviceId) => Task.CompletedTask;
+    Task RetryWindowsLocalServiceAsync(string serviceId) => Task.CompletedTask;
     Task RunDiagnosticsAsync();
     Task CopyDiagnosticSummaryAsync();
     Task OpenLogFolderAsync();

@@ -1,6 +1,7 @@
 <UserControl xmlns="https://github.com/avaloniaui"
              xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
              xmlns:vm="using:JKBridge.App.ViewModels"
+             xmlns:pages="using:JKBridge.App.Views.Pages"
              xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
              xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
              mc:Ignorable="d"
@@ -17,12 +18,23 @@
                     <TextBlock Text="集中管理 Windows 本地端口与 Linux 回环服务的映射。"
                                Classes="page-subtitle" Margin="0,4,0,0" />
                 </StackPanel>
-                <Button Grid.Column="1" Content="＋ 添加服务" Classes="primary"
-                        Command="{Binding AddServiceCommand}"
-                        VerticalAlignment="Center" />
+                <StackPanel Grid.Column="1" Orientation="Horizontal" Spacing="8"
+                            VerticalAlignment="Center">
+                    <Button Content="Linux 隧道" Classes="ghost"
+                            Classes.primary="{Binding IsLinuxServicesMode}"
+                            Command="{Binding ShowLinuxServicesCommand}" />
+                    <Button Content="Windows 本机" Classes="ghost"
+                            Classes.primary="{Binding IsWindowsLocalServicesMode}"
+                            Command="{Binding ShowWindowsLocalServicesCommand}" />
+                    <Button Content="＋ 添加转发" Classes="primary"
+                            IsVisible="{Binding IsLinuxServicesMode}"
+                            Command="{Binding AddServiceCommand}" />
+                </StackPanel>
             </Grid>
 
-            <Grid Grid.Row="2" ColumnDefinitions="1.08*,18,0.92*">
+            <Grid Grid.Row="2"
+                  ColumnDefinitions="1.08*,18,0.92*"
+                  IsVisible="{Binding IsLinuxServicesMode}">
                 <Grid Grid.Column="0" RowDefinitions="Auto,12,*">
                     <Grid ColumnDefinitions="*,Auto">
                         <TextBlock Text="转发清单" Classes="section-title" />
@@ -294,6 +306,9 @@
                     </ScrollViewer>
                 </Border>
             </Grid>
+
+            <pages:WindowsLocalServicesPanel Grid.Row="2"
+                                             IsVisible="{Binding IsWindowsLocalServicesMode}" />
         </Grid>
     </Border>
 </UserControl>

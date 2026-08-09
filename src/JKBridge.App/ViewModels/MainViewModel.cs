@@ -108,7 +108,13 @@ public partial class MainViewModel : ViewModelBase
     [ObservableProperty] private bool _hasUpdateInstaller;
     [ObservableProperty] private string _updateCheckFeedback = "仅在你点击后查询 JK Bridge 官方 GitHub Releases；确认后可下载、校验并启动覆盖安装。";
     [ObservableProperty] private string _updateReleaseUrl = string.Empty;
+    [ObservableProperty] private bool _isLinuxServicesMode = true;
+    [ObservableProperty] private bool _isWindowsLocalServiceScanning;
     [ObservableProperty] private string _serviceFeedback = "远端主机固定为 127.0.0.1，不会暴露给局域网。";
+    [ObservableProperty]
+    private string _windowsLocalScanFeedback =
+        "点击“扫描本机”读取当前回环监听；不会扫描磁盘或遍历全部端口。";
+    [ObservableProperty] private string _windowsLocalSummaryText = "尚未扫描";
 
     // One-shot Windows ↔ Linux pairing state.
     [ObservableProperty] private string _pairingCode = string.Empty;
@@ -201,6 +207,10 @@ public partial class MainViewModel : ViewModelBase
     }
 
     public ObservableCollection<ServiceCardViewModel> Services { get; } = [];
+    public ObservableCollection<WindowsLocalServiceCardViewModel> WindowsLocalServices { get; } = [];
+    public ObservableCollection<DiscoveredWindowsLocalServiceViewModel>
+        DiscoveredWindowsLocalServices
+    { get; } = [];
 
     public ObservableCollection<DiagnosticItemViewModel> Diagnostics { get; } = [];
 
@@ -214,6 +224,9 @@ public partial class MainViewModel : ViewModelBase
     public bool IsSettings => SelectedPage == AppPage.Settings;
     public bool IsStopped => !IsConnected && !IsConnecting && !IsDegraded;
     public bool HasNoIssue => !HasIssue;
+    public bool IsWindowsLocalServicesMode => !IsLinuxServicesMode;
+    public bool CanScanWindowsLocalServices => !IsWindowsLocalServiceScanning;
+    public bool HasDiscoveredWindowsLocalServices => DiscoveredWindowsLocalServices.Count > 0;
     public bool CanExportDiagnosticBundle => !IsDiagnosticBundleBusy;
     public bool CanCheckForUpdates => !IsUpdateChecking;
     public bool CanInstallUpdate => HasUpdateInstaller && !IsUpdateChecking;
@@ -274,6 +287,10 @@ public partial class MainViewModel : ViewModelBase
     partial void OnIsConnectedChanged(bool value) => OnPropertyChanged(nameof(IsStopped));
     partial void OnIsConnectingChanged(bool value) => OnPropertyChanged(nameof(IsStopped));
     partial void OnIsDegradedChanged(bool value) => OnPropertyChanged(nameof(IsStopped));
+    partial void OnIsLinuxServicesModeChanged(bool value) =>
+        OnPropertyChanged(nameof(IsWindowsLocalServicesMode));
+    partial void OnIsWindowsLocalServiceScanningChanged(bool value) =>
+        OnPropertyChanged(nameof(CanScanWindowsLocalServices));
     partial void OnHasIssueChanged(bool value) => OnPropertyChanged(nameof(HasNoIssue));
     partial void OnIsDiagnosticBundleBusyChanged(bool value) =>
         OnPropertyChanged(nameof(CanExportDiagnosticBundle));
@@ -675,6 +692,48 @@ public partial class MainViewModel : ViewModelBase
     private Task AddServiceAsync() => _actions.AddServiceAsync();
 
     [RelayCommand]
+    private void ShowLinuxServices()
+    {
+        IsLinuxServicesMode = true;
+        SelectedPage = AppPage.Services;
+    }
+
+    [RelayCommand]
+    private void ShowWindowsLocalServices()
+    {
+        IsLinuxServicesMode = false;
+        SelectedPage = AppPage.Services;
+    }
+
+    [RelayCommand]
+    private async Task ScanWindowsLocalServicesAsync()
+    {
+        if (IsWindowsLocalServiceScanning)
+        {
+            return;
+        }
+
+        IsWindowsLocalServiceScanning = true;
+        WindowsLocalScanFeedback = "正在读取回环监听并进行无正文网页识别…";
+        try
+        {
+            await _actions.ScanWindowsLocalServicesAsync();
+        }
+        finally
+        {
+            IsWindowsLocalServiceScanning = false;
+        }
+    }
+
+    [RelayCommand]
+    private void CancelWindowsLocalServiceScan() =>
+        _actions.CancelWindowsLocalServiceScan();
+
+    [RelayCommand]
+    private Task AddWindowsLocalServiceAsync() =>
+        _actions.AddWindowsLocalServiceAsync();
+
+    [RelayCommand]
     private Task SaveSelectedServiceAsync() =>
         SelectedService is null ? Task.CompletedTask : SaveServiceDraftAsync(SelectedService);
 
@@ -733,6 +792,53 @@ public partial class MainViewModel : ViewModelBase
 
             existing.ApplyRuntimeState(state);
         }
+    }
+
+    public void SetWindowsLocalServices(IEnumerable<WindowsLocalServiceUiState> services)
+    {
+        WindowsLocalServices.Clear();
+        foreach (var state in services)
+        {
+            WindowsLocalServices.Add(new WindowsLocalServiceCardViewModel(
+                state,
+                service => _actions.OpenWindowsLocalServiceAsync(service.Id),
+                service => _actions.RetryWindowsLocalServiceAsync(service.Id),
+                service => _actions.CopyAddressAsync(service.LocalUrlPreview),
+                SaveWindowsLocalServiceDraftAsync,
+                service => _actions.RemoveWindowsLocalServiceAsync(service.Id)));
+        }
+    }
+
+    public void UpdateWindowsLocalServices(IEnumerable<WindowsLocalServiceUiState> services)
+    {
+        var states = services.ToArray();
+        foreach (var state in states)
+        {
+            var existing = WindowsLocalServices.FirstOrDefault(service => service.Id == state.Id);
+            if (existing is null)
+            {
+                SetWindowsLocalServices(states);
+                return;
+            }
+
+            existing.ApplyRuntimeState(state);
+        }
+    }
+
+    public void SetDiscoveredWindowsLocalServices(
+        IEnumerable<DiscoveredWindowsLocalServiceUiState> services)
+    {
+        DiscoveredWindowsLocalServices.Clear();
+        foreach (var state in services)
+        {
+            DiscoveredWindowsLocalServices.Add(new DiscoveredWindowsLocalServiceViewModel(
+                state,
+                service => _actions.OpenDiscoveredWindowsLocalServiceAsync(service.State),
+                service => _actions.CopyAddressAsync(service.OpenUrl),
+                service => _actions.SaveDiscoveredWindowsLocalServiceAsync(service.State)));
+        }
+
+        OnPropertyChanged(nameof(HasDiscoveredWindowsLocalServices));
     }
 
     public void SetDiagnostics(IEnumerable<DiagnosticUiState> diagnostics)
@@ -1159,6 +1265,17 @@ public partial class MainViewModel : ViewModelBase
         }
 
         await _actions.SaveServiceAsync(state!);
+    }
+
+    private async Task SaveWindowsLocalServiceDraftAsync(WindowsLocalServiceCardViewModel service)
+    {
+        if (!service.TryCreateState(out var state, out var error))
+        {
+            WindowsLocalScanFeedback = error;
+            return;
+        }
+
+        await _actions.SaveWindowsLocalServiceAsync(state!);
     }
 
     private void LoadDesignData()

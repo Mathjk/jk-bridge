@@ -136,6 +136,19 @@ any unchecked live gate below as passed:
 - [ ] Portable ZIP and installer can coexist for release testing without sharing a running instance or overwriting an unrelated directory.
 - [ ] Code-signed installer, EXE, and uninstaller verify with an accepted timestamp before the installer is promoted from development artifact to stable Release asset.
 
+### Windows-local service discovery
+
+- [ ] Scanning lists active IPv4 and IPv6 loopback listeners without elevation and never shows LAN, wildcard, Tailscale, or public listeners.
+- [ ] A known local HTTP service is identified with a header-only request and can be opened, copied, and saved with its safe same-origin path.
+- [ ] A self-signed local HTTPS service is labeled certificate-unverified; saving it defaults to TCP status and never silently treats the certificate as trusted for normal browsing.
+- [ ] Redirects are not followed, response bodies are not downloaded, cookies and proxies are not used, and redirect query/fragment data is not persisted.
+- [ ] A non-HTTP TCP listener is labeled TCP-only and is not offered as a confirmed scanned web page.
+- [ ] Ports assigned to enabled Linux tunnels are labeled as existing tunnels and cannot be saved again as Windows-local services.
+- [ ] Cancel and the eight-second overall timeout return control promptly without changing saved cards.
+- [ ] Saving, editing, disabling, or deleting a Windows-local card does not restart SSH, change `permitopen`, or stop the owning Windows process.
+- [ ] After the owning process stops, a saved card remains but shows offline after scanning; restarting the process restores status on the next scan.
+- [ ] Process-name changes produce an advisory warning only; browser targets remain restricted to literal `127.0.0.1` or `::1` HTTP(S).
+
 ### In-app Release update
 
 - [ ] A stable build queries only the fixed latest stable endpoint; a Preview build queries the bounded official list, selects the highest published SemVer, and does not downgrade to an older stable release.

@@ -147,6 +147,28 @@ These entries are editable. Nothing is bound to the public internet or ordinary 
 
 Each service's SSH forward, browser URL, health target, and Linux authorization port come from one loopback route. For self-signed HTTPS, choose **TCP connect** health in the Services editor. Health warnings remain visible, but they no longer block browser launch after the SSH forward exists.
 
+### Discover web apps already running on Windows
+
+Choose **Services → Windows local → Scan this PC**. JK Bridge reads only TCP
+listeners that are already bound to literal `127.0.0.1` or `::1`, then sends
+short, body-free HTTP/HTTPS `HEAD` probes to those candidates:
+
+- it does not scan disks or iterate across the `1–65535` port range;
+- it uses no proxy or cookies, follows no redirects, and reads no response body;
+- the overall scan is capped at eight seconds, with bounded per-probe time and
+  concurrency;
+- ports already used by JK Bridge Linux tunnels are labeled but cannot be saved
+  again;
+- “TCP only” means a listener exists, not that a web page was confirmed;
+- self-signed HTTPS is labeled as certificate-unverified and defaults to TCP
+  status when saved.
+
+Confirmed pages can be saved as independent Windows-local cards. They never
+join SSH forwarding or Linux port authorization, and removing a card does not
+stop its Windows process. A stopped potential service cannot be reliably found
+from the active listener table; saved cards remain and show offline until a
+later scan sees them again.
+
 ### Understand the two ports
 
 The Windows and Linux ports do not have to match. In this example, JK Bridge

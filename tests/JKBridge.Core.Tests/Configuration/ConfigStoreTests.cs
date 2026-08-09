@@ -233,6 +233,36 @@ public sealed class ConfigStoreTests
         Assert.False(result.Config.Agent.IsConfigured);
     }
 
+    [Fact]
+    public async Task LoadWithResultAsync_MigratesVersionFourWithEmptyWindowsLocalServices()
+    {
+        using var directory = new TemporaryDirectory();
+        using var store = new ConfigStore(directory.File("config.json"));
+        var legacy = TestConfigs.CreateConfigured() with
+        {
+            SchemaVersion = 4,
+        };
+        var json = JsonNode.Parse(JsonSerializer.Serialize(legacy))!.AsObject();
+        Assert.True(json.Remove("WindowsLocalServices"));
+        Directory.CreateDirectory(directory.Path);
+        await File.WriteAllTextAsync(store.ConfigPath, json.ToJsonString());
+
+        var result = await store.LoadWithResultAsync();
+
+        Assert.True(result.WasMigrated);
+        Assert.Equal(AppConfig.CurrentSchemaVersion, result.Config.SchemaVersion);
+        Assert.Empty(result.Config.WindowsLocalServices);
+        Assert.Equal(legacy.Services, result.Config.Services);
+        Assert.Equal(legacy.Authorization.IsKnown, result.Config.Authorization.IsKnown);
+        Assert.Equal(
+            legacy.Authorization.ClientKeyFingerprint,
+            result.Config.Authorization.ClientKeyFingerprint);
+        Assert.Equal(
+            legacy.Authorization.RemotePorts,
+            result.Config.Authorization.RemotePorts);
+        Assert.Equal(legacy.Agent, result.Config.Agent);
+    }
+
     private static AppConfig WithDisplayName(string displayName)
     {
         var defaults = AppConfig.CreateDefault();

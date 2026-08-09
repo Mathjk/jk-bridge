@@ -5,7 +5,7 @@
 > after security, migration, and Windows acceptance testing.
 >
 > **Version boundary:** v2.1.0 is the latest stable release. Preview builds on
-> the current line report a prerelease version such as `2.2.0-preview.2`;
+> the current line report a prerelease version such as `2.2.0-preview.3`;
 > neither a Preview asset nor the implemented vNext source is thereby stable or
 > supported as v2.2.0.
 
