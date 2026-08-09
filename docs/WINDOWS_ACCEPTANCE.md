@@ -1,9 +1,10 @@
 # Windows 11 Acceptance Checklist
 
-The checklist through **Privacy and logs** is the released v2.1 portable-client
-baseline. The final **unreleased 2.2.0/vNext release gates** section covers development targets.
-Unchecked vNext items are requirements, not evidence that an installer, Linux
-Agent, enrollment workflow, or Service Profile UI currently ships.
+The checklist through **Privacy and logs** began as the v2.1 portable-client
+baseline and remains applicable to stable v2.2.0. The final v2.2.0/vNext
+section is a historical acceptance record plus remaining optional Agent/relay
+targets. Unchecked Agent items are requirements, not evidence that its
+lifecycle is supported for routine deployment.
 
 ## Packaging
 
@@ -94,9 +95,9 @@ Agent, enrollment workflow, or Service Profile UI currently ships.
 - [ ] Log rotation honors the size and retention caps.
 - [ ] Public-release scan finds no real machine names, tailnet suffixes, user paths, generated keys, pairing tokens, credentials, runtime configuration, or logs.
 
-## Unreleased 2.2.0/vNext release gates — not part of v2.1.0
+## Outstanding optional Agent/vNext acceptance
 
-Do not publish an installer or describe Agent enrollment as stable until every
+Do not describe Agent enrollment as stable until every
 applicable item below has passed on disposable, clean Windows machines and a
 test Linux node. Each Windows test device must use a unique identity.
 

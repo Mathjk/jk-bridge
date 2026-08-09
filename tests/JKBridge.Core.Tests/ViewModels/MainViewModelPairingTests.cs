@@ -286,6 +286,43 @@ public sealed class MainViewModelPairingTests
     }
 
     [Fact]
+    public async Task WelcomeTutorial_CanBeDismissedReopenedNavigatedAndCompleted()
+    {
+        var actions = new RecordingActions();
+        var viewModel = new MainViewModel(actions);
+
+        viewModel.ShowWelcomeTutorialIfNeeded(completed: false);
+
+        Assert.True(viewModel.IsWelcomeTutorialVisible);
+        Assert.Equal(0, viewModel.WelcomeTutorialStepIndex);
+        Assert.Equal("步骤 1 / 4", viewModel.WelcomeTutorialProgressText);
+        Assert.Contains("本机", viewModel.WelcomeTutorialStep.Title);
+
+        viewModel.DismissWelcomeTutorialCommand.Execute(null);
+        Assert.False(viewModel.IsWelcomeTutorialVisible);
+
+        viewModel.ShowWelcomeTutorialCommand.Execute(null);
+        await viewModel.AdvanceWelcomeTutorialCommand.ExecuteAsync(null);
+        await viewModel.AdvanceWelcomeTutorialCommand.ExecuteAsync(null);
+        await viewModel.AdvanceWelcomeTutorialCommand.ExecuteAsync(null);
+
+        Assert.Equal(3, viewModel.WelcomeTutorialStepIndex);
+        Assert.True(viewModel.IsLastWelcomeTutorialStep);
+        Assert.Equal("完成教程", viewModel.WelcomeTutorialNextButtonText);
+        Assert.Equal(0, actions.TutorialCompletionCalls);
+
+        await viewModel.AdvanceWelcomeTutorialCommand.ExecuteAsync(null);
+
+        Assert.Equal(1, actions.TutorialCompletionCalls);
+        Assert.False(viewModel.IsWelcomeTutorialCompleting);
+
+        viewModel.MarkWelcomeTutorialCompleted();
+        Assert.False(viewModel.IsWelcomeTutorialVisible);
+        viewModel.ShowWelcomeTutorialIfNeeded(completed: true);
+        Assert.False(viewModel.IsWelcomeTutorialVisible);
+    }
+
+    [Fact]
     public void ThemeSelection_PreviewsImmediatelyAndDistinguishesUnsavedState()
     {
         var actions = new RecordingActions();
@@ -322,6 +359,7 @@ public sealed class MainViewModelPairingTests
         public string? ReboundEndpoint { get; private set; }
         public bool RebindConfirmed { get; private set; }
         public int InvalidateTransientCalls { get; private set; }
+        public int TutorialCompletionCalls { get; private set; }
         public List<ThemePreference> ThemePreviews { get; } = [];
 
         public Task PairDeviceAsync(PairingDraft pairing)
@@ -376,6 +414,12 @@ public sealed class MainViewModelPairingTests
         public void InvalidateTransientSetupState() => InvalidateTransientCalls++;
 
         public void PreviewTheme(ThemePreference theme) => ThemePreviews.Add(theme);
+
+        public Task CompleteWelcomeTutorialAsync()
+        {
+            TutorialCompletionCalls++;
+            return Task.CompletedTask;
+        }
 
         public Task ConnectAsync() => Task.CompletedTask;
         public Task DisconnectAsync() => Task.CompletedTask;

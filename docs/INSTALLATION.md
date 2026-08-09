@@ -5,16 +5,13 @@
 This guide takes a new Windows 11 x64 client and a Linux host from an empty environment to a working JK Bridge connection. System package installation is deliberately separate from one-click pairing: JK Bridge checks dependencies but never elevates itself or changes operating-system configuration.
 
 > [!IMPORTANT]
-> These steps install the released **v2.1.0** portable ZIP with one-shot Linux
-> pairing. The repository's unreleased 2.2.0/vNext installer, Service Profile,
-> Windows Agent client, Linux Agent package assets, and simple route editor are development
-> work. The repository has a hardened user unit and manual packaging guide. One
-> deployed pair has exercised install/start/restart and first-admin enrollment,
-> but there is no stable Agent artifact or complete clean-machine
-> upgrade/rollback/uninstall workflow.
-> Do not use an unreleased Agent screen as a substitute for the one-shot steps
-> below. Any locally built artifact marked `2.2.0` is for development
-> acceptance, not a stable Release.
+> These steps install stable **v2.2.0** from the unsigned per-user Windows
+> installer or verified portable ZIP, using one-shot Linux pairing. The
+> installer, service editor, Windows-local discovery, Service Profiles,
+> first-run tutorial, and manual updater are stable desktop features. The
+> optional Linux Agent and managed-relay lifecycle remain
+> advanced/experimental; do not substitute them for the one-shot steps below
+> unless you are deliberately testing that workflow.
 
 ## Before you begin
 
@@ -28,18 +25,18 @@ You need:
 
 The email addresses used to sign in to Tailscale do not have to be identical. Both devices simply need to be members of the same tailnet and allowed by its policy.
 
-### Released and in-development workflows
+### Stable and optional advanced workflows
 
-| Capability | v2.1.0 Release | Current unreleased 2.2.0/vNext repository state |
+| Capability | Stable v2.2.0 | Optional advanced/experimental Agent path |
 |---|---|---|
-| Windows delivery | Verified portable ZIP | CI-built unsigned Inno Setup installer and preview publishing pipeline; not a stable or clean-machine-accepted installer |
-| Linux setup | One-shot helper started in a terminal for each new device | No-AI Agent, user-unit assets, controlled loopback-relay helper, packaging guide, and Windows client exist in source; one deployed start/restart/enrollment passed, while the complete clean-machine lifecycle remains pending |
-| Service editing | Explicit local port, remote port, loopback URL, and health fields | Simple URL generation and advanced editor are under development |
-| Service transfer | Re-enter services on the new Windows computer | Native non-secret export and preview/confirm import UI exists in vNext source; not released or clean-Windows accepted |
-| Recovery | Run the one-shot helper and re-pair | The same one-shot flow remains the planned fallback |
+| Windows delivery | Unsigned per-user installer plus verified portable ZIP | Same Windows app; no separate Agent desktop build |
+| Linux setup | One-shot helper started in a terminal for each new device | No-AI Agent, user-unit assets, controlled relay helper, and Windows management client; complete lifecycle acceptance remains pending |
+| Service editing | Simple URL generation, advanced fields, templates, and conflict guidance | Agent catalog synchronization adds fleet-level coordination |
+| Service transfer | Native non-secret export and preview/confirm import | Agent catalog synchronization remains explicit and foreground |
+| Recovery | Run the one-shot helper and re-pair | The same one-shot flow remains the required fallback |
 
-An optional future Agent will be a deterministic program, not an AI feature. It
-will not need ChatGPT, Codex, a model API key, or cloud inference.
+The optional Agent is a deterministic program, not an AI feature. It does not
+need ChatGPT, Codex, a model API key, or cloud inference.
 
 ## 1. Prepare Windows 11
 
@@ -217,12 +214,11 @@ The last line must be `True`. Extract the ZIP to a stable folder such as one und
 
 The executable is currently unsigned. A SmartScreen warning is therefore possible. The checksum proves that the download matches the published Release asset; it does not replace normal trust in the repository and release process.
 
-The repository contains a vNext Inno Setup definition and build script, but the
-stable v2.1.0 instructions use the ZIP. Explicitly labelled Preview installers
-are development-acceptance artifacts. Do not treat an installer built by an
-unrelated third party as an official Release. The installer can detect
-Tailscale, open its official download page, and offer a UAC-confirmed OpenSSH
-Client installation; it cannot sign in to Tailscale for you.
+Stable v2.2.0 publishes both the portable ZIP and an unsigned per-user Inno
+Setup installer. Do not treat an installer built by an unrelated third party as
+an official Release. The official installer can detect Tailscale, open its
+official download page, and offer a UAC-confirmed OpenSSH Client installation;
+it cannot sign in to Tailscale for you.
 
 Starting with Preview 4, an installed build can use **Settings → Version check
 → Check official Release**, followed by **Download and verify update**. Preview
@@ -238,6 +234,9 @@ Preview 6 uses the Windows/.NET system proxy for GitHub metadata and assets
 while retaining exact-host, redirect, size, and SHA-256 validation. Preview 4/5
 forced direct connections; a proxy-dependent machine must manually install
 Preview 6 once before later in-app downloads can use its system proxy.
+Preview 6 then recognizes stable v2.2.0 as a newer semantic version and selects
+the stable installer/checksum pair, which is the intended test path for this
+release.
 
 The flow does not check in the background, install
 silently, or bypass SmartScreen. Configuration, device credentials, and SSH keys
@@ -336,19 +335,18 @@ Do not copy the old computer's private key, authorization receipt, or complete
 prevents independent revocation. A copied receipt only describes the old key's
 observed Linux authorization and cannot authorize a new key.
 
-The vNext Service Profile format and native file-picker workflow are deliberately non-secret: they may carry
+The v2.2.0 Service Profile format and native file-picker workflow is deliberately non-secret: it may carry
 service names, Windows and Linux ports, launch URLs, and health choices, but not
 private keys, pairing tokens, device credentials, server identity, or
-authorization receipts. The vNext UI can export this allow-list, validate and
+authorization receipts. The v2.2.0 UI can export this allow-list, validate and
 preview an import without mutation, and apply it only after explicit
-confirmation. This workflow is implemented in source but not released or
-clean-Windows accepted. Import replaces only local service definitions; a new
-device must still enroll through the Agent or complete one-shot pairing.
+confirmation. Import replaces only local service definitions; a new device must
+still enroll through the Agent or complete one-shot pairing.
 
-If the old computer can no longer export a Service Profile, the 2.2.0
-development import picker also accepts an exact v2.1/schema-v3 `config.json` as
-a legacy source. It validates the complete old shape, then projects only
-Services into the same read-only preview. Server identity, tailnet identity,
+If the old computer can no longer export a Service Profile, the v2.2.0 import
+picker also accepts an exact v2.1/schema-v3 `config.json` as a legacy source.
+It validates the complete old shape, then projects only Services into the same
+read-only preview. Server identity, tailnet identity,
 behavior settings, private-key path, authorization receipt, and all other
 device-specific fields are discarded. This does **not** make whole-config copy a
 migration method: do not overwrite the target configuration with the old file,
@@ -361,14 +359,14 @@ first-admin enrollment, but the assets have not completed login persistence,
 upgrade, rollback, uninstall, and clean-machine acceptance, so they are not stable
 installation instructions. A bounded discovery engine is present and tested:
 on explicit invocation it checks only known online Tailscale peers on the fixed
-Agent port and validates their node and tailnet identity. The vNext Setup page
-is wired to invoke it only after **Discover Agent** is selected. One result is
+Agent port and validates their node and tailnet identity. The v2.2.0 Setup page
+invokes it from the advanced area only after **Discover Agent** is selected. One result is
 preselected but not copied into the endpoint field; multiple results require an
 explicit choice. In either case **Use selected address** is a separate action,
 and enrollment still requires a one-time code plus an explicit enrollment
 click. This GUI flow is implemented but not clean-Windows accepted.
 
-After enrollment, any vNext device can manually synchronize its own service
+After enrollment, any Agent device can manually synchronize its own service
 selection through authenticated `/v1/me` and `/v1/services`. An administrator
 can additionally refresh the complete Agent device list and explicitly revoke a
 selected device other than the current computer. Revocation requires a

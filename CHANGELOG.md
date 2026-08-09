@@ -2,6 +2,76 @@
 
 All notable changes are documented here. The project follows semantic versioning after the first public release.
 
+## 2.2.0 - 2026-08-09
+
+This stable release consolidates the tested Preview line into the first
+installer-based JK Bridge release. The recommended setup path remains the
+one-shot Linux pairing helper; the optional Linux Agent and managed relay
+features remain explicitly advanced/experimental.
+
+### Added
+
+- Added a first-run, four-step in-app tutorial covering the product boundary,
+  one-shot pairing, Linux versus Windows-local services, diagnostics, settings,
+  and updates. Choosing **Later** closes only the current tutorial; completing
+  it persists the choice, and **User guide** can reopen it at any time.
+- Grouped navigation into daily use, configuration/maintenance, and
+  help/preferences, with concise purpose hints on every main page and navigation
+  entry.
+- Added bounded Windows-local web-service discovery that reads only active
+  loopback listeners, performs lightweight header-only recognition, and never
+  scans disks or unopened port ranges.
+- Added simple/advanced Linux service editing, reusable service templates,
+  local-port conflict guidance, and non-secret Service Profile
+  export/preview/confirmed-import.
+- Added an unsigned per-user Inno Setup installer with prerequisite checks,
+  while retaining the verified portable ZIP.
+- Added allow-listed, redacted diagnostic ZIP export.
+
+### Changed
+
+- Promoted the application informational version and all in-app version
+  displays to stable 2.2.0; the sidebar no longer hides a prerelease suffix
+  behind a hard-coded development label.
+- Appearance selection previews immediately and clearly distinguishes a
+  temporary preview from the saved startup preference.
+- Configuration schema V6 records tutorial completion without writing the
+  default false value, preserving strict legacy service-profile import
+  compatibility.
+- The optional Agent remains a deterministic no-AI management plane with the
+  one-shot pairing path retained for normal setup and recovery. Agent and relay
+  lifecycle operations are still documented as advanced/experimental.
+
+### Updates
+
+- Manual update checks now use the stable GitHub Release channel in stable
+  builds and the bounded official release list in Preview builds.
+- Download and installation are separate explicit actions. The app displays
+  byte/percentage progress, checksum and verification stages, supports
+  cancellation, and does not exit until the user starts the visible installer
+  and process creation succeeds.
+- GitHub metadata and assets use the Windows/.NET system proxy while retaining
+  exact-host validation, one approved release-asset CDN redirect, response-size
+  limits, and mandatory detached SHA-256 verification.
+- An automated regression test proves 2.2.0-preview.6 selects stable 2.2.0
+  and its matching installer/checksum pair as an upgrade.
+
+### Security
+
+- Windows-local discovery accepts only literal loopback listeners and browser
+  targets, never follows redirects, and never reads response bodies.
+- Generated/custom browser URLs and service profiles remain strictly bounded;
+  profiles cannot contain device credentials, keys, server identity, or Linux
+  authorization receipts.
+- The updater accepts only the fixed official Mathjk/jk-bridge metadata and
+  exact same-release installer/checksum assets.
+
+### Testing
+
+- Passed 361 .NET regression tests, the Linux helper/Agent suite, Agent security
+  tests, strict Release compilation, privacy scanning, documentation-link
+  validation, package-contract checks, and Windows x64 packaging gates.
+
 ## 2.2.0-preview.6 - 2026-08-09
 
 This prerelease supersedes Preview 5 after its Windows acceptance run exposed a

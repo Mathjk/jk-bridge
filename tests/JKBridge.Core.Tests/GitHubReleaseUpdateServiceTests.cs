@@ -109,6 +109,51 @@ public sealed class GitHubReleaseUpdateServiceTests
     }
 
     [Fact]
+    public async Task Check_PreviewSixPromotesToStableTwoTwoZeroWithInstallerPair()
+    {
+        var handler = new RecordingHandler(_ => JsonResponse(new[]
+        {
+            new
+            {
+                tag_name = "v2.2.0",
+                name = "JK Bridge 2.2.0",
+                html_url = "https://github.com/Mathjk/jk-bridge/releases/tag/v2.2.0",
+                draft = false,
+                prerelease = false,
+                published_at = "2026-08-09T10:00:00Z",
+                assets = new[]
+                {
+                    new
+                    {
+                        name = "JKBridge-Setup-win-x64-2.2.0.exe",
+                        browser_download_url = "https://github.com/Mathjk/jk-bridge/releases/download/v2.2.0/JKBridge-Setup-win-x64-2.2.0.exe",
+                    },
+                    new
+                    {
+                        name = "JKBridge-Setup-win-x64-2.2.0.exe.sha256",
+                        browser_download_url = "https://github.com/Mathjk/jk-bridge/releases/download/v2.2.0/JKBridge-Setup-win-x64-2.2.0.exe.sha256",
+                    },
+                },
+            },
+        }));
+        using var httpClient = new HttpClient(handler) { Timeout = Timeout.InfiniteTimeSpan };
+        using var service = new GitHubReleaseUpdateService(httpClient);
+
+        var result = await service.CheckAsync("2.2.0-preview.6");
+
+        Assert.True(result.UpdateAvailable);
+        Assert.False(result.IsPrerelease);
+        Assert.Equal("2.2.0", result.LatestVersion);
+        Assert.NotNull(result.Installer);
+        Assert.Equal(
+            "JKBridge-Setup-win-x64-2.2.0.exe",
+            result.Installer.FileName);
+        Assert.Equal(
+            GitHubReleaseUpdateService.PreviewReleasesMetadataUri,
+            Assert.Single(handler.Requests).RequestUri);
+    }
+
+    [Fact]
     public async Task DownloadInstaller_VerifiesPublishedChecksumBeforeReturningFile()
     {
         var installerBytes = Encoding.UTF8.GetBytes("verified installer fixture");

@@ -4,10 +4,11 @@
 > approved direction that remains in development and may move between releases
 > after security, migration, and Windows acceptance testing.
 >
-> **Version boundary:** v2.1.0 is the latest stable release. Preview builds on
-> the current line report a prerelease version such as `2.2.0-preview.6`;
-> neither a Preview asset nor the implemented vNext source is thereby stable or
-> supported as v2.2.0.
+> **Version boundary:** v2.2.0 is the latest stable release.
+> `2.2.0-preview.1` through `2.2.0-preview.6` remain historical prereleases.
+> Stable v2.2.0 covers the desktop, one-shot pairing, service-profile, local
+> discovery, diagnostics, installer, and updater flows described below; the
+> optional Agent/relay lifecycle remains advanced/experimental vNext work.
 
 ## V2.0 — portable public release (released)
 
@@ -24,22 +25,30 @@
 - Browser launch separated from advisory HTTP/TLS health results.
 - Investment News default service and existing-installation migration helper.
 
-## V2.2 — current development line, not released
+## V2.2 — desktop usability and controlled updates (released)
 
-- Complete clean-machine Windows acceptance on supported Windows 11 builds.
-- Authenticode code signing and timestamping.
-- Optional installer while retaining the portable ZIP.
-- Manual fixed-official-Release checking plus an explicit, SHA-256-verified
-  installer download/overlay-install action, without background download or
-  silent installation (implemented source; acceptance pending).
-- Allow-listed, redacted diagnostic ZIP export that excludes keys, device
-  credentials, identities, service details, and pairing codes (implemented
-  source; acceptance pending).
+- Publish an unsigned per-user Windows installer while retaining the verified
+  portable ZIP.
+- Discover active Windows loopback web services without disk or unopened-port
+  scanning, then explicitly save selected results.
+- Ship simple/advanced service editing, templates, local-port conflict
+  guidance, and non-secret Service Profile export/preview/confirmed-import.
+- Provide categorized navigation, concise page guidance, and a persistent
+  four-step first-run tutorial that can be reopened later.
+- Ship manual fixed-official-Release checking plus explicit, SHA-256-verified
+  download and separately confirmed visible installation, with progress and
+  cancellation but no background download or silent installation.
+- Use the Windows/.NET system proxy for GitHub metadata/assets without relaxing
+  exact-host, redirect, size, or checksum boundaries.
+- Export allow-listed, redacted diagnostic ZIPs that exclude keys, device
+  credentials, identities, service details, and pairing codes.
+- Preview System/Light/Dark appearance choices immediately and persist only on
+  explicit settings save.
 
-Distribution hardening does not by itself introduce the Linux Agent or claim
-schema V4 compatibility. The v2.2.0 development tree also contains the
-separately gated vNext Agent, schema V4, migration, and relay source described
-below; those features remain in-development until their own exit criteria pass.
+The v2.2.0 package also carries separately gated optional Agent, migration, and
+relay components. Their lifecycle remains advanced/experimental until the vNext
+exit criteria below pass; one-shot Linux pairing is the stable default and
+recovery path.
 
 ## vNext phase A — route UX and schema V4 (implemented source; acceptance pending)
 

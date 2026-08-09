@@ -13,7 +13,7 @@
             <Grid Grid.Row="0" ColumnDefinitions="*,Auto">
                 <StackPanel>
                     <TextBlock Text="设备配置" Classes="page-title" />
-                    <TextBlock Text="优先使用可选 Linux Agent 完成无终端登记；Agent 不可用时保留一次性配对。"
+                    <TextBlock Text="首次配对、添加其他电脑与 Agent 高级管理都在这里；多数用户只需完成一次配对。"
                                Classes="page-subtitle" Margin="0,4,0,0" />
                 </StackPanel>
                 <Border Grid.Column="1" Classes="code-chip" VerticalAlignment="Center">

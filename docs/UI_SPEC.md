@@ -22,9 +22,32 @@ The rail, app icon, and status surfaces share the same two-node bridge geometry.
 - Default size: `1120 x 760`.
 - Minimum size: `980 x 680`.
 - Native title bar for V1 reliability; Mica/blur is progressive enhancement with a solid fallback.
-- Left navigation rail: Device setup, Overview, Services, Diagnostics; Settings anchored at the bottom.
+- The left rail groups features by intent:
+  - **Daily use / 日常使用**: Overview and Services.
+  - **Configuration and maintenance / 配置与维护**: Device setup and Diagnostics.
+  - **Help and preferences / 帮助与偏好**: Usage guide and Settings.
+- Every navigation item has a short tooltip that explains when to use it.
+- The footer reads the packaged application version dynamically; it must never use a hard-coded preview label.
 - One navigation level only. Editing uses an in-window right drawer rather than additional windows.
 - Main content margin: 28–32 px; section gap: 24 px; control rhythm: 8 px.
+
+### First-run usage guide
+
+- Schema-v6 profiles add a non-secret `welcomeTutorialCompleted` behavior flag.
+- An incomplete profile opens a four-step modal guide after configuration is loaded:
+  1. distinguish Linux tunnels from Windows-local loopback services;
+  2. explain recommended one-shot pairing and the optional advanced Agent path;
+  3. show how to scan, review, save, and reopen Windows-local services;
+  4. point to Overview, Diagnostics, Settings, updates, and this guide.
+- **Later / 以后再看** closes the guide for the current run only. It appears again on
+  the next start until the user completes the final step.
+- Completing the guide atomically saves the flag. A save failure keeps the guide
+  open and displays an actionable message.
+- **Usage guide / 使用指南** at the lower left always reopens the guide, including
+  after completion.
+- The guide explicitly states that local discovery reads the Windows listener
+  table and performs bounded lightweight probes; it does not scan disks or all
+  65,535 ports.
 
 ```text
 ┌──────────────────────────────────────────────────────────────┐
@@ -110,6 +133,17 @@ Do not display raw stderr as the primary message.
 - Remote host is fixed to `127.0.0.1` in normal mode.
 - Save validates duplicate/configured ports and URL safety; connection preflight performs the live local bind check without killing the occupying process.
 - Save validates the complete proposed configuration before committing and restarting the bridge once.
+
+### Windows-local services
+
+- The Services page first asks the user to choose **Linux tunnel** or
+  **Windows local** so the two address types are never mixed.
+- **Scan local** reads the active Windows loopback listener table. Only the
+  resulting candidate ports receive bounded HTTP(S) metadata probes.
+- Scan results are transient candidates. They become persistent launch entries
+  only after the user explicitly saves them.
+- Saved local services can be edited, disabled, deleted, copied, health-checked,
+  and opened without creating an SSH tunnel.
 
 ## Diagnostics page
 

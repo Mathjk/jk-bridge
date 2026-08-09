@@ -190,6 +190,7 @@ public interface IBridgeUiActions
     {
     }
     Task SaveSettingsAsync(SettingsDraft settings);
+    Task CompleteWelcomeTutorialAsync() => Task.CompletedTask;
     Task PairDeviceAsync(PairingDraft pairing);
 
     /// <summary>

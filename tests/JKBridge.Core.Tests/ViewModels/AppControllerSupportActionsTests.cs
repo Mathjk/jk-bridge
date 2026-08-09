@@ -56,13 +56,66 @@ public sealed class AppControllerSupportActionsTests
             await controller.CheckForUpdatesAsync();
 
             Assert.Equal(1, updateChecker.Calls);
-            Assert.Equal("2.2.0-preview.6", updateChecker.CurrentVersion);
+            Assert.Equal("2.2.0", updateChecker.CurrentVersion);
+            Assert.Equal("JK Bridge 2.2.0", controller.ViewModel.ApplicationVersionText);
+            Assert.Equal("v2.2.0 · Windows 11", controller.ViewModel.ApplicationFooterText);
             Assert.True(controller.ViewModel.HasUpdateReleaseInfo);
             Assert.Equal(
                 "https://github.com/Mathjk/jk-bridge/releases/tag/v2.3.0",
                 controller.ViewModel.UpdateReleaseUrl);
             Assert.Contains("没有成对的 Windows 安装器和 SHA-256", controller.ViewModel.UpdateCheckFeedback);
             Assert.False(controller.ViewModel.IsUpdateChecking);
+        }
+        finally
+        {
+            await controller.DisposeAsync();
+            if (Directory.Exists(directory))
+            {
+                Directory.Delete(directory, recursive: true);
+            }
+        }
+    }
+
+    [Fact]
+    public async Task WelcomeTutorial_FirstUpgradeShowsAndCompletionIsPersisted()
+    {
+        var directory = Path.Combine(Path.GetTempPath(), $"jkbridge-tutorial-{Guid.NewGuid():N}");
+        Directory.CreateDirectory(directory);
+        var configStore = new ConfigStore(Path.Combine(directory, "config.json"));
+        var config = TestConfigs.CreateConfigured() with
+        {
+            Behavior = TestConfigs.CreateConfigured().Behavior with
+            {
+                AutoConnect = false,
+                WelcomeTutorialCompleted = false,
+            },
+        };
+        await configStore.SaveAsync(config);
+        var controller = new AppController(
+            configStore,
+            new RollingFileLogger(Path.Combine(directory, "logs")),
+            new FakeRuntime(),
+            new FakePairingService(),
+            new StartupRegistration($"JK Bridge Test {Guid.NewGuid():N}"),
+            Path.Combine(directory, "logs"),
+            () => null,
+            dispatchUi: action => action());
+
+        try
+        {
+            await controller.InitializeAsync();
+
+            Assert.True(controller.ViewModel.IsWelcomeTutorialVisible);
+
+            await controller.CompleteWelcomeTutorialAsync();
+
+            Assert.False(controller.ViewModel.IsWelcomeTutorialVisible);
+            Assert.True(controller.CurrentConfig.Behavior.WelcomeTutorialCompleted);
+            var json = await File.ReadAllTextAsync(configStore.ConfigPath);
+            Assert.Contains(
+                "\"welcomeTutorialCompleted\": true",
+                json,
+                StringComparison.Ordinal);
         }
         finally
         {

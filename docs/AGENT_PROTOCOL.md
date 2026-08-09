@@ -1,6 +1,7 @@
-# JK Bridge Agent API V1 — vNext Development Contract
+# JK Bridge Agent API V1 — experimental contract
 
-> **Not released or supported for deployment.** The source tree contains a
+> **Advanced/experimental; not supported for routine deployment.** Stable
+> v2.2.0 packages the
 > working development Linux server (`scripts/jkbridge_agent.py`), bounded
 > Windows client and enrollment orchestration, schema V4 persistence, strict
 > relay companion (`scripts/jkbridge_relay.py`), tests, a reviewed systemd
@@ -9,10 +10,8 @@
 > Agent protocol V1. However, the implemented install/start/stop/status/fallback
 > paths have not passed live lifecycle acceptance, there is no explicit
 > upgrade/rollback/uninstall command yet, and there is no stable Agent Release
-> asset or completed
-> clean-machine end-to-end acceptance. Pairing Protocol V1 remains the released
-> setup path for stable v2.1.0. Current App/installer source reports
-> `v2.2.0 development`; v2.2.0 has not been released.
+> asset or completed clean-machine end-to-end acceptance. Pairing Protocol V1
+> remains the supported setup and recovery path for stable v2.2.0.
 
 The companion [AGENT_THREAT_MODEL.md](AGENT_THREAT_MODEL.md) defines release
 security requirements. Passing development tests does not convert an unchecked

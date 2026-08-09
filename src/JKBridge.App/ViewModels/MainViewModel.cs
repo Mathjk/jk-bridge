@@ -15,16 +15,88 @@ public enum AppPage
     Settings,
 }
 
+public sealed record WelcomeTutorialStep(
+    string Eyebrow,
+    string Title,
+    string Description,
+    string FirstTitle,
+    string FirstDetail,
+    string SecondTitle,
+    string SecondDetail,
+    string ThirdTitle,
+    string ThirdDetail,
+    string Note);
+
 /// <summary>
 /// Window-level presentation state. Runtime code supplies actions through
 /// <see cref="IBridgeUiActions"/> and pushes sanitized state through the Apply/Set methods.
 /// </summary>
 public partial class MainViewModel : ViewModelBase
 {
+    private static readonly IReadOnlyList<WelcomeTutorialStep> WelcomeTutorialSteps =
+    [
+        new(
+            "认识 JK Bridge",
+            "把只在本机开放的网页，变成清楚可控的入口",
+            "JK Bridge 同时管理两类服务：Linux 主机上的回环网页，以及当前 Windows 上只监听 127.0.0.1 / ::1 的网页。",
+            "Linux 服务",
+            "通过 Tailscale + SSH 转发到 Windows，浏览器仍然只访问本机地址。",
+            "Windows 本机服务",
+            "读取系统当前的回环监听并做轻量网页识别，保存后作为固定入口使用。",
+            "默认不做的事",
+            "不扫描磁盘、不遍历全部 1–65535 端口，也不会把服务暴露到局域网。",
+            "左侧导航已经按“日常使用”“配置与维护”“帮助与偏好”分类。"),
+        new(
+            "首次连接",
+            "第一次只需完成一次配对",
+            "若你只是连接一台 Linux 主机，使用一次性配对即可；Linux Agent 是多设备和集中管理场景的可选高级功能。",
+            "1 · Linux 生成配对码",
+            "在目标 Linux 上运行配对脚本，得到十分钟有效、只能使用一次的 jkbridge:// 配对码。",
+            "2 · Windows 完成设备配置",
+            "打开“设备配置”，粘贴配对码并点击“一键配对并连接”。",
+            "3 · 回到概览",
+            "看到“已连接”后，直接打开常用服务；以后通常只需启动 JK Bridge。",
+            "配对码和 Agent 登记码都属于一次性凭据，不要截图、转发或写进服务网址。"),
+        new(
+            "服务入口",
+            "“服务”页分成 Linux 隧道与 Windows 本机",
+            "先在页面右上角选择服务来源，再进行添加、扫描、编辑或打开，避免把两类端口混在一起。",
+            "Linux 隧道",
+            "设置 Windows 访问端口、Linux 回环端口和打开路径；新增端口通常需要重新配对授权。",
+            "Windows 本机",
+            "点击“扫描本机”查看当前正在监听的回环服务；确认后保存，之后无需重复扫描。",
+            "临时结果与固定入口",
+            "扫描结果只是候选；只有点击保存后，才会记录为长期使用的本机服务。",
+            "扫描只读取操作系统网络监听表，并对候选地址发送不下载正文的轻量请求。"),
+        new(
+            "日常使用与维护",
+            "平时看概览，打不开时再看诊断",
+            "大多数操作都可以按“概览 → 服务 → 诊断”的顺序完成；设置页负责长期偏好和软件更新。",
+            "概览",
+            "连接或断开全部 Linux 隧道，并查看每个服务是否可打开。",
+            "诊断",
+            "按 Tailscale、Linux 节点、SSH、网页健康检查逐段定位问题，并可导出脱敏诊断包。",
+            "设置",
+            "保存连接行为、外观和开机启动；版本更新分为检查、下载校验、确认安装三个可见阶段。",
+            "以后需要复习时，随时点击左下角“使用指南”重新打开本教程。"),
+    ];
+
     private readonly IBridgeUiActions _actions;
 
     [ObservableProperty]
     private AppPage _selectedPage = AppPage.Overview;
+
+    [ObservableProperty]
+    private bool _isWelcomeTutorialVisible;
+
+    [ObservableProperty]
+    private int _welcomeTutorialStepIndex;
+
+    [ObservableProperty]
+    private bool _isWelcomeTutorialCompleting;
+
+    [ObservableProperty]
+    private string _welcomeTutorialFeedback = "可以随时从左下角重新打开本教程。";
 
     [ObservableProperty]
     private bool _isConnected;
@@ -116,6 +188,7 @@ public partial class MainViewModel : ViewModelBase
     [ObservableProperty] private string _updateProgressText = "尚未开始下载";
     [ObservableProperty] private string _updateStageText = "等待检查";
     [ObservableProperty] private string _applicationVersionText = "JK Bridge";
+    [ObservableProperty] private string _applicationFooterText = "JK Bridge · Windows 11";
     [ObservableProperty] private string _updateCheckFeedback = "仅在你点击后查询 JK Bridge 官方 GitHub Releases；确认后可下载、校验并启动覆盖安装。";
     [ObservableProperty] private string _updateReleaseUrl = string.Empty;
     [ObservableProperty] private bool _isLinuxServicesMode = true;
@@ -232,6 +305,14 @@ public partial class MainViewModel : ViewModelBase
     public bool IsServices => SelectedPage == AppPage.Services;
     public bool IsDiagnostics => SelectedPage == AppPage.Diagnostics;
     public bool IsSettings => SelectedPage == AppPage.Settings;
+    public WelcomeTutorialStep WelcomeTutorialStep =>
+        WelcomeTutorialSteps[WelcomeTutorialStepIndex];
+    public string WelcomeTutorialProgressText =>
+        $"步骤 {WelcomeTutorialStepIndex + 1} / {WelcomeTutorialSteps.Count}";
+    public bool IsFirstWelcomeTutorialStep => WelcomeTutorialStepIndex == 0;
+    public bool IsLastWelcomeTutorialStep => WelcomeTutorialStepIndex == WelcomeTutorialSteps.Count - 1;
+    public string WelcomeTutorialNextButtonText => IsLastWelcomeTutorialStep ? "完成教程" : "下一步";
+    public bool CanAdvanceWelcomeTutorial => !IsWelcomeTutorialCompleting;
     public bool IsStopped => !IsConnected && !IsConnecting && !IsDegraded;
     public bool HasNoIssue => !HasIssue;
     public bool IsWindowsLocalServicesMode => !IsLinuxServicesMode;
@@ -295,6 +376,32 @@ public partial class MainViewModel : ViewModelBase
             ClearServiceProfilePreview();
             AgentEndpointRebindConfirmed = false;
         }
+    }
+
+    partial void OnWelcomeTutorialStepIndexChanged(int value)
+    {
+        OnPropertyChanged(nameof(WelcomeTutorialStep));
+        OnPropertyChanged(nameof(WelcomeTutorialProgressText));
+        OnPropertyChanged(nameof(IsFirstWelcomeTutorialStep));
+        OnPropertyChanged(nameof(IsLastWelcomeTutorialStep));
+        OnPropertyChanged(nameof(WelcomeTutorialNextButtonText));
+    }
+
+    partial void OnIsWelcomeTutorialCompletingChanged(bool value) =>
+        OnPropertyChanged(nameof(CanAdvanceWelcomeTutorial));
+
+    public void ShowWelcomeTutorialIfNeeded(bool completed)
+    {
+        if (!completed)
+        {
+            ShowWelcomeTutorial();
+        }
+    }
+
+    public void MarkWelcomeTutorialCompleted()
+    {
+        WelcomeTutorialFeedback = "教程已完成。以后仍可从左下角重新打开。";
+        IsWelcomeTutorialVisible = false;
     }
 
     partial void OnThemeIndexChanged(int value)
@@ -504,6 +611,56 @@ public partial class MainViewModel : ViewModelBase
         AgentEndpointRebindConfirmed = false;
         OnPropertyChanged(nameof(CanUseDiscoveredAgent));
         OnPropertyChanged(nameof(CanRebindAgentEndpoint));
+    }
+
+    [RelayCommand]
+    private void ShowWelcomeTutorial()
+    {
+        WelcomeTutorialStepIndex = 0;
+        WelcomeTutorialFeedback = "可以随时从左下角重新打开本教程。";
+        IsWelcomeTutorialVisible = true;
+    }
+
+    [RelayCommand]
+    private void DismissWelcomeTutorial()
+    {
+        WelcomeTutorialFeedback = "本次已关闭；下次启动仍会提醒，直到你完成教程。";
+        IsWelcomeTutorialVisible = false;
+    }
+
+    [RelayCommand]
+    private void PreviousWelcomeTutorial()
+    {
+        if (WelcomeTutorialStepIndex > 0 && !IsWelcomeTutorialCompleting)
+        {
+            WelcomeTutorialStepIndex--;
+        }
+    }
+
+    [RelayCommand]
+    private async Task AdvanceWelcomeTutorialAsync()
+    {
+        if (IsWelcomeTutorialCompleting)
+        {
+            return;
+        }
+
+        if (!IsLastWelcomeTutorialStep)
+        {
+            WelcomeTutorialStepIndex++;
+            return;
+        }
+
+        IsWelcomeTutorialCompleting = true;
+        WelcomeTutorialFeedback = "正在保存教程完成状态…";
+        try
+        {
+            await _actions.CompleteWelcomeTutorialAsync();
+        }
+        finally
+        {
+            IsWelcomeTutorialCompleting = false;
+        }
     }
 
     [RelayCommand]

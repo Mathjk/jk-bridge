@@ -1,10 +1,11 @@
-# vNext Agent multi-device and administrator operations
+# Experimental Agent multi-device and administrator operations
 
 [简体中文](AGENT_OPERATIONS.zh-CN.md) · **English**
 
 > [!IMPORTANT]
-> These operations describe the unreleased v2.2.0/vNext Agent workflow. The
-> stable v2.1.0 release continues to use one-shot pairing. Every Windows device
+> These operations describe the optional advanced/experimental Agent workflow
+> packaged with stable v2.2.0. One-shot pairing remains the supported default
+> and recovery path. Every Windows device
 > must have its own SSH key and Agent credential.
 
 ## Roles

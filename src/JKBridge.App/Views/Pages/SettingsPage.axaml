@@ -13,7 +13,7 @@
             <Grid Grid.Row="0" ColumnDefinitions="*,Auto">
                 <StackPanel>
                     <TextBlock Text="设置" Classes="page-title" />
-                    <TextBlock Text="管理 Linux 身份、连接行为与界面偏好。"
+                    <TextBlock Text="管理连接行为、外观与版本更新；除外观即时预览外，更改后请点击“保存设置”。"
                                Classes="page-subtitle" Margin="0,4,0,0" />
                 </StackPanel>
                 <Button Grid.Column="1" Content="保存设置" Classes="primary"

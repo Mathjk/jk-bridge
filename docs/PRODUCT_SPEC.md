@@ -1,11 +1,11 @@
 # JK Bridge Product Specification
 
-> **Status:** The V2.1 sections describe the released product. Sections marked
-> **vNext** describe approved work that is still in development;
-> they are not installation or API documentation for a shipping Agent.
-> The latest stable release is v2.1.0. Current App/installer builds identify as
-> `v2.2.0 development`, but v2.2.0 has not been released and that label does not
-> make any vNext feature supported.
+> **Status:** v2.2.0 is the latest stable desktop release. Its supported core
+> covers the Windows app, one-shot pairing, service editing/profiles,
+> Windows-local discovery, diagnostics, installer, updater, appearance, and
+> first-run guidance. Sections marked **vNext** describe the optional
+> Agent/relay lifecycle that remains advanced/experimental; they are not
+> installation or API documentation for a supported Agent deployment.
 
 ## Product statement
 
@@ -47,7 +47,7 @@ model API, Codex, or cloud-service dependency. Existing one-shot pairing remains
 available for portable use, recovery, and installations that do not want a
 persistent Agent.
 
-## V2.1 scope
+## V2.1 foundation retained in v2.2.0
 
 ### Automated setup
 
@@ -95,7 +95,10 @@ persistent Agent.
   Release endpoint; no background check, download, or installation.
 - Explicit error categories for Tailscale, pairing expiry, peer identity, SSH authentication, host-key mismatch, forwarding denial, port conflicts, and remote HTTP health.
 
-## vNext in-development scope
+## v2.2.0 desktop scope and optional vNext Agent extensions
+
+The service editor, profiles, Windows-local discovery, updater, appearance
+persistence, categorized navigation, and first-run guide are stable desktop scope. Agent enrollment and managed relays remain optional and experimental.
 
 ### Simple and advanced service editing
 

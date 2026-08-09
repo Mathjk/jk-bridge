@@ -1,8 +1,10 @@
+using System.Text.Json.Serialization;
+
 namespace JKBridge.Core.Models;
 
 public sealed record AppConfig
 {
-    public const int CurrentSchemaVersion = 5;
+    public const int CurrentSchemaVersion = 6;
 
     public int SchemaVersion { get; init; } = CurrentSchemaVersion;
 
@@ -102,6 +104,9 @@ public sealed record BehaviorSettings
     public bool StartWithWindows { get; init; }
 
     public ThemePreference Theme { get; init; } = ThemePreference.System;
+
+    [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingDefault)]
+    public bool WelcomeTutorialCompleted { get; init; }
 }
 
 public sealed record ForwardAuthorizationGrant

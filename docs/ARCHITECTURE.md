@@ -1,17 +1,16 @@
 # JK Bridge Architecture
 
-> **Release boundary:** JK Bridge v2.1.0 remains the latest stable release and
-> uses configuration schema V3 and the
-> one-shot Linux helper described below. The vNext source implements schema V4,
-> a development persistent Linux Agent/API, bounded Agent discovery and
-> same-node endpoint rebind, Windows enrollment, service-catalog synchronization
-> and confirmed catalog updates, administrator device management, native
-> non-secret Service Profile transfer, safe diagnostic export, a manual official
-> Release check, administrator-issued device enrollment codes, managed loopback
-> relays, and multi-device authorization. They are not part of a
-> supported release until installation and clean-machine acceptance complete.
-> Current App/installer source reports `v2.2.0 development`; v2.2.0 is not a
-> published stable release.
+> **Release boundary:** JK Bridge v2.2.0 is the latest stable desktop release
+> and uses configuration schema V6 with the one-shot Linux helper as the
+> recommended setup/recovery path. Stable desktop scope includes Windows-local
+> discovery, service editing and profiles, diagnostic export, the installer,
+> manual updater, appearance persistence, categorized navigation, and the
+> first-run tutorial. The package also contains an optional persistent Linux
+> Agent/API, bounded discovery/rebind, Windows enrollment, catalog and device
+> management, administrator enrollment codes, managed loopback relays, and
+> multi-device authorization. That optional Agent/relay lifecycle remains
+> advanced/experimental until its installation, upgrade, rollback, uninstall,
+> and clean-machine acceptance gates complete.
 
 ## Decision summary
 
@@ -28,14 +27,15 @@
 | Route integrity | One validated route object derives SSH, browser, health, and authorization endpoints |
 | Authorization state | Schema V3 stores the paired client fingerprint and exact granted remote-port set |
 | Persistence | Atomic JSON config, backup recovery, rotating redacted logs |
+| Stable configuration | Schema V6 migrates V1–V5 profiles, persists Windows-local services, and records tutorial completion |
 | Tests | Unit/integration tests for config, protocol, runtime, view model, Linux file mutation, and packaging |
-| vNext configuration | Schema V4 adds non-secret Agent registration/catalog state while preserving V3 routes and receipts |
+| Optional Agent configuration | Schema V4 introduced non-secret Agent registration/catalog state while preserving V3 routes and receipts |
 | vNext Linux management | Development non-root Agent/API over Tailscale plus `jkbridge-agentctl` install/start/stop/status/fallback source; one deployed install/bootstrap/start/restart/status and first-admin enrollment completed, but no supported upgrade/uninstall command or complete clean-machine lifecycle yet; V1 helper remains fallback |
 | vNext device identity | One dedicated Ed25519 identity and independently revocable authorization per Windows device |
-| vNext service migration | Native JSON export/import UI; bounded non-secret profile, read-only diff, explicit confirmation, atomic save |
+| Stable service migration | Native JSON export/import UI; bounded non-secret profile, read-only diff, explicit confirmation, atomic save |
 | vNext explicit relay | One exact DNS/IPv4 TCP target behind one Linux `127.0.0.1` `socat` user unit; read-only plan/probe before confirmed apply/delete |
 
-Avalonia enables Linux-hosted development and Windows cross-publishing while retaining a native tray and child-process supervision. In v2.1 the Linux side remains a short script because its only persistent output is standard OpenSSH authorization. The vNext Agent source adds an optional management plane; normal service traffic continues to use the same restricted OpenSSH data plane.
+Avalonia enables Linux-hosted development and Windows cross-publishing while retaining a native tray and child-process supervision. In stable v2.2.0 the recommended Linux side remains a short script because its only persistent output is standard OpenSSH authorization. The optional vNext Agent adds a management plane; normal service traffic continues to use the same restricted OpenSSH data plane.
 
 ## Repository structure
 
@@ -75,7 +75,7 @@ Runtime data defaults to:
 %USERPROFILE%\.ssh\jk_bridge_ed25519
 ```
 
-Fresh V3 configuration is intentionally unconfigured:
+The original V3 configuration shape was intentionally unconfigured:
 
 ```json
 {
@@ -99,17 +99,17 @@ Fresh V3 configuration is intentionally unconfigured:
 }
 ```
 
-An unconfigured app cannot enter tunnel preflight and routes to Device setup. Schema V1/V2 profiles migrate in memory to V3 while preserving their device and service settings. Because those versions did not record what Linux actually authorized, a configured legacy profile must re-pair once before SSH starts. That pairing establishes the V3 authorization baseline. Writes use a same-directory temporary file, flush, last-valid backup, and atomic replacement.
+An unconfigured app cannot enter tunnel preflight and routes to Device setup. Stable v2.2.0 loads schema V1–V5 profiles and migrates them in memory to V6 while preserving their device and service settings. Because V1/V2 did not record what Linux actually authorized, a configured profile from either version must re-pair once before SSH starts. That pairing establishes the authorization baseline. Writes use a same-directory temporary file, flush, last-valid backup, and atomic replacement.
 
-### Schema V4 migration — implemented in vNext source
+### Schema V4–V6 migration — released in v2.2.0
 
-Schema V4 is the in-development vNext persistence format, not a released v2.1
-format. It adds an `agent` registration object containing `isConfigured`, the
+Schema V4 introduced an `agent` registration object containing `isConfigured`, the
 canonical endpoint, pinned Linux Tailscale stable node ID, device ID/label, an
 opaque Windows Credential Manager reference, and catalog revision. The Agent
-credential itself is not in JSON. V3 deserialization supplies an unconfigured
-default Agent object, bumps the schema, and otherwise preserves the V3 server,
-services, behavior, and authorization receipt.
+credential itself is not in JSON. Schema V5 adds persisted Windows-local service
+definitions. Schema V6 adds the non-secret tutorial-completion behavior flag.
+Loading any V1–V5 profile supplies safe defaults for later fields, bumps the
+schema, and otherwise preserves server, services, behavior, and authorization.
 
 The migration and Agent catalog materialization preserve these boundaries:
 

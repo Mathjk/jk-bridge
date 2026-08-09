@@ -2,12 +2,11 @@
 
 This document describes the local one-shot setup protocol between the Linux helper and Windows application. It is not used for normal tunnel traffic.
 
-> **Status:** This is the released stable v2.1.0 protocol. The current App and
-> installer development source identify as v2.2.0, which is not released. The
-> optional persistent Linux
+> **Status:** This remains the released one-shot setup and recovery protocol in
+> stable v2.2.0. The optional persistent Linux
 > Agent and its multi-device management contract are a separate vNext design in
 > [AGENT_PROTOCOL.md](AGENT_PROTOCOL.md). No Agent endpoint described there is
-> released or implied by Pairing Protocol V1.
+> required or implied by Pairing Protocol V1.
 
 ## Pairing code
 

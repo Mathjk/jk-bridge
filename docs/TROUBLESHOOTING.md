@@ -5,12 +5,12 @@
 Work from the outside in: operating-system prerequisites, Tailscale reachability, pairing, SSH tunnel, then the Linux web service. JK Bridge can connect successfully even when one target web app is down, so keep tunnel failures and service-health failures separate.
 
 > [!NOTE]
-> Stable v2.1.0 uses only the portable Windows app and the one-shot Linux
-> helper. Agent controls, Service Profile support, and installer sources found
-> in an unreleased 2.2.0/vNext development build are not proof that a Linux
-> Agent or supported end-to-end enrollment workflow has shipped. A local
-> artifact marked `2.2.0` is a development/acceptance build, not a stable
-> Release.
+> Stable v2.2.0 provides both the unsigned installer and portable ZIP, plus
+> Service Profiles, Windows-local discovery, the manual updater, and first-run
+> guidance. One-shot Linux pairing remains the supported setup/recovery path.
+> Agent controls are included for advanced testing, but do not mean the Linux
+> Agent lifecycle has completed supported installation, upgrade, rollback,
+> uninstall, or clean-machine acceptance.
 
 ## Collect a safe baseline
 
@@ -139,12 +139,10 @@ The temporary server binds only the Linux Tailscale IPv4, not the LAN or public 
 
 ## Agent enrollment is unavailable or does not complete
 
-The stable v2.1.0 Release has no Agent enrollment. The vNext source tree now has
-a development Linux Agent, per-user systemd packaging assets, package checks,
-and a wired Windows enrollment client. These assets have not completed live
-install/upgrade/rollback or clean-Windows acceptance and are not a stable Agent
-Release. If that development path is incomplete or fails, use **one-shot
-pairing** instead:
+The stable v2.2.0 app includes optional advanced Agent enrollment controls,
+a Linux Agent, per-user systemd packaging assets, and package checks. This path
+remains experimental and is not required for normal use. If enrollment is
+incomplete or fails, use the recommended **one-shot pairing** path instead:
 
 ```bash
 python3 ~/jkbridge-linux.py pair
@@ -156,7 +154,7 @@ Tailscale Funnel, SOCKS proxy, exit node, or subnet route. Do not weaken
 program with no AI or model API dependency; Agent downtime should affect
 management only, not an already authorized SSH tunnel.
 
-The vNext Setup page now has an explicit **Discover Agent** action backed by a
+The v2.2.0 Setup page has an advanced **Discover Agent** action backed by a
 bounded, read-only discovery engine. It does not scan a subnet or enroll a
 device: it inspects only known online Tailscale peers on port `45871` and
 requires matching node, MagicDNS, tailnet, protocol, and Agent-version claims.
@@ -195,9 +193,9 @@ required.
 
 ## A Linux relay plan is blocked or apply is unavailable
 
-The vNext **Advanced: Linux reachable target** workflow is implemented in source
-but is not part of stable v2.1.0 and has not completed live Linux or clean
-Windows acceptance. **Generate plan and probe** is read-only. It must succeed
+The stable v2.2.0 app exposes the optional experimental **Advanced: Linux
+reachable target** workflow. It is not required for the normal one-shot pairing
+path. **Generate plan and probe** is read-only. It must succeed
 before the separate confirmation checkbox and apply button become available.
 
 Check the plan preview for the specific cause:
@@ -342,13 +340,11 @@ computer. The authorization receipt belongs to the old key, and sharing one
 private key prevents independent device revocation. Pair the new computer with
 its own key, then revoke the old fingerprint only after successful validation.
 
-The vNext app has a native Service Profile file picker: export writes the
+The stable v2.2.0 app has a native Service Profile file picker: export writes the
 service-only allow-list, while import first performs a read-only validation and
 change preview. Applying the preview requires a separate explicit confirmation.
-This source implementation is not part of v2.1.0 and still requires clean-
-Windows acceptance.
 
-The 2.2.0 development importer can also read an exact v2.1/schema-v3
+The v2.2.0 importer can also read an exact v2.1/schema-v3
 `config.json` as a legacy input when no Service Profile export is available. It
 validates the old document but projects only Services into the preview; the old
 server, tailnet, behavior, private-key path, authorization receipt, and device

@@ -148,7 +148,9 @@ public sealed partial class AppController : IBridgeUiActions, IAsyncDisposable
             Path.GetDirectoryName(_logDirectory) ?? _logDirectory,
             "Updates");
         ViewModel = new MainViewModel(this);
-        ViewModel.ApplicationVersionText = $"JK Bridge {GetApplicationVersion()}";
+        var applicationVersion = GetApplicationVersion();
+        ViewModel.ApplicationVersionText = $"JK Bridge {applicationVersion}";
+        ViewModel.ApplicationFooterText = $"v{applicationVersion} · Windows 11";
 
         _runtime.SnapshotChanged += RuntimeOnSnapshotChanged;
         _logger.EventWritten += LoggerOnEventWritten;
@@ -186,6 +188,8 @@ public sealed partial class AppController : IBridgeUiActions, IAsyncDisposable
                 ApplyTheme(_config.Behavior.Theme);
                 ApplySnapshot(_runtime.Snapshot);
                 RefreshDiagnostics();
+                ViewModel.ShowWelcomeTutorialIfNeeded(
+                    _config.Behavior.WelcomeTutorialCompleted);
             });
 
             if (!_config.SetupCompleted)
@@ -2382,6 +2386,32 @@ public sealed partial class AppController : IBridgeUiActions, IAsyncDisposable
         }
 
         RunOnUi(() => ApplyTheme(theme));
+    }
+
+    public async Task CompleteWelcomeTutorialAsync()
+    {
+        var saved = await SaveConfigAsync(
+            current => current with
+            {
+                Behavior = current.Behavior with
+                {
+                    WelcomeTutorialCompleted = true,
+                },
+            },
+            "教程完成状态已保存。",
+            refreshRuntime: false).ConfigureAwait(false);
+        RunOnUi(() =>
+        {
+            if (saved)
+            {
+                ViewModel.MarkWelcomeTutorialCompleted();
+            }
+            else
+            {
+                ViewModel.WelcomeTutorialFeedback =
+                    "暂时无法保存，请检查诊断信息后重试。";
+            }
+        });
     }
 
     public async Task SaveSettingsAsync(SettingsDraft settings)

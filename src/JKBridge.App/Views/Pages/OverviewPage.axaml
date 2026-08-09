@@ -14,7 +14,7 @@
                 <Grid ColumnDefinitions="*,Auto" Margin="0,0,0,24">
                     <StackPanel>
                         <TextBlock Text="本地服务桥" Classes="page-title" />
-                        <TextBlock Text="不记 IP，只连接确认过的 Linux 主机。"
+                        <TextBlock Text="日常入口：连接或断开 Linux 隧道，并确认哪些网页现在可以打开。"
                                    Classes="page-subtitle" Margin="0,4,0,0" />
                     </StackPanel>
                     <StackPanel Grid.Column="1" Orientation="Horizontal" VerticalAlignment="Center" Spacing="8">
