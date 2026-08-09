@@ -1,6 +1,6 @@
 # JK Bridge Product Specification
 
-> **Status:** v2.2.0 is the latest stable desktop release. Its supported core
+> **Status:** v2.2.1 is the latest stable desktop release. Its supported core
 > covers the Windows app, one-shot pairing, service editing/profiles,
 > Windows-local discovery, diagnostics, installer, updater, appearance, and
 > first-run guidance. Sections marked **vNext** describe the optional

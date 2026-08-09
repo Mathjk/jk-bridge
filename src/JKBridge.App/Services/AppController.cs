@@ -3320,7 +3320,7 @@ public sealed partial class AppController : IBridgeUiActions, IAsyncDisposable
 
         var version = assembly.GetName().Version;
         return version is null
-            ? "2.2.0"
+            ? "2.2.1"
             : $"{version.Major}.{version.Minor}.{Math.Max(0, version.Build)}";
     }
 

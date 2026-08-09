@@ -4,10 +4,10 @@
 > approved direction that remains in development and may move between releases
 > after security, migration, and Windows acceptance testing.
 >
-> **Version boundary:** v2.2.0 is the latest stable release.
+> **Version boundary:** v2.2.1 is the latest stable release.
 > `2.2.0-preview.1` through `2.2.0-preview.6` remain historical prereleases.
-> Stable v2.2.0 covers the desktop, one-shot pairing, service-profile, local
-> discovery, diagnostics, installer, and updater flows described below; the
+> Stable v2.2.1 covers the desktop, one-shot pairing, service-profile, local
+> discovery, diagnostics, installer, controllable updater, and setup flows described below; the
 > optional Agent/relay lifecycle remains advanced/experimental vNext work.
 
 ## V2.0 — portable public release (released)

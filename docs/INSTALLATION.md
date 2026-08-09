@@ -5,7 +5,7 @@
 This guide takes a new Windows 11 x64 client and a Linux host from an empty environment to a working JK Bridge connection. System package installation is deliberately separate from one-click pairing: JK Bridge checks dependencies but never elevates itself or changes operating-system configuration.
 
 > [!IMPORTANT]
-> These steps install stable **v2.2.0** from the unsigned per-user Windows
+> These steps install stable **v2.2.1** from the unsigned per-user Windows
 > installer or verified portable ZIP, using one-shot Linux pairing. The
 > installer, service editor, Windows-local discovery, Service Profiles,
 > first-run tutorial, and manual updater are stable desktop features. The
@@ -27,7 +27,7 @@ The email addresses used to sign in to Tailscale do not have to be identical. Bo
 
 ### Stable and optional advanced workflows
 
-| Capability | Stable v2.2.0 | Optional advanced/experimental Agent path |
+| Capability | Stable v2.2.1 | Optional advanced/experimental Agent path |
 |---|---|---|
 | Windows delivery | Unsigned per-user installer plus verified portable ZIP | Same Windows app; no separate Agent desktop build |
 | Linux setup | One-shot helper started in a terminal for each new device | No-AI Agent, user-unit assets, controlled relay helper, and Windows management client; complete lifecycle acceptance remains pending |
@@ -214,7 +214,7 @@ The last line must be `True`. Extract the ZIP to a stable folder such as one und
 
 The executable is currently unsigned. A SmartScreen warning is therefore possible. The checksum proves that the download matches the published Release asset; it does not replace normal trust in the repository and release process.
 
-Stable v2.2.0 publishes both the portable ZIP and an unsigned per-user Inno
+Stable v2.2.1 publishes both the portable ZIP and an unsigned per-user Inno
 Setup installer. Do not treat an installer built by an unrelated third party as
 an official Release. The official installer can detect Tailscale, open its
 official download page, and offer a UAC-confirmed OpenSSH Client installation;
@@ -343,15 +343,15 @@ Do not copy the old computer's private key, authorization receipt, or complete
 prevents independent revocation. A copied receipt only describes the old key's
 observed Linux authorization and cannot authorize a new key.
 
-The v2.2.0 Service Profile format and native file-picker workflow is deliberately non-secret: it may carry
+The v2.2.1 Service Profile format and native file-picker workflow is deliberately non-secret: it may carry
 service names, Windows and Linux ports, launch URLs, and health choices, but not
 private keys, pairing tokens, device credentials, server identity, or
-authorization receipts. The v2.2.0 UI can export this allow-list, validate and
+authorization receipts. The v2.2.1 UI can export this allow-list, validate and
 preview an import without mutation, and apply it only after explicit
 confirmation. Import replaces only local service definitions; a new device must
 still enroll through the Agent or complete one-shot pairing.
 
-If the old computer can no longer export a Service Profile, the v2.2.0 import
+If the old computer can no longer export a Service Profile, the v2.2.1 import
 picker also accepts an exact v2.1/schema-v3 `config.json` as a legacy source.
 It validates the complete old shape, then projects only Services into the same
 read-only preview. Server identity, tailnet identity,
@@ -363,11 +363,11 @@ handle that source as sensitive, and prefer a Service Profile when possible.
 The vNext source also contains the Agent and relay scripts, a hardened per-user
 systemd unit, an environment example, package checks, and a manual packaging
 guide. One deployed pair has completed installation, restart, discovery, and
-first-admin enrollment, but the assets have not completed login persistence,
-upgrade, rollback, uninstall, and clean-machine acceptance, so they are not stable
-installation instructions. A bounded discovery engine is present and tested:
+first-admin enrollment. Upgrade, rollback, and state-preserving uninstall are
+implemented and tested, but login persistence and clean-machine lifecycle
+acceptance remain open, so these are not stable installation instructions. A bounded discovery engine is present and tested:
 on explicit invocation it checks only known online Tailscale peers on the fixed
-Agent port and validates their node and tailnet identity. The v2.2.0 Setup page
+Agent port and validates their node and tailnet identity. The v2.2.1 Setup page
 invokes it from the advanced area only after **Discover Agent** is selected. One result is
 preselected but not copied into the endpoint field; multiple results require an
 explicit choice. In either case **Use selected address** is a separate action,

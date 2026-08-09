@@ -8,8 +8,8 @@
     <AssemblyName>JKBridge</AssemblyName>
     <Product>JK Bridge</Product>
     <Description>Securely opens Linux localhost services from Windows through Tailscale and SSH.</Description>
-    <Version>2.2.0</Version>
-    <InformationalVersion>2.2.0</InformationalVersion>
+    <Version>2.2.1</Version>
+    <InformationalVersion>2.2.1</InformationalVersion>
     <SelfContained Condition="'$(RuntimeIdentifier)' != ''">true</SelfContained>
     <PublishSingleFile Condition="'$(RuntimeIdentifier)' != ''">true</PublishSingleFile>
     <IncludeNativeLibrariesForSelfExtract Condition="'$(RuntimeIdentifier)' != ''">true</IncludeNativeLibrariesForSelfExtract>

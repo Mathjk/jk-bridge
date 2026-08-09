@@ -2,7 +2,12 @@
 
 All notable changes are documented here. The project follows semantic versioning after the first public release.
 
-## Unreleased
+## 2.2.1 - 2026-08-09
+
+This release improves update delivery, setup clarity, diagnostics, and the
+optional Linux Agent management path. One-shot Linux pairing remains the
+supported default and recovery path; the Agent remains explicitly
+advanced/experimental pending clean-machine lifecycle acceptance.
 
 ### Added
 

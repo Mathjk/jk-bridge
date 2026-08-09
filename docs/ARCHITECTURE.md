@@ -1,8 +1,7 @@
 # JK Bridge Architecture
 
-> **Release boundary:** JK Bridge v2.2.0 is the latest stable desktop release
-> and uses configuration schema V6. The current development branch adds schema
-> V7 update-network preferences and verified one-line quick pairing. The one-shot
+> **Release boundary:** JK Bridge v2.2.1 is the latest stable desktop release
+> and uses configuration schema V7. The one-shot
 > Linux helper remains the recommended setup/recovery path. Stable desktop scope includes Windows-local
 > discovery, service editing and profiles, diagnostic export, the installer,
 > manual updater, appearance persistence, categorized navigation, and the
@@ -36,7 +35,7 @@
 | Stable service migration | Native JSON export/import UI; bounded non-secret profile, read-only diff, explicit confirmation, atomic save |
 | vNext explicit relay | One exact DNS/IPv4 TCP target behind one Linux `127.0.0.1` `socat` user unit; read-only plan/probe before confirmed apply/delete |
 
-Avalonia enables Linux-hosted development and Windows cross-publishing while retaining a native tray and child-process supervision. In stable v2.2.0 the recommended Linux side remains a short script because its only persistent output is standard OpenSSH authorization. The optional vNext Agent adds a management plane; normal service traffic continues to use the same restricted OpenSSH data plane.
+Avalonia enables Linux-hosted development and Windows cross-publishing while retaining a native tray and child-process supervision. In stable v2.2.1 the recommended Linux side remains a short script because its only persistent output is standard OpenSSH authorization. The optional vNext Agent adds a management plane; normal service traffic continues to use the same restricted OpenSSH data plane.
 
 ## Repository structure
 
@@ -100,7 +99,7 @@ The original V3 configuration shape was intentionally unconfigured:
 }
 ```
 
-An unconfigured app cannot enter tunnel preflight and routes to Device setup. Stable v2.2.0 loads schema V1–V5 profiles and migrates them in memory to V6 while preserving their device and service settings. Because V1/V2 did not record what Linux actually authorized, a configured profile from either version must re-pair once before SSH starts. That pairing establishes the authorization baseline. Writes use a same-directory temporary file, flush, last-valid backup, and atomic replacement.
+An unconfigured app cannot enter tunnel preflight and routes to Device setup. Stable v2.2.1 loads schema V1–V6 profiles and migrates them in memory to V7 while preserving their device, service, and behavior settings. Because V1/V2 did not record what Linux actually authorized, a configured profile from either version must re-pair once before SSH starts. That pairing establishes the authorization baseline. Writes use a same-directory temporary file, flush, last-valid backup, and atomic replacement.
 
 ### Schema V4–V6 migration — released in v2.2.0
 
@@ -112,7 +111,7 @@ definitions. Schema V6 adds the non-secret tutorial-completion behavior flag.
 Loading any V1–V5 profile supplies safe defaults for later fields, bumps the
 schema, and otherwise preserves server, services, behavior, and authorization.
 
-### Schema V7 migration — current development branch
+### Schema V7 migration — released in v2.2.1
 
 Schema V7 adds an isolated `updateNetwork` object. Existing V1–V6 profiles
 default to Windows system-proxy mode. Manual mode stores only a loopback HTTP

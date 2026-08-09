@@ -3,7 +3,7 @@
 **简体中文** · [English](AGENT_OPERATIONS.md)
 
 > [!IMPORTANT]
-> 本文描述稳定版 v2.2.0 软件包中的可选高级/实验 Agent 流程。一次性配对仍是
+> 本文描述稳定版 v2.2.1 软件包中的可选高级/实验 Agent 流程。一次性配对仍是
 > 受支持的默认与恢复路径。每台 Windows 都必须拥有自己的 SSH 密钥和 Agent 凭据。
 
 ## 权限角色

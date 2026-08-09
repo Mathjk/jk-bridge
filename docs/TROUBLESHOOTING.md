@@ -5,7 +5,7 @@
 Work from the outside in: operating-system prerequisites, Tailscale reachability, pairing, SSH tunnel, then the Linux web service. JK Bridge can connect successfully even when one target web app is down, so keep tunnel failures and service-health failures separate.
 
 > [!NOTE]
-> Stable v2.2.0 provides both the unsigned installer and portable ZIP, plus
+> Stable v2.2.1 provides both the unsigned installer and portable ZIP, plus
 > Service Profiles, Windows-local discovery, the manual updater, and first-run
 > guidance. One-shot Linux pairing remains the supported setup/recovery path.
 > Agent controls are included for advanced testing, but do not mean the Linux
@@ -146,7 +146,7 @@ The temporary server binds only the Linux Tailscale IPv4, not the LAN or public 
 
 ## Agent enrollment is unavailable or does not complete
 
-The stable v2.2.0 app includes optional advanced Agent enrollment controls,
+The stable v2.2.1 app includes optional advanced Agent enrollment controls,
 a Linux Agent, per-user systemd packaging assets, and package checks. This path
 remains experimental and is not required for normal use. If enrollment is
 incomplete or fails, use the recommended **one-shot pairing** path instead:
@@ -161,7 +161,7 @@ Tailscale Funnel, SOCKS proxy, exit node, or subnet route. Do not weaken
 program with no AI or model API dependency; Agent downtime should affect
 management only, not an already authorized SSH tunnel.
 
-The v2.2.0 Setup page has an advanced **Discover Agent** action backed by a
+The v2.2.1 Setup page has an advanced **Discover Agent** action backed by a
 bounded, read-only discovery engine. It does not scan a subnet or enroll a
 device: it inspects only known online Tailscale peers on port `45871` and
 requires matching node, MagicDNS, tailnet, protocol, and Agent-version claims.
@@ -200,7 +200,7 @@ required.
 
 ## A Linux relay plan is blocked or apply is unavailable
 
-The stable v2.2.0 app exposes the optional experimental **Advanced: Linux
+The stable v2.2.1 app exposes the optional experimental **Advanced: Linux
 reachable target** workflow. It is not required for the normal one-shot pairing
 path. **Generate plan and probe** is read-only. It must succeed
 before the separate confirmation checkbox and apply button become available.
@@ -347,11 +347,11 @@ computer. The authorization receipt belongs to the old key, and sharing one
 private key prevents independent device revocation. Pair the new computer with
 its own key, then revoke the old fingerprint only after successful validation.
 
-The stable v2.2.0 app has a native Service Profile file picker: export writes the
+The stable v2.2.1 app has a native Service Profile file picker: export writes the
 service-only allow-list, while import first performs a read-only validation and
 change preview. Applying the preview requires a separate explicit confirmation.
 
-The v2.2.0 importer can also read an exact v2.1/schema-v3
+The v2.2.1 importer can also read an exact v2.1/schema-v3
 `config.json` as a legacy input when no Service Profile export is available. It
 validates the old document but projects only Services into the preview; the old
 server, tailnet, behavior, private-key path, authorization receipt, and device

@@ -1,7 +1,7 @@
 # JK Bridge Agent API V1 — experimental contract
 
 > **Advanced/experimental; not supported for routine deployment.** Stable
-> v2.2.0 remains on the one-shot pairing path. The current source tree contains
+> v2.2.1 keeps one-shot pairing as the supported default. The release contains
 > the working development Linux server (`scripts/jkbridge_agent.py`), bounded
 > Windows client and enrollment orchestration, schema V4 persistence, strict
 > relay companion (`scripts/jkbridge_relay.py`), tests, a reviewed systemd
@@ -11,7 +11,7 @@
 > and their fail-closed package tests are implemented, but the resulting bundle
 > has not passed clean-machine live acceptance and is not yet a stable Agent
 > Release asset. Pairing Protocol V1 remains the supported setup and recovery
-> path for stable v2.2.0.
+> path for stable v2.2.1.
 
 The companion [AGENT_THREAT_MODEL.md](AGENT_THREAT_MODEL.md) defines release
 security requirements. Passing development tests does not convert an unchecked

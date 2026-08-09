@@ -4,7 +4,7 @@
 
 > [!IMPORTANT]
 > These operations describe the optional advanced/experimental Agent workflow
-> packaged with stable v2.2.0. One-shot pairing remains the supported default
+> packaged with stable v2.2.1. One-shot pairing remains the supported default
 > and recovery path. Every Windows device
 > must have its own SSH key and Agent credential.
 

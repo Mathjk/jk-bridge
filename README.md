@@ -31,11 +31,11 @@
 </p>
 
 > [!NOTE]
-> The latest stable release is **v2.2.0**, available as an unsigned per-user
-> Windows installer and a verified portable ZIP. It adds Windows-local service
-> discovery, clearer service editing, non-secret Service Profiles, visible
-> two-stage updates, appearance fixes, categorized navigation, and a first-run
-> tutorial. The recommended Linux setup and recovery path remains the one-shot
+> The latest stable release is **v2.2.1**, available as an unsigned per-user
+> Windows installer and a verified portable ZIP. It adds controllable update
+> networking and progress, one-line Linux setup commands, Linux pending-service
+> drafts, more service templates, and a four-layer Connection Doctor. The
+> recommended Linux setup and recovery path remains the one-shot
 > `jkbridge-linux.py` helper. The optional no-AI Linux Agent and managed-relay
 > lifecycle remain advanced/experimental features; they are not required for
 > normal use.
@@ -192,7 +192,7 @@ exactly `127.0.0.1`. JK Bridge is a TCP forward: it does not rewrite redirects
 returned by the web app or make a certificate issued for another hostname valid
 for `127.0.0.1`.
 
-In stable v2.2.0, review the Windows port, Linux destination port, and loopback
+In stable v2.2.1, review the Windows port, Linux destination port, and loopback
 URL together in the Services editor. Simple mode derives the URL from protocol
 + Windows port + launch path and previews the complete mapping; advanced mode
 keeps an explicit validated loopback URL.
@@ -211,7 +211,7 @@ keeps an explicit validated loopback URL.
 
 Pairing updates only the JK Bridge-managed line in `~/.ssh/authorized_keys` and first backs up the file under `~/.ssh/jkbridge-backups/`.
 
-## v2.2.0 migration and optional experimental Agent status
+## v2.2.1 setup and optional experimental Agent status
 
 The intended Agent-first new-device flow is `sign in to Tailscale -> install JK
 Bridge -> add this computer -> synchronize services -> connect`, after a one-time
@@ -221,7 +221,7 @@ runtime dependency. SSH remains the restricted data plane, and every Windows
 computer keeps an independent key that can be revoked without affecting another
 computer.
 
-That optional Agent-first flow is **not the supported default in v2.2.0**:
+That optional Agent-first flow is **not the supported default in v2.2.1**:
 
 - a development Linux Agent, hardened user-unit/environment packaging assets,
   package checks, a sibling loopback-relay helper, and a wired Windows
@@ -247,7 +247,7 @@ That optional Agent-first flow is **not the supported default in v2.2.0**:
   `JKBA1.` setup code;
 - a bounded, read-only discovery engine exists and tests only known online
   Tailscale peers on port `45871`, checking node ID, MagicDNS identity, tailnet,
-  protocol, and Agent version. The v2.2.0 Setup page exposes this in its advanced
+  protocol, and Agent version. The v2.2.1 Setup page exposes this in its advanced
   area only after an explicit **Discover Agent** action. One result is preselected but not used;
   multiple results require a choice, and **Use selected address** is always a
   separate action. Discovery never enrolls a device, so a one-time code and an
@@ -269,7 +269,7 @@ Diagnostics now presents a four-layer **Connection Doctor** (Tailscale peer,
 SSH trust/authorization, tunnel, and service health) with a specific cause,
 next action, and contextual retry/setup/services button.
 
-The optional experimental Agent in v2.2.0 also has an administrator-only
+The optional experimental Agent in v2.2.1 also has an administrator-only
 **Linux reachable target** workflow. It first returns a read-only plan and probe, displays the
 normalized mapping and affected grants, and requires a separate confirmation
 before create/update/delete. Applying a current plan uses the packaged sibling
@@ -282,9 +282,9 @@ Windows-managed create/update/delete and clean-machine acceptance remain open.
 
 Until those release gates are complete, use the one-shot helper for every new
 Windows computer. Do not copy a private key, authorization receipt, or whole
-`config.json` between computers. The v2.2.0 Service Profile UI transfers only
+`config.json` between computers. The v2.2.1 Service Profile UI transfers only
 non-secret service choices; importing it never authorizes Linux by itself. As a
-migration fallback, the v2.2.0 importer can also validate an exact
+migration fallback, the v2.2.1 importer can also validate an exact
 v2.1/schema-v3 `config.json` and project only its Services into the same preview.
 It discards every old device, server, identity-path, tailnet, behavior, and
 authorization field; never replace the new computer's configuration with the

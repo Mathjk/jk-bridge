@@ -109,6 +109,54 @@ public sealed class GitHubReleaseUpdateServiceTests
     }
 
     [Fact]
+    public async Task Check_StableTwoTwoZeroSelectsStableTwoTwoOneInstallerPair()
+    {
+        var handler = new RecordingHandler(_ => JsonResponse(new
+        {
+            tag_name = "v2.2.1",
+            name = "JK Bridge 2.2.1",
+            html_url = "https://github.com/Mathjk/jk-bridge/releases/tag/v2.2.1",
+            draft = false,
+            prerelease = false,
+            published_at = "2026-08-09T15:00:00Z",
+            assets = new[]
+            {
+                new
+                {
+                    name = "JKBridge-Setup-win-x64-2.2.1.exe",
+                    browser_download_url =
+                        "https://github.com/Mathjk/jk-bridge/releases/download/v2.2.1/JKBridge-Setup-win-x64-2.2.1.exe",
+                },
+                new
+                {
+                    name = "JKBridge-Setup-win-x64-2.2.1.exe.sha256",
+                    browser_download_url =
+                        "https://github.com/Mathjk/jk-bridge/releases/download/v2.2.1/JKBridge-Setup-win-x64-2.2.1.exe.sha256",
+                },
+            },
+        }));
+        using var httpClient = new HttpClient(handler) { Timeout = Timeout.InfiniteTimeSpan };
+        using var service = new GitHubReleaseUpdateService(httpClient);
+
+        var result = await service.CheckAsync("2.2.0");
+
+        Assert.True(result.UpdateAvailable);
+        Assert.False(result.IsPrerelease);
+        Assert.Equal("2.2.0", result.CurrentVersion);
+        Assert.Equal("2.2.1", result.LatestVersion);
+        Assert.NotNull(result.Installer);
+        Assert.Equal(
+            "JKBridge-Setup-win-x64-2.2.1.exe",
+            result.Installer.FileName);
+        Assert.Equal(
+            "https://github.com/Mathjk/jk-bridge/releases/download/v2.2.1/JKBridge-Setup-win-x64-2.2.1.exe.sha256",
+            result.Installer.ChecksumUri.AbsoluteUri);
+        Assert.Equal(
+            GitHubReleaseUpdateService.LatestReleaseMetadataUri,
+            Assert.Single(handler.Requests).RequestUri);
+    }
+
+    [Fact]
     public async Task Check_PreviewBuildSelectsNewestOfficialPreviewWithInstallerPair()
     {
         var handler = new RecordingHandler(request => JsonResponse(new[]
