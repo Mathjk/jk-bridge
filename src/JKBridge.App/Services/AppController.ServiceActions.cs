@@ -1,3 +1,4 @@
+using System.Text;
 using JKBridge.Core.Diagnostics;
 using JKBridge.Core.Models;
 using JKBridge.Core.Routing;
@@ -50,63 +51,80 @@ public sealed partial class AppController
             service.LocalPort,
             service.RestartPath).Uri;
 
-        using var client = new HttpClient(new HttpClientHandler { UseProxy = false });
-        using var request = new HttpRequestMessage(HttpMethod.Post, restartUri);
-        if (!string.IsNullOrWhiteSpace(service.RestartToken))
-        {
-            request.Headers.Add(RestartTokenHeader, service.RestartToken.Trim());
-        }
-
-        using var timeout = new CancellationTokenSource(RestartRequestTimeout);
-        var accepted = false;
-        string? rejection = null;
+        var ownsClient = _restartHttpClient is null;
+        var client = _restartHttpClient ?? new HttpClient(new HttpClientHandler { UseProxy = false });
         try
         {
-            using var response = await client
-                .SendAsync(request, HttpCompletionOption.ResponseHeadersRead, timeout.Token)
-                .ConfigureAwait(false);
-            accepted = response.IsSuccessStatusCode;
+            using var timeout = new CancellationTokenSource(RestartRequestTimeout);
+            var accepted = false;
+            string? rejection = null;
+            using (var request = new HttpRequestMessage(HttpMethod.Post, restartUri)
+            {
+                // The Linux API requires an explicit JSON body on POST.
+                Content = new StringContent("{}", Encoding.UTF8, "application/json"),
+            })
+            {
+                if (!string.IsNullOrWhiteSpace(service.RestartToken))
+                {
+                    request.Headers.Add(RestartTokenHeader, service.RestartToken.Trim());
+                }
+
+                try
+                {
+                    using var response = await client
+                        .SendAsync(request, HttpCompletionOption.ResponseHeadersRead, timeout.Token)
+                        .ConfigureAwait(false);
+                    accepted = response.IsSuccessStatusCode;
+                    if (!accepted)
+                    {
+                        rejection = $"HTTP {(int)response.StatusCode}";
+                    }
+                }
+                catch (OperationCanceledException) when (timeout.IsCancellationRequested)
+                {
+                    // The service accepted the restart and never finished the response.
+                    accepted = true;
+                }
+                catch (HttpRequestException)
+                {
+                    // An in-place restart can drop the loopback connection before the
+                    // response body is written. Treat a transport failure as "sent".
+                    accepted = true;
+                }
+            }
+
             if (!accepted)
             {
-                rejection = $"HTTP {(int)response.StatusCode}";
+                await SafeLogAsync(
+                        DiagnosticSeverity.Warning,
+                        "Service",
+                        $"Restart rejected for {service.Name}.",
+                        rejection)
+                    .ConfigureAwait(false);
+                ShowControllerError(
+                    "重启被拒绝",
+                    $"Linux 服务没有接受重启请求（{rejection ?? "未知原因"}）。请检查重启路径和令牌是否正确。");
+                return;
+            }
+
+            await SafeLogAsync(
+                    DiagnosticSeverity.Information,
+                    "Service",
+                    $"Restart requested for {service.Name}.")
+                .ConfigureAwait(false);
+            RunOnUi(() => ViewModel.ShowNotice(
+                "重启指令已发送",
+                $"{service.Name} 正在重启；稍等片刻会自动刷新健康状态。"));
+
+            await Task.Delay(RestartSettleDelay).ConfigureAwait(false);
+            await ProbeServiceAsync(service).ConfigureAwait(false);
+        }
+        finally
+        {
+            if (ownsClient)
+            {
+                client.Dispose();
             }
         }
-        catch (OperationCanceledException) when (timeout.IsCancellationRequested)
-        {
-            // The service accepted the restart and never finished the response.
-            accepted = true;
-        }
-        catch (HttpRequestException)
-        {
-            // An in-place restart can drop the loopback connection before the
-            // response body is written. Treat a transport failure as "sent".
-            accepted = true;
-        }
-
-        if (!accepted)
-        {
-            await SafeLogAsync(
-                    DiagnosticSeverity.Warning,
-                    "Service",
-                    $"Restart rejected for {service.Name}.",
-                    rejection)
-                .ConfigureAwait(false);
-            ShowControllerError(
-                "重启被拒绝",
-                $"Linux 服务没有接受重启请求（{rejection ?? "未知原因"}）。请检查重启路径和令牌是否正确。");
-            return;
-        }
-
-        await SafeLogAsync(
-                DiagnosticSeverity.Information,
-                "Service",
-                $"Restart requested for {service.Name}.")
-            .ConfigureAwait(false);
-        RunOnUi(() => ViewModel.ShowNotice(
-            "重启指令已发送",
-            $"{service.Name} 正在重启；稍等片刻会自动刷新健康状态。"));
-
-        await Task.Delay(RestartSettleDelay).ConfigureAwait(false);
-        await ProbeServiceAsync(service).ConfigureAwait(false);
     }
 }

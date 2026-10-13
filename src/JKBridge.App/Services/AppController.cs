@@ -58,6 +58,7 @@ public sealed partial class AppController : IBridgeUiActions, IAsyncDisposable
     private readonly Func<Task> _applicationExitRequester;
     private readonly string _updateDirectory;
     private readonly StartupRegistration _startupRegistration;
+    private readonly HttpClient? _restartHttpClient;
     private readonly Func<Window?> _getWindow;
     private readonly Action<Action> _dispatchUi;
     private readonly string _logDirectory;
@@ -107,7 +108,8 @@ public sealed partial class AppController : IBridgeUiActions, IAsyncDisposable
         IReleaseUpdateChecker? releaseUpdateChecker = null,
         Action<string>? installerLauncher = null,
         IWindowsLocalServiceDiscovery? windowsLocalDiscovery = null,
-        Func<Task>? applicationExitRequester = null)
+        Func<Task>? applicationExitRequester = null,
+        HttpClient? restartHttpClient = null)
     {
         _configStore = configStore ?? throw new ArgumentNullException(nameof(configStore));
         _logger = logger ?? throw new ArgumentNullException(nameof(logger));
@@ -147,6 +149,7 @@ public sealed partial class AppController : IBridgeUiActions, IAsyncDisposable
         }
         _installerLauncher = installerLauncher ?? LaunchInstaller;
         _applicationExitRequester = applicationExitRequester ?? (() => Task.CompletedTask);
+        _restartHttpClient = restartHttpClient;
         _updateDirectory = Path.Combine(
             Path.GetDirectoryName(_logDirectory) ?? _logDirectory,
             "Updates");

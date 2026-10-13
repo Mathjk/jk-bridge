@@ -1,3 +1,4 @@
+using System.Net;
 using JKBridge.App.Platform;
 using JKBridge.App.Services;
 using JKBridge.App.ViewModels;
@@ -187,6 +188,207 @@ public sealed class ServiceRestartActionTests
         Assert.NotNull(state);
         Assert.Empty(state!.RestartPath);
         Assert.Empty(state.RestartToken);
+    }
+
+    [Fact]
+    public async Task RestartServiceAsync_SendsJsonPostWithTokenThroughTunnelPort()
+    {
+        var handler = new CapturingHandler();
+        using var client = new HttpClient(handler);
+        var directory = CreateControllerDirectory();
+        var controller = CreateController(client, directory);
+
+        try
+        {
+            var existing = controller.CurrentConfig.Services.Single(service => service.Id == "gpu-dashboard");
+            await controller.SaveServiceAsync(new ServiceUiState(
+                existing.Id,
+                "GD",
+                existing.Name,
+                existing.Description,
+                existing.OpenUrl,
+                existing.LocalPort,
+                existing.RemotePort,
+                "可用",
+                "ok",
+                existing.Enabled,
+                true,
+                false,
+                true,
+                existing.HealthKind,
+                existing.HealthPath,
+                "/api/restart",
+                "unit-test-token"));
+
+            await controller.RestartServiceAsync("gpu-dashboard");
+
+            Assert.True(handler.Called, "The restart request was never sent.");
+            Assert.Equal(HttpMethod.Post, handler.Method);
+            Assert.Equal(
+                $"http://127.0.0.1:{existing.LocalPort}/api/restart",
+                handler.RequestUri);
+            Assert.Contains("application/json", handler.ContentType ?? string.Empty, StringComparison.Ordinal);
+            Assert.Equal("{}", handler.Body);
+            Assert.Equal("unit-test-token", handler.Token);
+            Assert.Contains("重启指令已发送", controller.ViewModel.IssueTitle, StringComparison.Ordinal);
+        }
+        finally
+        {
+            await controller.DisposeAsync();
+            if (Directory.Exists(directory))
+            {
+                Directory.Delete(directory, recursive: true);
+            }
+        }
+    }
+
+    [Fact]
+    public async Task RestartServiceAsync_SurfacesRejectionWithoutClaimingSuccess()
+    {
+        var handler = new CapturingHandler(HttpStatusCode.InternalServerError);
+        using var client = new HttpClient(handler);
+        var directory = CreateControllerDirectory();
+        var controller = CreateController(client, directory);
+
+        try
+        {
+            var existing = controller.CurrentConfig.Services.Single(service => service.Id == "gpu-dashboard");
+            await controller.SaveServiceAsync(new ServiceUiState(
+                existing.Id,
+                "GD",
+                existing.Name,
+                existing.Description,
+                existing.OpenUrl,
+                existing.LocalPort,
+                existing.RemotePort,
+                "可用",
+                "ok",
+                existing.Enabled,
+                true,
+                false,
+                true,
+                existing.HealthKind,
+                existing.HealthPath,
+                "/api/restart",
+                "unit-test-token"));
+
+            await controller.RestartServiceAsync("gpu-dashboard");
+
+            Assert.True(handler.Called, "The restart request was never sent.");
+            Assert.Contains("重启被拒绝", controller.ViewModel.IssueTitle, StringComparison.Ordinal);
+        }
+        finally
+        {
+            await controller.DisposeAsync();
+            if (Directory.Exists(directory))
+            {
+                Directory.Delete(directory, recursive: true);
+            }
+        }
+    }
+
+    [Fact]
+    public async Task RestartServiceAsync_DoesNothingWithoutConfiguredAction()
+    {
+        var handler = new CapturingHandler();
+        using var client = new HttpClient(handler);
+        var directory = CreateControllerDirectory();
+        var controller = CreateController(client, directory);
+
+        try
+        {
+            await controller.RestartServiceAsync("overleaf");
+
+            Assert.False(handler.Called);
+        }
+        finally
+        {
+            await controller.DisposeAsync();
+            if (Directory.Exists(directory))
+            {
+                Directory.Delete(directory, recursive: true);
+            }
+        }
+    }
+
+    private static string CreateControllerDirectory()
+    {
+        var directory = Path.Combine(
+            Path.GetTempPath(),
+            $"jkbridge-restart-http-{Guid.NewGuid():N}");
+        Directory.CreateDirectory(directory);
+        return directory;
+    }
+
+    private static AppController CreateController(HttpClient client, string directory) =>
+        new(
+            new ConfigStore(Path.Combine(directory, "config.json")),
+            new RollingFileLogger(Path.Combine(directory, "logs")),
+            new ConnectedRuntime(),
+            new FakePairingService(),
+            new StartupRegistration($"JK Bridge Test {Guid.NewGuid():N}"),
+            Path.Combine(directory, "logs"),
+            () => null,
+            dispatchUi: action => action(),
+            restartHttpClient: client);
+
+    private sealed class CapturingHandler(HttpStatusCode status = HttpStatusCode.OK) : HttpMessageHandler
+    {
+        public bool Called { get; private set; }
+
+        public HttpMethod? Method { get; private set; }
+
+        public string? RequestUri { get; private set; }
+
+        public string? ContentType { get; private set; }
+
+        public string? Body { get; private set; }
+
+        public string? Token { get; private set; }
+
+        protected override async Task<HttpResponseMessage> SendAsync(
+            HttpRequestMessage request,
+            CancellationToken cancellationToken)
+        {
+            Called = true;
+            Method = request.Method;
+            RequestUri = request.RequestUri?.AbsoluteUri;
+            ContentType = request.Content?.Headers.ContentType?.ToString();
+            Body = request.Content is null ? null : await request.Content.ReadAsStringAsync(cancellationToken);
+            Token = request.Headers.TryGetValues("X-JKBridge-Restart-Token", out var values)
+                ? values.Single()
+                : null;
+            return new HttpResponseMessage(status);
+        }
+    }
+
+    private sealed class ConnectedRuntime : IBridgeRuntime
+    {
+        public event EventHandler<TunnelSnapshot>? SnapshotChanged
+        {
+            add { }
+            remove { }
+        }
+
+        public TunnelSnapshot Snapshot { get; } = new(
+            TunnelPhase.Connected,
+            DesiredConnected: true,
+            "Connected.",
+            DateTimeOffset.Now,
+            [new ServiceSnapshot("gpu-dashboard", "GPU Dashboard", ServicePhase.Available)]);
+
+        public Task StartAsync(AppConfig config, CancellationToken cancellationToken = default) =>
+            Task.CompletedTask;
+
+        public Task StopAsync(CancellationToken cancellationToken = default) => Task.CompletedTask;
+
+        public Task RestartAsync(AppConfig config, CancellationToken cancellationToken = default) =>
+            Task.CompletedTask;
+
+        public Task RefreshAsync(AppConfig config, CancellationToken cancellationToken = default) =>
+            Task.CompletedTask;
+
+        public ValueTask DisposeAsync() => ValueTask.CompletedTask;
     }
 
     private static ServiceCardViewModel CreateDraft(string restartPath, string restartToken)
