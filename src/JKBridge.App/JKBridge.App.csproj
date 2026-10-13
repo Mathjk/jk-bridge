@@ -9,7 +9,7 @@
     <Product>JK Bridge</Product>
     <Description>Securely opens Linux localhost services from Windows through Tailscale and SSH.</Description>
     <Version>2.3.0</Version>
-    <InformationalVersion>2.2.1</InformationalVersion>
+    <InformationalVersion>2.3.0</InformationalVersion>
     <SelfContained Condition="'$(RuntimeIdentifier)' != ''">true</SelfContained>
     <PublishSingleFile Condition="'$(RuntimeIdentifier)' != ''">true</PublishSingleFile>
     <IncludeNativeLibrariesForSelfExtract Condition="'$(RuntimeIdentifier)' != ''">true</IncludeNativeLibrariesForSelfExtract>
