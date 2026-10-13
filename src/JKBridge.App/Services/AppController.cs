@@ -2647,6 +2647,8 @@ public sealed partial class AppController : IBridgeUiActions, IAsyncDisposable
                         HealthPath = state.HealthPath.Trim(),
                         HealthKind = state.HealthKind,
                         Enabled = state.IsEnabled,
+                        RestartPath = state.RestartPath.Trim(),
+                        RestartToken = state.RestartToken.Trim(),
                     };
                     return current with
                     {
@@ -3691,7 +3693,9 @@ public sealed partial class AppController : IBridgeUiActions, IAsyncDisposable
             warning,
             snapshot.CanOpen,
             service.HealthKind,
-            service.HealthPath);
+            service.HealthPath,
+            service.RestartPath,
+            service.RestartToken);
     }
 
     /// <summary>

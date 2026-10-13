@@ -47,4 +47,10 @@ public sealed record ServiceProfileEntry
     public string HealthPath { get; init; } = "/";
 
     public HealthCheckKind HealthKind { get; init; } = HealthCheckKind.HttpStatus;
+
+    /// <summary>
+    /// Non-secret restart action path. The restart token is deliberately excluded
+    /// from the portable profile and must be entered on each installation.
+    /// </summary>
+    public string RestartPath { get; init; } = string.Empty;
 }

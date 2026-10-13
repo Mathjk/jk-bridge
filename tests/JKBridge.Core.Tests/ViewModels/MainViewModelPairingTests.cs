@@ -427,6 +427,7 @@ public sealed class MainViewModelPairingTests
         public Task RetryAsync() => Task.CompletedTask;
         public Task OpenServiceAsync(string serviceId, string localUrl) => Task.CompletedTask;
         public Task RetryServiceAsync(string serviceId) => Task.CompletedTask;
+        public Task RestartServiceAsync(string serviceId) => Task.CompletedTask;
         public Task CopyAddressAsync(string localUrl) => Task.CompletedTask;
         public Task SetServiceEnabledAsync(string serviceId, bool enabled) => Task.CompletedTask;
         public Task AddServiceAsync() => Task.CompletedTask;

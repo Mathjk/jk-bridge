@@ -124,6 +124,7 @@ internal static class ServiceProfileMapping
         OpenUrl = service.OpenUrl,
         HealthPath = service.HealthPath,
         HealthKind = service.HealthKind,
+        RestartPath = service.RestartPath,
     };
 
     public static ServiceDefinition ToServiceDefinition(ServiceProfileEntry entry) => new()
@@ -140,5 +141,6 @@ internal static class ServiceProfileMapping
         OpenUrl = entry.OpenUrl,
         HealthPath = entry.HealthPath,
         HealthKind = entry.HealthKind,
+        RestartPath = entry.RestartPath,
     };
 }

@@ -128,6 +128,13 @@ internal sealed record LegacyServiceDefinitionV3
 
     public required HealthCheckKind HealthKind { get; init; }
 
+    // Optional forward-compatible fields: a v2.1 document never contains them,
+    // but a newer configuration dropped into the legacy import path keeps its
+    // restart action instead of failing or silently dropping it.
+    public string RestartPath { get; init; } = string.Empty;
+
+    public string RestartToken { get; init; } = string.Empty;
+
     public ServiceDefinition ToCurrent() => new()
     {
         Id = Id,
@@ -142,5 +149,7 @@ internal sealed record LegacyServiceDefinitionV3
         OpenUrl = OpenUrl,
         HealthPath = HealthPath,
         HealthKind = HealthKind,
+        RestartPath = RestartPath,
+        RestartToken = RestartToken,
     };
 }

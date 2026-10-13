@@ -1136,6 +1136,7 @@ public partial class MainViewModel : ViewModelBase
                 state,
                 service => _actions.OpenServiceAsync(service.Id, service.LocalUrl),
                 service => _actions.RetryServiceAsync(service.Id),
+                service => _actions.RestartServiceAsync(service.Id),
                 service => _actions.CopyAddressAsync(service.LocalUrl),
                 (service, enabled) => SaveServiceDraftAsync(service),
                 SaveServiceDraftAsync,

@@ -163,12 +163,16 @@
                                         <TextBlock Text="{Binding LocalUrl}" Classes="technical-strong" TextTrimming="CharacterEllipsis" />
                                         <TextBlock Text="{Binding HealthDetail}" Classes="caption" Margin="0,3,0,0" />
                                     </StackPanel>
-                                    <Grid Grid.Row="2" ColumnDefinitions="*,Auto,8,Auto">
+                                    <Grid Grid.Row="2" ColumnDefinitions="*,Auto,8,Auto,8,Auto">
                                         <Button Content="复制地址" Classes="ghost" HorizontalAlignment="Left"
                                                 Command="{Binding CopyAddressCommand}" />
                                         <Button Grid.Column="1" Content="检查" Classes="ghost"
                                                 Command="{Binding RetryCommand}" />
-                                        <Button Grid.Column="3" Content="打开 ↗" Classes="primary service-open"
+                                        <Button Grid.Column="3" Content="重启" Classes="ghost"
+                                                Command="{Binding RestartCommand}"
+                                                IsVisible="{Binding HasRestartAction}"
+                                                AutomationProperties.Name="重启服务" />
+                                        <Button Grid.Column="5" Content="打开 ↗" Classes="primary service-open"
                                                 Command="{Binding OpenCommand}"
                                                 IsEnabled="{Binding CanOpen}"
                                                 AutomationProperties.Name="打开服务" />

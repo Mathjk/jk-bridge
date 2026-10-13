@@ -2,6 +2,29 @@
 
 All notable changes are documented here. The project follows semantic versioning after the first public release.
 
+## 2.3.0 - 2026-10-13
+
+This release adds an optional per-service restart action. The Linux service
+owns the restart itself; JK Bridge only POSTs to a configured loopback path
+through the existing SSH tunnel. SSH grants, the pairing protocol, and the
+loopback-only security model are unchanged.
+
+### Added
+
+- Added an optional per-service restart action configured in the advanced
+  section of the Services editor: a safe single-slash restart path plus an
+  optional shared token. The Overview and Services pages show a restart
+  button only for services with a valid restart path.
+- Added a restart request sent through the existing SSH tunnel to
+  `127.0.0.1:<Windows port><restart path>`, carrying the token in the
+  `X-JKBridge-Restart-Token` header. A transport failure during an in-place
+  restart is treated as "sent"; the service health check runs again after a
+  short settle delay.
+- Added restart-path support to the portable service profile. The restart
+  token is deliberately excluded from the profile and must be entered on
+  each installation.
+- The default GPU Dashboard service now carries the `/api/restart` path.
+
 ## 2.2.1 - 2026-08-09
 
 This release improves update delivery, setup clarity, diagnostics, and the

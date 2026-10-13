@@ -496,8 +496,50 @@ public static class ConfigValidator
                     "service.invalidHealthKind",
                     "Health-check kind is invalid."));
             }
+
+            ValidateServiceRestartAction(service, path, issues);
         }
     }
+
+    private static void ValidateServiceRestartAction(
+        ServiceDefinition service,
+        string path,
+        ICollection<ConfigValidationIssue> issues)
+    {
+        if (string.IsNullOrWhiteSpace(service.RestartPath))
+        {
+            if (!string.IsNullOrWhiteSpace(service.RestartToken))
+            {
+                issues.Add(new(
+                    $"{path}.restartToken",
+                    "service.restartTokenWithoutPath",
+                    "A restart token requires a restart path."));
+            }
+
+            return;
+        }
+
+        if (!IsSafeRestartPath(service.RestartPath))
+        {
+            issues.Add(new(
+                $"{path}.restartPath",
+                "service.invalidRestartPath",
+                "Restart path must be a single-slash relative path without #, backslash, query or control characters."));
+        }
+
+        ValidateOptionalText(service.RestartToken, $"{path}.restartToken", 256, issues);
+    }
+
+    private static bool IsSafeRestartPath(string? path) =>
+        !string.IsNullOrWhiteSpace(path) &&
+        path.Length <= 2048 &&
+        path.StartsWith("/", StringComparison.Ordinal) &&
+        !path.StartsWith("//", StringComparison.Ordinal) &&
+        !path.Contains('#') &&
+        !path.Contains('\\') &&
+        !path.Contains('?') &&
+        !path.Any(char.IsControl) &&
+        Uri.IsWellFormedUriString(path, UriKind.Relative);
 
     private static void ValidateWindowsLocalServices(
         List<WindowsLocalServiceDefinition>? localServices,

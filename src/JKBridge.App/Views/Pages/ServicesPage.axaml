@@ -115,11 +115,14 @@
                                                        Classes.warning="{Binding HasWarning}" />
                                         </Border>
                                         <Grid Grid.Row="1" Grid.Column="1" Grid.ColumnSpan="2"
-                                              ColumnDefinitions="*,Auto,Auto" Margin="12,10,0,0">
+                                              ColumnDefinitions="*,Auto,Auto,Auto" Margin="12,10,0,0">
                                             <TextBlock Text="{Binding BrowserUrlPreview}" Classes="caption"
                                                        VerticalAlignment="Center" TextTrimming="CharacterEllipsis" />
                                             <Button Grid.Column="1" Content="检查" Classes="ghost" Command="{Binding RetryCommand}" />
-                                            <Button Grid.Column="2" Content="打开 ↗" Classes="ghost" Command="{Binding OpenCommand}"
+                                            <Button Grid.Column="2" Content="重启" Classes="ghost"
+                                                    Command="{Binding RestartCommand}"
+                                                    IsVisible="{Binding HasRestartAction}" />
+                                            <Button Grid.Column="3" Content="打开 ↗" Classes="ghost" Command="{Binding OpenCommand}"
                                                     IsEnabled="{Binding CanOpen}" />
                                         </Grid>
                                     </Grid>
@@ -297,6 +300,25 @@
                                          IsEnabled="{Binding UseCustomHealthPath}" Margin="0,7,0,0"
                                          PlaceholderText="例如 /api/health" />
                                 <TextBlock Text="{Binding HealthPathValidationHint}"
+                                           Classes="caption" Margin="0,5,0,0" TextWrapping="Wrap" />
+
+                                <Grid ColumnDefinitions="*,Auto" Margin="0,14,0,0">
+                                    <StackPanel>
+                                        <TextBlock Text="重启操作" Classes="body-strong" />
+                                        <TextBlock Text="开启后服务卡片显示重启按钮；请求经现有隧道 POST 到该路径"
+                                                   Classes="caption" TextWrapping="Wrap" />
+                                    </StackPanel>
+                                    <ToggleSwitch Grid.Column="1" IsChecked="{Binding UseRestartAction}"
+                                                  VerticalAlignment="Center" />
+                                </Grid>
+                                <TextBox Text="{Binding RestartPathText}" Classes="field technical"
+                                         IsEnabled="{Binding UseRestartAction}" Margin="0,7,0,0"
+                                         PlaceholderText="例如 /api/restart" />
+                                <TextBlock Text="重启令牌" Classes="body-strong" Margin="0,10,0,6" />
+                                <TextBox Text="{Binding RestartTokenText}" Classes="field technical"
+                                         IsEnabled="{Binding UseRestartAction}" PasswordChar="•"
+                                         PlaceholderText="可留空；Linux 服务未校验令牌时无需填写" />
+                                <TextBlock Text="{Binding RestartActionHint}"
                                            Classes="caption" Margin="0,5,0,0" TextWrapping="Wrap" />
 
                                 <TextBlock Text="健康检查方式" Classes="body-strong" Margin="0,14,0,6" />

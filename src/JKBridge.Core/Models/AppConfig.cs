@@ -59,6 +59,7 @@ public sealed record AppConfig
             OpenUrl = "http://127.0.0.1:8765/",
             HealthPath = "/api/health",
             HealthKind = HealthCheckKind.JsonOk,
+            RestartPath = "/api/restart",
         },
         new()
         {
@@ -182,6 +183,22 @@ public sealed record ServiceDefinition
     public string HealthPath { get; init; } = "/";
 
     public HealthCheckKind HealthKind { get; init; } = HealthCheckKind.HttpStatus;
+
+    /// <summary>
+    /// Optional loopback-only restart action. When set, the desktop shows a restart
+    /// button that POSTs to this path on the Windows-local tunnel port. The path is
+    /// not a secret and may travel in a portable service profile; the token never does.
+    /// </summary>
+    public string RestartPath { get; init; } = string.Empty;
+
+    /// <summary>
+    /// Shared secret sent as the X-JKBridge-Restart-Token header. Stays in this
+    /// installation's config only.
+    /// </summary>
+    public string RestartToken { get; init; } = string.Empty;
+
+    [JsonIgnore(Condition = JsonIgnoreCondition.Always)]
+    public bool HasRestartAction => !string.IsNullOrWhiteSpace(RestartPath);
 }
 
 public enum ThemePreference

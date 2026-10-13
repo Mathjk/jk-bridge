@@ -10,6 +10,7 @@ public partial class ServiceCardViewModel : ViewModelBase
 {
     private readonly Func<ServiceCardViewModel, Task> _open;
     private readonly Func<ServiceCardViewModel, Task> _retry;
+    private readonly Func<ServiceCardViewModel, Task> _restart;
     private readonly Func<ServiceCardViewModel, Task> _copy;
     private readonly Func<ServiceCardViewModel, bool, Task> _setEnabled;
     private readonly Func<ServiceCardViewModel, Task> _save;
@@ -41,6 +42,9 @@ public partial class ServiceCardViewModel : ViewModelBase
     [ObservableProperty] private bool _useCustomUrl;
     [ObservableProperty] private string _healthPathText;
     [ObservableProperty] private bool _useCustomHealthPath;
+    [ObservableProperty] private string _restartPathText;
+    [ObservableProperty] private string _restartTokenText;
+    [ObservableProperty] private bool _useRestartAction;
     [ObservableProperty] private ServiceTemplateOptionViewModel? _selectedTemplate;
     [ObservableProperty] private bool _templateApplyConfirmed;
     [ObservableProperty] private string _templateApplyFeedback = "选择模板只会显示预览；确认并点击应用后才会改动当前草稿。";
@@ -55,6 +59,7 @@ public partial class ServiceCardViewModel : ViewModelBase
         ServiceUiState state,
         Func<ServiceCardViewModel, Task> open,
         Func<ServiceCardViewModel, Task> retry,
+        Func<ServiceCardViewModel, Task> restart,
         Func<ServiceCardViewModel, Task> copy,
         Func<ServiceCardViewModel, bool, Task> setEnabled,
         Func<ServiceCardViewModel, Task> save,
@@ -101,8 +106,13 @@ public partial class ServiceCardViewModel : ViewModelBase
             derivedHealthPath,
             StringComparison.Ordinal);
 
+        _restartPathText = state.RestartPath;
+        _restartTokenText = state.RestartToken;
+        _useRestartAction = !string.IsNullOrWhiteSpace(state.RestartPath);
+
         _open = open;
         _retry = retry;
+        _restart = restart;
         _copy = copy;
         _setEnabled = setEnabled;
         _save = save;
@@ -187,6 +197,18 @@ public partial class ServiceCardViewModel : ViewModelBase
     partial void OnHealthPathTextChanged(string value) =>
         OnPropertyChanged(nameof(HealthPathValidationHint));
 
+    partial void OnUseRestartActionChanged(bool value)
+    {
+        OnPropertyChanged(nameof(HasRestartAction));
+        OnPropertyChanged(nameof(RestartActionHint));
+    }
+
+    partial void OnRestartPathTextChanged(string value)
+    {
+        OnPropertyChanged(nameof(HasRestartAction));
+        OnPropertyChanged(nameof(RestartActionHint));
+    }
+
     partial void OnUseCustomHealthPathChanged(bool value)
     {
         OnPropertyChanged(nameof(UsesDerivedHealthPath));
@@ -224,6 +246,9 @@ public partial class ServiceCardViewModel : ViewModelBase
 
     [RelayCommand]
     private Task RetryAsync() => _retry(this);
+
+    [RelayCommand]
+    private Task RestartAsync() => _restart(this);
 
     [RelayCommand]
     private Task CopyAddressAsync() => _copy(this);
@@ -356,6 +381,35 @@ public partial class ServiceCardViewModel : ViewModelBase
             : "默认跟随打开网址的路径；URL 查询参数和 # 后的片段不会参与健康检查。"
         : "健康路径必须以单个 / 开头，不能包含 #、反斜杠或控制字符。";
 
+    /// <summary>
+    /// Drives the restart button. Only a safe single-slash path enables the action;
+    /// the token stays optional so services may rely on the loopback boundary.
+    /// </summary>
+    public bool HasRestartAction => UseRestartAction && IsSafeRestartPath(RestartPathText);
+
+    public string RestartActionHint
+    {
+        get
+        {
+            if (!UseRestartAction)
+            {
+                return "关闭时不显示重启按钮，已有的路径和令牌会保留在配置中。";
+            }
+
+            if (!IsSafeRestartPath(RestartPathText))
+            {
+                return "重启路径必须以单个 / 开头，不能包含 #、反斜杠、查询参数或控制字符。";
+            }
+
+            return string.IsNullOrWhiteSpace(RestartTokenText)
+                ? "未设置令牌：任何能访问该 Windows 端口的程序都可以触发重启。"
+                : "重启请求会经现有隧道 POST 到该路径，并携带令牌头。";
+        }
+    }
+
+    private static bool IsSafeRestartPath(string? path) =>
+        IsSafeHealthPath(path) && !path!.Contains('?');
+
     public string HealthModeExplanation => HealthModeIndex switch
     {
         0 => "TCP 端口：只确认连接能够建立；适合自签名证书、SNI 不匹配或非 HTTP 服务。",
@@ -447,10 +501,32 @@ public partial class ServiceCardViewModel : ViewModelBase
             return false;
         }
 
+        var restartPath = RestartPathText.Trim();
+        var restartToken = RestartTokenText.Trim();
+        if (UseRestartAction)
+        {
+            if (!IsSafeRestartPath(restartPath))
+            {
+                error = "重启路径必须以单个 / 开头，不能包含 #、反斜杠、查询参数或控制字符。";
+                return false;
+            }
+
+            if (restartToken.Length > 256 || restartToken.Any(char.IsControl))
+            {
+                error = "重启令牌最多 256 个字符，且不能包含控制字符。";
+                return false;
+            }
+        }
+        else
+        {
+            restartPath = string.Empty;
+            restartToken = string.Empty;
+        }
+
         state = new ServiceUiState(
             Id, ShortCode, Name, Description, LocalUrl.Trim(), localPort, remotePort,
             Status, HealthDetail, IsEnabled, IsAvailable, HasWarning, CanOpen,
-            FromHealthModeIndex(HealthModeIndex), HealthPathText.Trim());
+            FromHealthModeIndex(HealthModeIndex), HealthPathText.Trim(), restartPath, restartToken);
         error = string.Empty;
         return true;
     }
