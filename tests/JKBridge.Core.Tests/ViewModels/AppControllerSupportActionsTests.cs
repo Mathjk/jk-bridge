@@ -57,9 +57,9 @@ public sealed class AppControllerSupportActionsTests
             await controller.CheckForUpdatesAsync();
 
             Assert.Equal(1, updateChecker.Calls);
-            Assert.Equal("2.3.0", updateChecker.CurrentVersion);
-            Assert.Equal("JK Bridge 2.3.0", controller.ViewModel.ApplicationVersionText);
-            Assert.Equal("v2.3.0 · Windows 11", controller.ViewModel.ApplicationFooterText);
+            Assert.Equal("2.3.1", updateChecker.CurrentVersion);
+            Assert.Equal("JK Bridge 2.3.1", controller.ViewModel.ApplicationVersionText);
+            Assert.Equal("v2.3.1 · Windows 11", controller.ViewModel.ApplicationFooterText);
             Assert.True(controller.ViewModel.HasUpdateReleaseInfo);
             Assert.Equal(
                 "https://github.com/Mathjk/jk-bridge/releases/tag/v2.3.0",

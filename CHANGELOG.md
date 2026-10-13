@@ -2,6 +2,22 @@
 
 All notable changes are documented here. The project follows semantic versioning after the first public release.
 
+## 2.3.1 - 2026-10-13
+
+This release generalizes the restart action so one shared Linux control
+endpoint can restart every configured service. The tunnel, pairing, and
+loopback-only security model are unchanged.
+
+### Added
+
+- Added an optional restart port per service. When set, the restart request
+  targets that Windows-local port instead of the service's own port, so a
+  single control endpoint behind one existing tunnel can serve many service
+  cards. Validation requires the port to match another configured service's
+  local port, guaranteeing the request travels through an existing tunnel.
+- The restart editor now exposes the port next to the path and token, and the
+  hint explains which tunnel the request uses.
+
 ## 2.3.0 - 2026-10-13
 
 This release adds an optional per-service restart action. The Linux service
