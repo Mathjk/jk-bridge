@@ -53,4 +53,9 @@ public sealed record ServiceProfileEntry
     /// from the portable profile and must be entered on each installation.
     /// </summary>
     public string RestartPath { get; init; } = string.Empty;
+
+    /// <summary>
+    /// Windows-local port the restart request targets; 0 reuses the service port.
+    /// </summary>
+    public int RestartLocalPort { get; init; }
 }

@@ -442,6 +442,10 @@ public static class ConfigValidator
 
         var ids = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
         var localPorts = new HashSet<int>();
+        var tunnelPorts = services
+            .Where(service => service is not null && service.LocalPort is >= 1 and <= 65535)
+            .Select(service => service!.LocalPort)
+            .ToHashSet();
 
         for (var index = 0; index < services.Count; index++)
         {
@@ -497,14 +501,15 @@ public static class ConfigValidator
                     "Health-check kind is invalid."));
             }
 
-            ValidateServiceRestartAction(service, path, issues);
+            ValidateServiceRestartAction(service, path, issues, tunnelPorts);
         }
     }
 
     private static void ValidateServiceRestartAction(
         ServiceDefinition service,
         string path,
-        ICollection<ConfigValidationIssue> issues)
+        ICollection<ConfigValidationIssue> issues,
+        IReadOnlyCollection<int> tunnelPorts)
     {
         if (string.IsNullOrWhiteSpace(service.RestartPath))
         {
@@ -525,6 +530,23 @@ public static class ConfigValidator
                 $"{path}.restartPath",
                 "service.invalidRestartPath",
                 "Restart path must be a single-slash relative path without #, backslash, query or control characters."));
+        }
+
+        if (service.RestartLocalPort is < 0 or > 65535)
+        {
+            issues.Add(new(
+                $"{path}.restartLocalPort",
+                "service.invalidRestartLocalPort",
+                "Restart port must be 0 (reuse the service port) or between 1 and 65535."));
+        }
+        else if (service.RestartLocalPort != 0 &&
+                 service.RestartLocalPort != service.LocalPort &&
+                 !tunnelPorts.Contains(service.RestartLocalPort))
+        {
+            issues.Add(new(
+                $"{path}.restartLocalPort",
+                "service.restartPortWithoutTunnel",
+                "Restart port must match a configured service's Windows local port so an SSH tunnel already exists."));
         }
 
         ValidateOptionalText(service.RestartToken, $"{path}.restartToken", 256, issues);

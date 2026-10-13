@@ -125,6 +125,7 @@ internal static class ServiceProfileMapping
         HealthPath = service.HealthPath,
         HealthKind = service.HealthKind,
         RestartPath = service.RestartPath,
+        RestartLocalPort = service.RestartLocalPort,
     };
 
     public static ServiceDefinition ToServiceDefinition(ServiceProfileEntry entry) => new()
@@ -142,5 +143,6 @@ internal static class ServiceProfileMapping
         HealthPath = entry.HealthPath,
         HealthKind = entry.HealthKind,
         RestartPath = entry.RestartPath,
+        RestartLocalPort = entry.RestartLocalPort,
     };
 }

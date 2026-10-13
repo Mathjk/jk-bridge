@@ -311,6 +311,83 @@ public sealed class ServiceRestartActionTests
         }
     }
 
+    [Fact]
+    public void Validate_AcceptsRestartPortThatMatchesAnExistingTunnel()
+    {
+        var config = Configured("/api/restart/investment-news", "unit-test-token", restartLocalPort: 8765);
+
+        var result = ConfigValidator.Validate(config);
+
+        Assert.True(result.IsValid, string.Join(Environment.NewLine, result.Issues));
+    }
+
+    [Fact]
+    public void Validate_RejectsRestartPortWithoutMatchingTunnel()
+    {
+        var config = Configured("/api/restart/investment-news", "unit-test-token", restartLocalPort: 9123);
+
+        var result = ConfigValidator.Validate(config);
+
+        AssertIssue(result, "service.restartPortWithoutTunnel", "services[1].restartLocalPort");
+    }
+
+    [Fact]
+    public void Validate_RejectsOutOfRangeRestartPort()
+    {
+        var config = Configured("/api/restart", "unit-test-token", restartLocalPort: 70000);
+
+        var result = ConfigValidator.Validate(config);
+
+        AssertIssue(result, "service.invalidRestartLocalPort", "services[1].restartLocalPort");
+    }
+
+    [Fact]
+    public async Task RestartServiceAsync_TargetsSharedControlPortWhenConfigured()
+    {
+        var handler = new CapturingHandler();
+        using var client = new HttpClient(handler);
+        var directory = CreateControllerDirectory();
+        var controller = CreateController(client, directory);
+
+        try
+        {
+            var existing = controller.CurrentConfig.Services.Single(service => service.Id == "investment-news");
+            await controller.SaveServiceAsync(new ServiceUiState(
+                existing.Id,
+                "IN",
+                existing.Name,
+                existing.Description,
+                existing.OpenUrl,
+                existing.LocalPort,
+                existing.RemotePort,
+                "可用",
+                "ok",
+                existing.Enabled,
+                true,
+                false,
+                true,
+                existing.HealthKind,
+                existing.HealthPath,
+                "/api/restart/investment-news",
+                "unit-test-token",
+                RestartLocalPort: 8765));
+
+            await controller.RestartServiceAsync("investment-news");
+
+            Assert.True(handler.Called, "The restart request was never sent.");
+            Assert.Equal("http://127.0.0.1:8765/api/restart/investment-news", handler.RequestUri);
+            Assert.Equal("unit-test-token", handler.Token);
+        }
+        finally
+        {
+            await controller.DisposeAsync();
+            if (Directory.Exists(directory))
+            {
+                Directory.Delete(directory, recursive: true);
+            }
+        }
+    }
+
     private static string CreateControllerDirectory()
     {
         var directory = Path.Combine(
@@ -375,7 +452,10 @@ public sealed class ServiceRestartActionTests
             DesiredConnected: true,
             "Connected.",
             DateTimeOffset.Now,
-            [new ServiceSnapshot("gpu-dashboard", "GPU Dashboard", ServicePhase.Available)]);
+            [
+                new ServiceSnapshot("gpu-dashboard", "GPU Dashboard", ServicePhase.Available),
+                new ServiceSnapshot("investment-news", "Investment News", ServicePhase.Available),
+            ]);
 
         public Task StartAsync(AppConfig config, CancellationToken cancellationToken = default) =>
             Task.CompletedTask;
@@ -422,14 +502,22 @@ public sealed class ServiceRestartActionTests
             _ => Task.CompletedTask);
     }
 
-    private static AppConfig Configured(string restartPath, string restartToken) =>
+    private static AppConfig Configured(
+        string restartPath,
+        string restartToken,
+        int restartLocalPort = 0) =>
         AppConfig.CreateDefault() with
         {
             Services =
             [
                 .. AppConfig.CreateDefault().Services.Select(service =>
                     service.Id == "gpu-dashboard"
-                        ? service with { RestartPath = restartPath, RestartToken = restartToken }
+                        ? service with
+                        {
+                            RestartPath = restartPath,
+                            RestartToken = restartToken,
+                            RestartLocalPort = restartLocalPort,
+                        }
                         : service with { }),
             ],
         };

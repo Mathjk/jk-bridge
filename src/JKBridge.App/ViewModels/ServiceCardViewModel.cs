@@ -44,6 +44,7 @@ public partial class ServiceCardViewModel : ViewModelBase
     [ObservableProperty] private bool _useCustomHealthPath;
     [ObservableProperty] private string _restartPathText;
     [ObservableProperty] private string _restartTokenText;
+    [ObservableProperty] private string _restartLocalPortText;
     [ObservableProperty] private bool _useRestartAction;
     [ObservableProperty] private ServiceTemplateOptionViewModel? _selectedTemplate;
     [ObservableProperty] private bool _templateApplyConfirmed;
@@ -108,6 +109,9 @@ public partial class ServiceCardViewModel : ViewModelBase
 
         _restartPathText = state.RestartPath;
         _restartTokenText = state.RestartToken;
+        _restartLocalPortText = state.RestartLocalPort == 0
+            ? string.Empty
+            : state.RestartLocalPort.ToString(System.Globalization.CultureInfo.InvariantCulture);
         _useRestartAction = !string.IsNullOrWhiteSpace(state.RestartPath);
 
         _open = open;
@@ -208,6 +212,9 @@ public partial class ServiceCardViewModel : ViewModelBase
         OnPropertyChanged(nameof(HasRestartAction));
         OnPropertyChanged(nameof(RestartActionHint));
     }
+
+    partial void OnRestartLocalPortTextChanged(string value) =>
+        OnPropertyChanged(nameof(RestartActionHint));
 
     partial void OnUseCustomHealthPathChanged(bool value)
     {
@@ -401,11 +408,21 @@ public partial class ServiceCardViewModel : ViewModelBase
                 return "重启路径必须以单个 / 开头，不能包含 #、反斜杠、查询参数或控制字符。";
             }
 
+            var portHint = string.IsNullOrWhiteSpace(RestartLocalPortText) || RestartLocalPortText == LocalPortText
+                ? $"请求发送到本机端口 {LocalPortText}（当前服务的隧道）。"
+                : $"请求发送到本机端口 {RestartLocalPortText}（另一个已有隧道的端口，用于共享重启控制端）。";
+
             return string.IsNullOrWhiteSpace(RestartTokenText)
-                ? "未设置令牌：任何能访问该 Windows 端口的程序都可以触发重启。"
-                : "重启请求会经现有隧道 POST 到该路径，并携带令牌头。";
+                ? $"未设置令牌：任何能访问该 Windows 端口的程序都可以触发重启。{portHint}"
+                : $"重启请求会经现有隧道 POST 到该路径，并携带令牌头。{portHint}";
         }
     }
+
+    /// <summary>
+    /// Effective Windows-local port for the restart request; 0 reuses the service port.
+    /// </summary>
+    public int EffectiveRestartLocalPort =>
+        int.TryParse(RestartLocalPortText, out var port) && port is >= 1 and <= 65535 ? port : 0;
 
     private static bool IsSafeRestartPath(string? path) =>
         IsSafeHealthPath(path) && !path!.Contains('?');
@@ -503,6 +520,7 @@ public partial class ServiceCardViewModel : ViewModelBase
 
         var restartPath = RestartPathText.Trim();
         var restartToken = RestartTokenText.Trim();
+        var restartLocalPort = 0;
         if (UseRestartAction)
         {
             if (!IsSafeRestartPath(restartPath))
@@ -516,6 +534,16 @@ public partial class ServiceCardViewModel : ViewModelBase
                 error = "重启令牌最多 256 个字符，且不能包含控制字符。";
                 return false;
             }
+
+            if (!string.IsNullOrWhiteSpace(RestartLocalPortText))
+            {
+                if (!int.TryParse(RestartLocalPortText, out restartLocalPort) ||
+                    restartLocalPort is < 1 or > 65535)
+                {
+                    error = "重启端口必须是 1–65535 的整数，或留空复用本服务端口。";
+                    return false;
+                }
+            }
         }
         else
         {
@@ -526,7 +554,8 @@ public partial class ServiceCardViewModel : ViewModelBase
         state = new ServiceUiState(
             Id, ShortCode, Name, Description, LocalUrl.Trim(), localPort, remotePort,
             Status, HealthDetail, IsEnabled, IsAvailable, HasWarning, CanOpen,
-            FromHealthModeIndex(HealthModeIndex), HealthPathText.Trim(), restartPath, restartToken);
+            FromHealthModeIndex(HealthModeIndex), HealthPathText.Trim(), restartPath, restartToken,
+            restartLocalPort);
         error = string.Empty;
         return true;
     }

@@ -48,7 +48,7 @@ public sealed partial class AppController
         var restartUri = new UriBuilder(
             route.OpenUri.Scheme,
             ServiceDefinition.LoopbackHost,
-            service.LocalPort,
+            service.RestartLocalPort is >= 1 and <= 65535 ? service.RestartLocalPort : service.LocalPort,
             service.RestartPath).Uri;
 
         var ownsClient = _restartHttpClient is null;

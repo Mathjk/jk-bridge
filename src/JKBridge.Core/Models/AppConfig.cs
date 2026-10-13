@@ -192,6 +192,14 @@ public sealed record ServiceDefinition
     public string RestartPath { get; init; } = string.Empty;
 
     /// <summary>
+    /// Optional Windows-local port for the restart request. Zero inherits the
+    /// service's own local port. A non-zero value must match another configured
+    /// service's local port so the request travels through an existing tunnel —
+    /// this lets one shared control endpoint restart several services.
+    /// </summary>
+    public int RestartLocalPort { get; init; }
+
+    /// <summary>
     /// Shared secret sent as the X-JKBridge-Restart-Token header. Stays in this
     /// installation's config only.
     /// </summary>

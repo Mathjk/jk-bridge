@@ -2652,6 +2652,7 @@ public sealed partial class AppController : IBridgeUiActions, IAsyncDisposable
                         Enabled = state.IsEnabled,
                         RestartPath = state.RestartPath.Trim(),
                         RestartToken = state.RestartToken.Trim(),
+                        RestartLocalPort = state.RestartLocalPort,
                     };
                     return current with
                     {
@@ -3698,7 +3699,8 @@ public sealed partial class AppController : IBridgeUiActions, IAsyncDisposable
             service.HealthKind,
             service.HealthPath,
             service.RestartPath,
-            service.RestartToken);
+            service.RestartToken,
+            service.RestartLocalPort);
     }
 
     /// <summary>

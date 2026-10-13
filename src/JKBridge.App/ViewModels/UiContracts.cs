@@ -34,7 +34,8 @@ public sealed record ServiceUiState(
     HealthCheckKind HealthKind,
     string HealthPath = "/",
     string RestartPath = "",
-    string RestartToken = "");
+    string RestartToken = "",
+    int RestartLocalPort = 0);
 
 public sealed record WindowsLocalServiceUiState(
     string Id,

@@ -135,6 +135,8 @@ internal sealed record LegacyServiceDefinitionV3
 
     public string RestartToken { get; init; } = string.Empty;
 
+    public int RestartLocalPort { get; init; }
+
     public ServiceDefinition ToCurrent() => new()
     {
         Id = Id,
@@ -151,5 +153,6 @@ internal sealed record LegacyServiceDefinitionV3
         HealthKind = HealthKind,
         RestartPath = RestartPath,
         RestartToken = RestartToken,
+        RestartLocalPort = RestartLocalPort,
     };
 }
