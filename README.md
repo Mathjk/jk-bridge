@@ -31,14 +31,13 @@
 </p>
 
 > [!NOTE]
-> The latest stable release is **v2.2.1**, available as an unsigned per-user
-> Windows installer and a verified portable ZIP. It adds controllable update
-> networking and progress, one-line Linux setup commands, Linux pending-service
-> drafts, more service templates, and a four-layer Connection Doctor. The
-> recommended Linux setup and recovery path remains the one-shot
-> `jkbridge-linux.py` helper. The optional no-AI Linux Agent and managed-relay
-> lifecycle remain advanced/experimental features; they are not required for
-> normal use.
+> The latest stable release is **v2.3.1**, available as an unsigned per-user
+> Windows installer and a verified portable ZIP. It adds per-service restart
+> actions with confirmation and audit, an optional Linux control daemon
+> (`jkbridge-ctl`) for restart, logs, and status, desktop alerts when a service
+> breaks, a configurable health-check interval, and restart tokens kept in the
+> Windows credential store. The recommended Linux setup and recovery path
+> remains the one-shot `jkbridge-linux.py` helper.
 
 ## Why JK Bridge?
 
@@ -211,92 +210,6 @@ keeps an explicit validated loopback URL.
 
 Pairing updates only the JK Bridge-managed line in `~/.ssh/authorized_keys` and first backs up the file under `~/.ssh/jkbridge-backups/`.
 
-## v2.2.1 setup and optional experimental Agent status
-
-The intended Agent-first new-device flow is `sign in to Tailscale -> install JK
-Bridge -> add this computer -> synchronize services -> connect`, after a one-time
-Linux Agent installation. The optional `jkbridge-agent` is designed as an
-ordinary deterministic Linux program: it has no AI, model API, Codex, or cloud
-runtime dependency. SSH remains the restricted data plane, and every Windows
-computer keeps an independent key that can be revoked without affecting another
-computer.
-
-That optional Agent-first flow is **not the supported default in v2.2.1**:
-
-- a development Linux Agent, hardened user-unit/environment packaging assets,
-  package checks, a sibling loopback-relay helper, and a wired Windows
-  enrollment/management client exist in the source tree. One deployed pair has
-  completed non-root install/bootstrap/start/restart/status, explicit Agent
-  discovery, first-admin enrollment, catalog synchronization, exact SSH grants,
-  and connection. Manifest-verified upgrade, rollback, state-preserving
-  uninstall, second-device revocation, and automated tests are implemented;
-  clean-machine live acceptance and stable-release sign-off remain open;
-- the current source build exposes a two-step Agent setup: copy one self-
-  contained command from Windows into the ordinary Linux user's terminal, then
-  paste the printed `JKBA1.` setup code into Windows. There is no clone,
-  download-directory, or `cd` step. The same command upgrades an already
-  managed Agent while preserving its identity, so Windows needs no new code.
-  Python 3.9+, Tailscale, OpenSSH Server, `socat`, `ss`, and a systemd user
-  manager remain explicit OS prerequisites and are never installed with sudo;
-- any enrolled Agent device can manually synchronize its service selection
-  through authenticated `/v1/me` plus `/v1/services`; an administrator can also
-  list all devices and revoke a selected non-current device after explicit
-  confirmation, and can generate a transient 10-minute, one-use code for adding
-  one ordinary device. The first administrator still uses the code printed by
-  Linux bootstrap/recovery, now wrapped with the verified endpoint in the
-  `JKBA1.` setup code;
-- a bounded, read-only discovery engine exists and tests only known online
-  Tailscale peers on port `45871`, checking node ID, MagicDNS identity, tailnet,
-  protocol, and Agent version. The v2.2.1 Setup page exposes this in its advanced
-  area only after an explicit **Discover Agent** action. One result is preselected but not used;
-  multiple results require a choice, and **Use selected address** is always a
-  separate action. Discovery never enrolls a device, so a one-time code and an
-  explicit enrollment click are still required. This GUI has not completed
-  clean-Windows acceptance.
-
-The current source Services page also has an administrator-only **Linux pending
-services** inbox. One explicit scan reads only the current exact
-`127.0.0.1` listener table and performs bounded loopback metadata probes; it
-does not scan disks or port ranges. The user may instead paste a strict
-`http(s)://127.0.0.1:port/path` or `localhost` URL. Both paths create only a
-disabled Windows draft, strip query/fragment secrets from pasted URLs, and
-leave the Linux catalog and SSH grants unchanged until the existing diff
-preview is explicitly confirmed. Recognition templates cover Syncthing,
-JupyterLab, Grafana, Ollama, ComfyUI, Stable Diffusion WebUI, Overleaf, and
-Sub2API with a generic fallback.
-
-Diagnostics now presents a four-layer **Connection Doctor** (Tailscale peer,
-SSH trust/authorization, tunnel, and service health) with a specific cause,
-next action, and contextual retry/setup/services button.
-
-The optional experimental Agent in v2.2.1 also has an administrator-only
-**Linux reachable target** workflow. It first returns a read-only plan and probe, displays the
-normalized mapping and affected grants, and requires a separate confirmation
-before create/update/delete. Applying a current plan uses the packaged sibling
-`jkbridge_relay.py`, `/usr/bin/socat`, and per-user systemd units to expose only
-`127.0.0.1:<relayPort>` on Linux; it then updates the catalog and exact
-`permitopen` grants transactionally. This is a controlled TCP relay for one
-explicit host and port, not a SOCKS/general proxy. Existing operator-created
-loopback relays remained active during the first field enrollment, but live
-Windows-managed create/update/delete and clean-machine acceptance remain open.
-
-Until those release gates are complete, use the one-shot helper for every new
-Windows computer. Do not copy a private key, authorization receipt, or whole
-`config.json` between computers. The v2.2.1 Service Profile UI transfers only
-non-secret service choices; importing it never authorizes Linux by itself. As a
-migration fallback, the v2.2.1 importer can also validate an exact
-v2.1/schema-v3 `config.json` and project only its Services into the same preview.
-It discards every old device, server, identity-path, tailnet, behavior, and
-authorization field; never replace the new computer's configuration with the
-old file, and prefer the non-secret profile export when available.
-The one-shot path will remain the explicit setup and recovery fallback even
-after the Agent becomes available.
-
-The security contract and remaining release questions are tracked in the
-[vNext Agent protocol draft](docs/AGENT_PROTOCOL.md) and
-[Agent threat model](docs/AGENT_THREAT_MODEL.md). They are design and review
-documents, not stable installation instructions.
-
 ## Package contents
 
 | File | Use |
@@ -345,9 +258,6 @@ Read the full [security design](docs/SECURITY.md) and [pairing protocol](docs/PA
 | [Architecture](docs/ARCHITECTURE.md) | Maintainers and security reviewers |
 | [Security design](docs/SECURITY.md) | Administrators and reviewers |
 | [Pairing protocol](docs/PAIRING_PROTOCOL.md) | Implementers and protocol reviewers |
-| [Agent protocol draft](docs/AGENT_PROTOCOL.md) · [threat model](docs/AGENT_THREAT_MODEL.md) | vNext implementers and security reviewers; not stable installation instructions |
-| [Agent multi-device operations](docs/AGENT_OPERATIONS.md) · [中文](docs/AGENT_OPERATIONS.zh-CN.md) | vNext administrators adding, replacing, or revoking devices |
-| [vNext field acceptance record](docs/FIELD_ACCEPTANCE.md) | Maintainers tracking real-machine evidence separately from release gates |
 | [Development guide](docs/DEVELOPMENT.md) | Contributors building and releasing the project |
 | [Windows acceptance checklist](docs/WINDOWS_ACCEPTANCE.md) | Release testers |
 

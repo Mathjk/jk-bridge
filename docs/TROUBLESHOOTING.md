@@ -5,12 +5,11 @@
 Work from the outside in: operating-system prerequisites, Tailscale reachability, pairing, SSH tunnel, then the Linux web service. JK Bridge can connect successfully even when one target web app is down, so keep tunnel failures and service-health failures separate.
 
 > [!NOTE]
-> Stable v2.2.1 provides both the unsigned installer and portable ZIP, plus
-> Service Profiles, Windows-local discovery, the manual updater, and first-run
-> guidance. One-shot Linux pairing remains the supported setup/recovery path.
-> Agent controls are included for advanced testing, but do not mean the Linux
-> Agent lifecycle has completed supported installation, upgrade, rollback,
-> uninstall, or clean-machine acceptance.
+> The current release provides both the unsigned installer and portable ZIP,
+> plus Service Profiles, Windows-local discovery, restart actions, the optional
+> `jkbridge-ctl` control daemon, desktop alerts, the manual updater, and
+> first-run guidance. One-shot Linux pairing remains the supported
+> setup/recovery path.
 
 ## Collect a safe baseline
 
@@ -144,87 +143,9 @@ Run that before connecting. After JK Bridge reports connected, use:
 
 The temporary server binds only the Linux Tailscale IPv4, not the LAN or public interfaces.
 
-## Agent enrollment is unavailable or does not complete
-
-The stable v2.2.1 app includes optional advanced Agent enrollment controls,
-a Linux Agent, per-user systemd packaging assets, and package checks. This path
-remains experimental and is not required for normal use. If enrollment is
-incomplete or fails, use the recommended **one-shot pairing** path instead:
-
-```bash
-python3 ~/jkbridge-linux.py pair
-```
-
-An Agent endpoint must never be replaced with a public URL, LAN wildcard bind,
-Tailscale Funnel, SOCKS proxy, exit node, or subnet route. Do not weaken
-`authorized_keys` to bypass Agent management. The Agent is a deterministic local
-program with no AI or model API dependency; Agent downtime should affect
-management only, not an already authorized SSH tunnel.
-
-The v2.2.1 Setup page has an advanced **Discover Agent** action backed by a
-bounded, read-only discovery engine. It does not scan a subnet or enroll a
-device: it inspects only known online Tailscale peers on port `45871` and
-requires matching node, MagicDNS, tailnet, protocol, and Agent-version claims.
-A single result is only preselected; multiple results require a choice. In both
-cases select **Use selected address** before entering the expiring one-use code
-and explicitly enrolling. If no verified result appears, confirm both devices
-are on the intended tailnet and that the Agent is listening on its Tailscale
-IPv4 port, then retry or manually enter that exact endpoint. This wired flow
-still lacks clean-Windows acceptance.
-
-Any enrolled device can manually synchronize its own service selection using
-the authenticated `GET /v1/me` receipt and `/v1/services` catalog. An
-administrator can additionally refresh the complete device list, revoke a
-selected non-current device after explicit confirmation, and generate a
-10-minute, one-use code for one new ordinary device. If **Generate new device
-code** is unavailable or rejected, first synchronize Agent state and verify that
-the current device is still an administrator. If the target says the code is
-expired or already used, generate a new one; do not save codes in configuration,
-notes, screenshots, or command history. The first administrator still requires
-an administrator code printed by Linux bootstrap/recovery. An ordinary device
-sees only its own record and cannot generate codes, list/revoke peers, or manage
-relays; the Windows UI refuses self-revocation.
-
-Preview 1 also has a display bug: the Linux Agent canonicalizes a Tailscale
-login to lower case while Windows may preserve casing such as `Mathjk@github`.
-That can falsely report a current-device identity mismatch and hide the admin
-role and enrollment-code controls. Preview 2 compares only this account-name
-field without case sensitivity while continuing to require the exact device ID,
-Tailscale node ID, and SSH public-key fingerprint. Overlay-install Preview 2;
-the administrator device does not need to be revoked or enrolled again.
-
-Revocation prevents future Agent requests and new SSH authentication for that
-device. It cannot terminate a tunnel that is already connected; disconnect the
-revoked Windows device or end its SSH session separately if immediate cutoff is
-required.
-
 ## A Linux relay plan is blocked or apply is unavailable
 
 The stable v2.2.1 app exposes the optional experimental **Advanced: Linux
-reachable target** workflow. It is not required for the normal one-shot pairing
-path. **Generate plan and probe** is read-only. It must succeed
-before the separate confirmation checkbox and apply button become available.
-
-Check the plan preview for the specific cause:
-
-- the Linux package must place `jkbridge_relay.py` beside
-  `jkbridge_agent.py`;
-- `/usr/bin/socat` and a working per-user systemd session are required;
-- the chosen Linux relay port must be free on loopback, and the exact target
-  DNS/IPv4 address and TCP port must be reachable from Linux;
-- the target must be one host and port, not a URL, wildcard, CIDR, IPv6,
-  broadcast/multicast address, UDP endpoint, SOCKS proxy, Funnel, exit node, or
-  subnet route;
-- a conflicting or unrecognized `jkbridge-relay-<id>.service` is deliberately
-  blocked rather than overwritten or deleted.
-
-Any field edit or Linux/catalog/device change invalidates the previous plan.
-Generate and inspect a fresh plan instead of retrying an old token. If an apply
-times out or returns an uncertain result, synchronize the Agent catalog and
-inspect the per-user unit locally before planning again; do not blindly repeat
-the mutation. Managed units listen only on Linux `127.0.0.1`. Never work around
-a failure with `0.0.0.0` or a broad `permitopen` grant.
-
 For HTTPS, the relay is transparent TCP. A successful TCP probe does not prove
 that a certificate, SNI, cookie domain, redirect, or application host check will
 accept a Windows URL whose host is `127.0.0.1`.
@@ -361,8 +282,7 @@ file, and continue treating that legacy source as sensitive.
 A profile intentionally contains no private key, pairing token, device
 credential, server identity, or authorization receipt. Importing service
 definitions therefore never authorizes Linux. If the preview lists a new Linux
-remote port, complete a verified Agent synchronization when available or use
-one-shot pairing. Canceling the picker or refusing confirmation makes no change;
+remote port, complete one-shot pairing again. Canceling the picker or refusing confirmation makes no change;
 if services changed after preview, select and preview the file again.
 
 ## Still blocked?

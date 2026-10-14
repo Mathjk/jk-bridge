@@ -41,8 +41,6 @@ public sealed class ServiceProfileTransferServiceTests
         Assert.DoesNotContain(current.Server.PinnedHostKey, json, StringComparison.Ordinal);
         Assert.DoesNotContain(current.ExpectedTailnetDnsSuffix, json, StringComparison.Ordinal);
         Assert.DoesNotContain(current.Authorization.ClientKeyFingerprint, json, StringComparison.Ordinal);
-        Assert.DoesNotContain(current.Agent.CredentialReference, json, StringComparison.Ordinal);
-        Assert.DoesNotContain(current.Agent.Endpoint, json, StringComparison.Ordinal);
         Assert.Empty(Directory.EnumerateFiles(temporary.Path, ".*.tmp"));
     }
 
@@ -152,12 +150,10 @@ public sealed class ServiceProfileTransferServiceTests
         Assert.Equal(ServiceProfileImportSource.LegacyConfigV3, preview.Source);
         Assert.Equal(current.Server, loaded.Server);
         AssertAuthorizationEqual(current.Authorization, loaded.Authorization);
-        Assert.Equal(current.Agent, loaded.Agent);
         Assert.Equal(current.Behavior, loaded.Behavior);
         Assert.Equal(legacy.Services, loaded.Services);
         Assert.Equal(current.Server, result.Config.Server);
         AssertAuthorizationEqual(current.Authorization, result.Config.Authorization);
-        Assert.Equal(current.Agent, result.Config.Agent);
     }
 
     [Fact]
@@ -191,7 +187,6 @@ public sealed class ServiceProfileTransferServiceTests
         Assert.Equal(current.Server, loaded.Server);
         Assert.Equal(current.Behavior, loaded.Behavior);
         AssertAuthorizationEqual(current.Authorization, loaded.Authorization);
-        Assert.Equal(current.Agent, loaded.Agent);
         Assert.Equal(proposed.Services, loaded.Services);
         Assert.Equal(proposed.Services, result.Config.Services);
 
@@ -200,7 +195,6 @@ public sealed class ServiceProfileTransferServiceTests
         Assert.Equal(current.Services, backup.Services);
         Assert.Equal(current.Server, backup.Server);
         AssertAuthorizationEqual(current.Authorization, backup.Authorization);
-        Assert.Equal(current.Agent, backup.Agent);
     }
 
     [Fact]
@@ -332,16 +326,6 @@ public sealed class ServiceProfileTransferServiceTests
             Server = configured.Server with
             {
                 IdentityFile = @"C:\private\sentinel-jk-bridge-ed25519",
-            },
-            Agent = new AgentRegistration
-            {
-                IsConfigured = true,
-                Endpoint = "http://100.64.0.10:45871/",
-                TailscaleNodeId = "node-sensitive-123",
-                DeviceId = "device-sensitive-123",
-                DeviceLabel = "Sensitive test device",
-                CredentialReference = "agent-sensitive-credential-reference",
-                CatalogRevision = "sha256:sensitive-test-revision",
             },
         };
     }

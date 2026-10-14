@@ -432,12 +432,6 @@ internal sealed partial class DiagnosticBundleRedactor
         yield return config.Server.HostKeyAlias;
         yield return config.Server.PinnedHostKey;
         yield return config.Authorization.ClientKeyFingerprint;
-        yield return config.Agent.Endpoint;
-        yield return config.Agent.TailscaleNodeId;
-        yield return config.Agent.DeviceId;
-        yield return config.Agent.DeviceLabel;
-        yield return config.Agent.CredentialReference;
-        yield return config.Agent.CatalogRevision;
         yield return snapshot.PeerDnsName ?? string.Empty;
         yield return snapshot.TargetHost ?? string.Empty;
         yield return snapshot.TailscaleSelfDnsName ?? string.Empty;

@@ -1,0 +1,17 @@
+[Unit]
+Description=JK Bridge loopback control daemon
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+WorkingDirectory=%h
+Environment=PYTHONUNBUFFERED=1
+ExecStart=/usr/bin/python3 %h/.local/share/jkbridge/jkbridge-ctl.py --host 127.0.0.1 --port 8890
+Restart=always
+RestartSec=3
+StandardOutput=append:%h/.local/share/jkbridge/ctl.log
+StandardError=append:%h/.local/share/jkbridge/ctl.log
+
+[Install]
+WantedBy=default.target

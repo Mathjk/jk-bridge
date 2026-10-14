@@ -31,7 +31,6 @@ internal sealed record LegacyConfigV3Document
         Server = Server.ToCurrent(),
         Behavior = Behavior.ToCurrent(),
         Authorization = Authorization.ToCurrent(),
-        Agent = new AgentRegistration(),
         Services = Services.Select(service => service.ToCurrent()).ToList(),
     };
 }

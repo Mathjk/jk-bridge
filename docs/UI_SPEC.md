@@ -36,7 +36,7 @@ The rail, app icon, and status surfaces share the same two-node bridge geometry.
 - Schema-v6 profiles add a non-secret `welcomeTutorialCompleted` behavior flag.
 - An incomplete profile opens a four-step modal guide after configuration is loaded:
   1. distinguish Linux tunnels from Windows-local loopback services;
-  2. explain recommended one-shot pairing and the optional advanced Agent path;
+  2. explain recommended one-shot pairing ;
   3. show how to scan, review, save, and reopen Windows-local services;
   4. point to Overview, Diagnostics, Settings, updates, and this guide.
 - **Later / 以后再看** closes the guide for the current run only. It appears again on

@@ -475,7 +475,7 @@ public partial class ServiceCardViewModel : ViewModelBase
             }
 
             return IsEnabled
-                ? $"Linux 服务端口将从 {_savedRemotePort} 改为 {remotePort}；保存时软件会核对完整端口集合，必要时要求重新配对或由 Linux Agent 更新精确授权。"
+                ? $"Linux 服务端口将从 {_savedRemotePort} 改为 {remotePort}；保存时软件会核对完整端口集合，必要时要求重新配对或重新配对更新精确授权。"
                 : $"Linux 服务端口将从 {_savedRemotePort} 改为 {remotePort}。服务当前已停用，暂不申请权限；以后启用时需要核对 Linux 授权。";
         }
     }

@@ -12,7 +12,7 @@ public sealed class ServiceProfileTests
     [Fact]
     public void CreateAndSerialize_UsesAnExplicitNonSecretAllowList()
     {
-        var config = ConfiguredWithAgent();
+        var config = TestConfigs.CreateConfigured();
 
         var profile = ServiceProfileSerializer.Create(config, "Portable services");
         var json = ServiceProfileSerializer.Serialize(profile);
@@ -26,10 +26,6 @@ public sealed class ServiceProfileTests
         Assert.DoesNotContain("pinnedHostKey", json, StringComparison.OrdinalIgnoreCase);
         Assert.DoesNotContain("authorization", json, StringComparison.OrdinalIgnoreCase);
         Assert.DoesNotContain("fingerprint", json, StringComparison.OrdinalIgnoreCase);
-        Assert.DoesNotContain(config.Agent.Endpoint, json, StringComparison.Ordinal);
-        Assert.DoesNotContain(config.Agent.TailscaleNodeId, json, StringComparison.Ordinal);
-        Assert.DoesNotContain(config.Agent.DeviceId, json, StringComparison.Ordinal);
-        Assert.DoesNotContain(config.Agent.CredentialReference, json, StringComparison.Ordinal);
         Assert.DoesNotContain(config.Server.IdentityFile, json, StringComparison.Ordinal);
         Assert.DoesNotContain(config.Server.PinnedHostKey, json, StringComparison.Ordinal);
         Assert.DoesNotContain(config.Authorization.ClientKeyFingerprint, json, StringComparison.Ordinal);
@@ -64,10 +60,10 @@ public sealed class ServiceProfileTests
     [Fact]
     public void DeserializeImportDocument_ExtractsOnlyServicesFromLegalV21Configuration()
     {
-        var legacy = ConfiguredWithAgent() with
+        var legacy = TestConfigs.CreateConfigured() with
         {
             SchemaVersion = 3,
-            Server = ConfiguredWithAgent().Server with
+            Server = TestConfigs.CreateConfigured().Server with
             {
                 IdentityFile = @"C:\private\legacy-jk-bridge-key",
             },
@@ -256,7 +252,7 @@ public sealed class ServiceProfileTests
     [Fact]
     public void PrepareImport_ReplacesOnlyServicesAndReportsNewRemoteAuthorization()
     {
-        var current = ConfiguredWithAgent();
+        var current = TestConfigs.CreateConfigured();
         var sub2Api = ServiceTemplateCatalog.Create(ServiceTemplateCatalog.Sub2Api);
         var profile = ServiceProfileSerializer.Create(current) with
         {
@@ -270,7 +266,6 @@ public sealed class ServiceProfileTests
 
         Assert.Equal(current.Server, plan.CandidateConfig.Server);
         Assert.Equal(current.Authorization, plan.CandidateConfig.Authorization);
-        Assert.Equal(current.Agent, plan.CandidateConfig.Agent);
         Assert.Equal(current.Behavior, plan.CandidateConfig.Behavior);
         Assert.Equal(current.ExpectedTailnetDnsSuffix, plan.CandidateConfig.ExpectedTailnetDnsSuffix);
         Assert.Equal(ServiceDefinition.LoopbackHost, plan.CandidateConfig.Services[^1].RemoteHost);
@@ -282,7 +277,7 @@ public sealed class ServiceProfileTests
     [Fact]
     public void PrepareImport_LocalUrlEditPreservesAuthorizationAndNeedsNoRepair()
     {
-        var current = ConfiguredWithAgent();
+        var current = TestConfigs.CreateConfigured();
         var profile = ServiceProfileSerializer.Create(current);
         profile.Services[0] = profile.Services[0] with
         {
@@ -312,19 +307,6 @@ public sealed class ServiceProfileTests
             issue.Path == "services[0]" && issue.Code == "service.required");
     }
 
-    private static AppConfig ConfiguredWithAgent() => TestConfigs.CreateConfigured() with
-    {
-        Agent = new AgentRegistration
-        {
-            IsConfigured = true,
-            Endpoint = "http://100.73.7.51:45821/",
-            TailscaleNodeId = "nJKBridgeLinux123",
-            DeviceId = "device_A1b2c3d4",
-            DeviceLabel = "Office Windows",
-            CredentialReference = "agent-" + new string('a', 64),
-            CatalogRevision = "sha256:abcdef123456",
-        },
-    };
 
     private static string SerializeLegacyV3(AppConfig config)
     {

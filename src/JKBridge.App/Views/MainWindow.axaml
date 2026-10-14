@@ -67,7 +67,7 @@
                         <ToggleButton Classes="nav-item"
                                       IsChecked="{Binding IsSetup}"
                                       Command="{Binding ShowSetupCommand}"
-                                      ToolTip.Tip="首次配对、添加设备与 Agent 高级管理"
+                                      ToolTip.Tip="首次配对与设备配置 高级管理"
                                       AutomationProperties.Name="设备配置">
                             <Grid ColumnDefinitions="28,*">
                                 <TextBlock Text="03" Classes="technical-strong" VerticalAlignment="Center" />

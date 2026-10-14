@@ -27,14 +27,6 @@ public static class ConfigValidator
         "^SHA256:[A-Za-z0-9+/]{43}$",
         RegexOptions.CultureInvariant | RegexOptions.Compiled);
 
-    private static readonly Regex AgentDeviceIdPattern = new(
-        "^[A-Za-z0-9][A-Za-z0-9_-]{7,63}$",
-        RegexOptions.CultureInvariant | RegexOptions.Compiled);
-
-    private static readonly Regex TailscaleNodeIdPattern = new(
-        "^[A-Za-z0-9][A-Za-z0-9_:-]{0,127}$",
-        RegexOptions.CultureInvariant | RegexOptions.Compiled);
-
     private static readonly Regex CredentialReferencePattern = new(
         "^[A-Za-z0-9][A-Za-z0-9_-]{0,127}$",
         RegexOptions.CultureInvariant | RegexOptions.Compiled);
@@ -77,7 +69,6 @@ public static class ConfigValidator
         ValidateBehavior(config.Behavior, issues);
         ValidateUpdateNetwork(config.UpdateNetwork, issues);
         ValidateAuthorization(config.Authorization, issues);
-        ValidateAgent(config.Agent, issues);
         ValidateServices(config.Services, issues);
         ValidateWindowsLocalServices(config.WindowsLocalServices, config.Services, issues);
 
@@ -317,106 +308,7 @@ public static class ConfigValidator
         }
     }
 
-    private static void ValidateAgent(
-        AgentRegistration? agent,
-        ICollection<ConfigValidationIssue> issues)
-    {
-        if (agent is null)
-        {
-            issues.Add(new("agent", "agent.required", "Agent registration state is required."));
-            return;
-        }
-
-        if (!agent.IsConfigured)
-        {
-            if (!string.IsNullOrEmpty(agent.Endpoint) ||
-                !string.IsNullOrEmpty(agent.TailscaleNodeId) ||
-                !string.IsNullOrEmpty(agent.DeviceId) ||
-                !string.IsNullOrEmpty(agent.DeviceLabel) ||
-                !string.IsNullOrEmpty(agent.CredentialReference) ||
-                !string.IsNullOrEmpty(agent.CatalogRevision))
-            {
-                issues.Add(new(
-                    "agent",
-                    "agent.unconfiguredHasRegistration",
-                    "An unconfigured Agent registration cannot contain enrollment state."));
-            }
-
-            return;
-        }
-
-        if (!IsCanonicalTailscaleAgentEndpoint(agent.Endpoint))
-        {
-            issues.Add(new(
-                "agent.endpoint",
-                "agent.invalidEndpoint",
-                "Agent endpoint must be canonical HTTP on a Tailscale IPv4 address and explicit port."));
-        }
-
-        if (string.IsNullOrWhiteSpace(agent.DeviceId) ||
-            !AgentDeviceIdPattern.IsMatch(agent.DeviceId))
-        {
-            issues.Add(new(
-                "agent.deviceId",
-                "agent.invalidDeviceId",
-                "Agent device id must be 8–64 safe ASCII characters."));
-        }
-
-        if (string.IsNullOrWhiteSpace(agent.TailscaleNodeId) ||
-            !TailscaleNodeIdPattern.IsMatch(agent.TailscaleNodeId))
-        {
-            issues.Add(new(
-                "agent.tailscaleNodeId",
-                "agent.invalidTailscaleNodeId",
-                "Pinned Tailscale node id must be 1–128 safe ASCII characters."));
-        }
-
-        ValidateRequiredText(agent.DeviceLabel, "agent.deviceLabel", 80, issues);
-
-        if (string.IsNullOrWhiteSpace(agent.CredentialReference) ||
-            !CredentialReferencePattern.IsMatch(agent.CredentialReference))
-        {
-            issues.Add(new(
-                "agent.credentialReference",
-                "agent.invalidCredentialReference",
-                "Agent credential reference must be a 1–128 character non-secret operating-system credential identifier."));
-        }
-
-        if (string.IsNullOrWhiteSpace(agent.CatalogRevision) ||
-            !CatalogRevisionPattern.IsMatch(agent.CatalogRevision))
-        {
-            issues.Add(new(
-                "agent.catalogRevision",
-                "agent.invalidCatalogRevision",
-                "Agent catalog revision must be 1–128 safe ASCII characters."));
-        }
-    }
-
-    private static bool IsCanonicalTailscaleAgentEndpoint(string? endpoint)
-    {
-        if (string.IsNullOrWhiteSpace(endpoint) ||
-            endpoint.Any(char.IsControl) ||
-            !Uri.IsWellFormedUriString(endpoint, UriKind.Absolute) ||
-            !Uri.TryCreate(endpoint, UriKind.Absolute, out var uri) ||
-            !string.Equals(uri.Scheme, Uri.UriSchemeHttp, StringComparison.Ordinal) ||
-            !string.IsNullOrEmpty(uri.UserInfo) ||
-            !string.IsNullOrEmpty(uri.Query) ||
-            !string.IsNullOrEmpty(uri.Fragment) ||
-            uri.Port is < 1 or > 65535 ||
-            !IPAddress.TryParse(uri.Host, out var address) ||
-            address.AddressFamily != System.Net.Sockets.AddressFamily.InterNetwork)
-        {
-            return false;
-        }
-
-        var bytes = address.GetAddressBytes();
-        var isTailscaleIpv4 = bytes[0] == 100 && bytes[1] is >= 64 and <= 127;
-        var canonical = $"http://{address}:{uri.Port}/";
-        return isTailscaleIpv4 &&
-               string.Equals(endpoint, canonical, StringComparison.Ordinal);
-    }
-
-    private static void ValidateServices(
+            private static void ValidateServices(
         List<ServiceDefinition>? services,
         ICollection<ConfigValidationIssue> issues)
     {

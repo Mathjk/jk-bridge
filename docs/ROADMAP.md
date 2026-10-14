@@ -8,7 +8,6 @@
 > `2.2.0-preview.1` through `2.2.0-preview.6` remain historical prereleases.
 > Stable v2.2.1 covers the desktop, one-shot pairing, service-profile, local
 > discovery, diagnostics, installer, controllable updater, and setup flows described below; the
-> optional Agent/relay lifecycle remains advanced/experimental vNext work.
 
 ## V2.0 — portable public release (released)
 
@@ -45,7 +44,7 @@
 - Preview System/Light/Dark appearance choices immediately and persist only on
   explicit settings save.
 
-The v2.2.0 package also carries separately gated optional Agent, migration, and
+The package also carries separately gated migration and
 relay components. Their lifecycle remains advanced/experimental until the vNext
 exit criteria below pass; one-shot Linux pairing is the stable default and
 recovery path.
@@ -75,110 +74,9 @@ conflicts and migration recovery on a real prior installation.
 
 The bounded serializer, validator, change analysis, native file-picker
 export/import UI, tests, read-only preview, explicit confirmation, atomic save,
-and backup path exist. The flow preserves device/server/Agent state and cannot
+and backup path exist. The flow preserves device/server state and cannot
 manufacture Linux authorization. Exit still requires clean-machine Windows
 acceptance; implemented source alone is not a released migration feature.
-
-## vNext phase C — optional Linux Agent MVP (implemented source; deployment unsupported)
-
-- Provide a deterministic, no-AI Agent that runs as the ordinary Linux SSH user under systemd.
-- Bind the management listener only to the Linux Tailscale interface.
-- Maintain a versioned Linux service manifest as the source of truth for Linux destinations.
-- Enroll, label, list, and revoke independent Windows device identities.
-- Derive and atomically install exact per-device `permitopen` authorization.
-- Reuse tested ownership, locking, backup, symlink-rejection, and atomic-write controls from the one-shot helper.
-- Authenticate management operations using `tailscale whois --json` stable node/login identity plus an independently revocable device credential or one-use Linux enrollment code; source IP alone is insufficient.
-- Add limits for message size, rate, concurrency, and failure attempts.
-- Keep `jkbridge-linux.py pair/status/remove` as a supported fallback.
-
-The Python server, fixed `/v1` endpoints, manifest and device transactions,
-Windows bounded client, per-device credentials, listing/rename/revocation,
-tests, systemd user-unit template, and non-root
-`jkbridge-agentctl preflight/install/upgrade/rollback/uninstall/start/stop/status/fallback` source exist. Request and response bodies are limited to
-64 KiB. Agent device records carry stable Tailscale node and login fields, and
-revocation returns a fixed receipt while warning that existing SSH sessions
-must be disconnected separately.
-
-The Agent and one-shot helper also share the SSH-writer lock, and strict
-same-key fallback conversion/reconciliation is tested. Exit still requires live
-acceptance of the implemented install/upgrade/rollback/uninstall lifecycle,
-signed package provenance,
-clean-machine end-to-end enrollment and independent-revocation acceptance, and
-stable Release assets. The frozen development contract is in
-[AGENT_PROTOCOL.md](AGENT_PROTOCOL.md).
-
-One deployed pair has completed non-root Agent install/bootstrap/start/restart/
-status, explicit Windows discovery, first-admin enrollment, seven-service
-catalog synchronization, exact managed SSH authorization, and connection. This
-is recorded in [FIELD_ACCEPTANCE.md](FIELD_ACCEPTANCE.md); it narrows the field
-risk but does not replace the clean-machine or multi-device exit criteria.
-
-## vNext phase D — Windows no-terminal enrollment and sync (implemented source; acceptance pending)
-
-- Detect Tailscale and Windows OpenSSH prerequisites in the first-run UI.
-- Generate and protect a unique Ed25519 identity on each Windows device.
-- Select a trusted exact Tailscale Agent endpoint, cross-check its stable node and MagicDNS identity, and enroll with a one-use Linux-issued code.
-- Manually synchronize the service manifest and exact current-device grant while
-  preserving same-ID Windows local-port overrides.
-- Let non-admin devices synchronize their own state without exposing the fleet
-  device list.
-- Add an administrator Devices UI for sanitized list/refresh and
-  explicit-confirmation revoke.
-- Let an enrolled administrator generate a short-lived, one-use ordinary-device
-  enrollment code in Windows; keep administrator recovery Linux-local.
-- Rename device labels without changing identity or grants (implemented).
-- Add an explicit approval flow for replacement/old devices (planned).
-- Add an opt-in, well-bounded background synchronization design after the manual
-  flow is accepted.
-- Show a clear one-shot-pairing fallback when the Agent is unavailable or disabled.
-- Complete clean Windows 11 acceptance without requiring PowerShell or CMD for normal enrollment.
-
-Exit criteria: after one-time Linux Agent preparation, the normal new-device
-flow is `Tailscale login -> install JK Bridge -> Add this computer -> connect`.
-The enrollment screen/client, bounded explicit discovery, same-stable-node
-endpoint rebind, foreground catalog sync, administrator catalog
-preview/confirm/write, device list/rename/revoke and ordinary-device code
-controls, and Service Profile transfer exist in source. Old-device approval,
-background sync, supported Linux lifecycle, and clean Windows/Linux acceptance
-remain open.
-
-## vNext phase E — managed explicit relays (implemented source; acceptance pending)
-
-- Support direct Linux loopback services and one explicit target per managed loopback relay.
-- Plan and probe before mutation; show final target, Linux relay port, Windows local port, protocol, and launch path.
-- Bind every relay to `127.0.0.1` and refuse to overwrite an unrecognized unit.
-- Apply relay creation, manifest update, per-device exact authorization, and Windows synchronization as a recoverable transaction.
-- Require explicit confirmation before removal, back up state, and contract every affected device's grant afterward.
-- Keep arbitrary proxies, UDP, wildcard targets, exit nodes, and subnet routes unsupported.
-
-The Linux relay companion, strict `/v1/relays` plan/probe/apply/delete endpoints,
-Windows advanced UI, state-bound plan tokens, explicit confirmation, managed
-unit backup/rollback, catalog convergence, and exact affected-device grant
-updates exist in source and tests. The package contract includes the sibling
-relay script, but does not install `socat` or enable/test the systemd user
-instance.
-
-A strict legacy Skill-unit adoption plan/apply primitive also exists and is
-tested at the relay-manager layer. It is not exposed through Agent API or the
-Windows UI, so migration integration remains phase-F work.
-
-Exit still requires supported dependency/lifecycle installation, clean Linux
-systemd-user create/update/delete/rollback acceptance, clean Windows UI and
-post-apply sync acceptance, DNS/TLS edge-case testing, and migration of the
-currently deployed explicit relays without address or port changes.
-
-## vNext phase F — deployment migration and release (planned)
-
-- Inventory the deployed Windows services, Linux listeners, managed relays, and exact authorization before mutation.
-- Import the current service set into the manifest while keeping existing browser URLs stable.
-- Run the existing Windows through the Agent while retaining the one-shot fallback.
-- Test enrollment and revocation with a second clean Windows device.
-- Ship installer/portable artifacts, hashes, protocol compatibility tests, and rollback instructions.
-- Stop or remove legacy management only after an observation period and explicit approval.
-
-The first deployed Windows-to-Agent migration and catalog synchronization are
-complete. Second-device enrollment/revocation, supported lifecycle operations,
-and remote adoption of existing relay units remain open.
 
 ## Later candidates
 

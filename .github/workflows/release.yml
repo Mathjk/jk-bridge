@@ -24,11 +24,10 @@ jobs:
         run: ./scripts/check-public-release.sh
       - name: Documentation link check
         run: ./scripts/check-doc-links.sh
-      - name: Agent package contract check
-        run: ./scripts/check-agent-package.sh
-      - name: Python helper and Agent tests
+      - name: Public-release privacy scan
+      - name: Python helper tests
         run: python3 -m unittest discover -s tests/linux -p 'test_*.py'
-      - name: Agent security regression tests
+      - name: Security regression tests
         run: python3 -m unittest discover -s tests/security -p 'test_*.py' -v
       - name: Portable service-profile privacy tests
         run: dotnet test JKBridge.slnx -c Release --nologo --filter FullyQualifiedName~ServiceProfileTests

@@ -208,17 +208,7 @@ public sealed class DiagnosticBundleServiceTests
                 IdentityFile = @"C:\Users\Alice\.ssh\sentinel-private-key",
                 HostKeyAlias = "sentinel-host-key-alias",
             },
-            Agent = new AgentRegistration
-            {
-                IsConfigured = true,
-                Endpoint = "http://100.64.12.34:45871/",
-                TailscaleNodeId = "node-sentinel-identity",
-                DeviceId = "00112233445566778899aabbccddeeff",
-                DeviceLabel = "Alice private laptop",
-                CredentialReference = "sentinel-credential-reference",
-                CatalogRevision = "sha256:sentinel-catalog-revision",
-            },
-        };
+};
         var services = new[]
         {
             new ServiceSnapshot(
@@ -248,7 +238,7 @@ public sealed class DiagnosticBundleServiceTests
             new DiagnosticEvent(
                 GeneratedAt.AddMinutes(-1),
                 DiagnosticSeverity.Information,
-                "Agent node-sentinel-identity",
+                "Sensitive node-sentinel-identity",
                 "host=linux-box.example-tailnet.ts.net login=alice@example.com " +
                 "endpoint=http://100.64.12.34:45871/",
                 @"IdentityFile=C:\Users\Alice\.ssh\sentinel-private-key " +
@@ -272,12 +262,6 @@ public sealed class DiagnosticBundleServiceTests
         yield return input.Config.Server.HostKeyAlias;
         yield return input.Config.Server.PinnedHostKey;
         yield return input.Config.Authorization.ClientKeyFingerprint;
-        yield return input.Config.Agent.Endpoint;
-        yield return input.Config.Agent.TailscaleNodeId;
-        yield return input.Config.Agent.DeviceId;
-        yield return input.Config.Agent.DeviceLabel;
-        yield return input.Config.Agent.CredentialReference;
-        yield return input.Config.Agent.CatalogRevision;
         yield return "alice@example.com";
         yield return "super-secret-token";
         yield return "correct-horse-battery-staple";

@@ -9,14 +9,6 @@
   <ItemGroup>
     <EmbeddedResource Include="../../scripts/jkbridge-linux.py"
                       LogicalName="JKBridge.Core.Pairing.jkbridge-linux.py" />
-    <EmbeddedResource Include="../../scripts/jkbridge_agent.py"
-                      LogicalName="JKBridge.Core.Pairing.jkbridge_agent.py" />
-    <EmbeddedResource Include="../../scripts/jkbridge_relay.py"
-                      LogicalName="JKBridge.Core.Pairing.jkbridge_relay.py" />
-    <EmbeddedResource Include="../../packaging/linux/jkbridge-agentctl"
-                      LogicalName="JKBridge.Core.Pairing.jkbridge-agentctl" />
-    <EmbeddedResource Include="../../packaging/linux/jkbridge-agent.service"
-                      LogicalName="JKBridge.Core.Pairing.jkbridge-agent.service" />
   </ItemGroup>
 
 </Project>

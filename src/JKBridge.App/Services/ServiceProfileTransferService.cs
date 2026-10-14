@@ -69,7 +69,7 @@ public sealed class ServiceProfileTransferService
         cancellationToken.ThrowIfCancellationRequested();
 
         // Create maps an explicit service-only allow-list. It cannot serialize a
-        // server profile, identity path, Agent registration, or authorization receipt.
+        // server profile, identity path, or authorization receipt.
         var profile = ServiceProfileSerializer.Create(current, displayName);
         var document = ServiceProfileSerializer.SerializeToUtf8Bytes(profile);
         if (document.Length > ServiceProfileSerializer.MaximumDocumentBytes)
@@ -326,8 +326,7 @@ public sealed class ServiceProfileTransferService
                 StringComparison.Ordinal) ||
             !Equals(current.Server, candidate.Server) ||
             !Equals(current.Behavior, candidate.Behavior) ||
-            !ReferenceEquals(current.Authorization, candidate.Authorization) ||
-            !Equals(current.Agent, candidate.Agent))
+            !ReferenceEquals(current.Authorization, candidate.Authorization))
         {
             throw new ServiceProfileTransferException(
                 "The import attempted to alter device, server, or authorization state and was rejected.");

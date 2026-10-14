@@ -50,7 +50,6 @@ mkdir -p -- "$DELIVERY/docs/images"
 printf 'Using .NET SDK %s\n' "$("$DOTNET_BIN" --version)"
 "$ROOT/scripts/check-public-release.sh"
 "$ROOT/scripts/check-doc-links.sh"
-"$ROOT/scripts/check-agent-package.sh"
 python3 -m unittest discover -s "$ROOT/tests/linux" -p 'test_*.py'
 python3 -m unittest discover -s "$ROOT/tests/security" -p 'test_*.py' -v
 "$DOTNET_BIN" test "$ROOT/JKBridge.slnx" \
@@ -82,12 +81,9 @@ mv -- "$STAGE" "$OUT"
 
 install -m 0644 "$OUT/JKBridge.exe" "$DELIVERY/JKBridge.exe"
 install -m 0755 "$ROOT/scripts/jkbridge-linux.py" "$DELIVERY/jkbridge-linux.py"
-install -m 0755 "$ROOT/scripts/jkbridge_agent.py" "$DELIVERY/jkbridge_agent.py"
-install -m 0755 "$ROOT/scripts/jkbridge_relay.py" "$DELIVERY/jkbridge_relay.py"
-install -m 0755 "$ROOT/packaging/linux/jkbridge-agentctl" "$DELIVERY/linux/jkbridge-agentctl"
-install -m 0644 "$ROOT/packaging/linux/jkbridge-agent.service" "$DELIVERY/linux/jkbridge-agent.service"
-install -m 0644 "$ROOT/packaging/linux/jkbridge-agent.env.example" "$DELIVERY/linux/jkbridge-agent.env.example"
 install -m 0644 "$ROOT/packaging/linux/README.md" "$DELIVERY/linux/README.md"
+install -m 0755 "$ROOT/scripts/jkbridge-ctl.py" "$DELIVERY/linux/jkbridge-ctl.py"
+install -m 0644 "$ROOT/packaging/linux/jkbridge-ctl.service" "$DELIVERY/linux/jkbridge-ctl.service"
 install -m 0644 "$ROOT/scripts/setup-windows.ps1" "$DELIVERY/Setup-JKBridge.ps1"
 install -m 0644 "$ROOT/scripts/add-investment-news.ps1" "$DELIVERY/Add-Investment-News.ps1"
 install -m 0644 "$ROOT/scripts/verify-windows.ps1" "$DELIVERY/Verify-JKBridge.ps1"
@@ -103,11 +99,6 @@ install -m 0644 "$ROOT/docs/TROUBLESHOOTING.md" "$DELIVERY/docs/TROUBLESHOOTING.
 install -m 0644 "$ROOT/docs/TROUBLESHOOTING.zh-CN.md" "$DELIVERY/docs/TROUBLESHOOTING.zh-CN.md"
 install -m 0644 "$ROOT/docs/DEVELOPMENT.md" "$DELIVERY/docs/DEVELOPMENT.md"
 install -m 0644 "$ROOT/docs/ARCHITECTURE.md" "$DELIVERY/docs/ARCHITECTURE.md"
-install -m 0644 "$ROOT/docs/AGENT_PROTOCOL.md" "$DELIVERY/docs/AGENT_PROTOCOL.md"
-install -m 0644 "$ROOT/docs/AGENT_THREAT_MODEL.md" "$DELIVERY/docs/AGENT_THREAT_MODEL.md"
-install -m 0644 "$ROOT/docs/AGENT_OPERATIONS.md" "$DELIVERY/docs/AGENT_OPERATIONS.md"
-install -m 0644 "$ROOT/docs/AGENT_OPERATIONS.zh-CN.md" "$DELIVERY/docs/AGENT_OPERATIONS.zh-CN.md"
-install -m 0644 "$ROOT/docs/FIELD_ACCEPTANCE.md" "$DELIVERY/docs/FIELD_ACCEPTANCE.md"
 install -m 0644 "$ROOT/docs/PAIRING_PROTOCOL.md" "$DELIVERY/docs/PAIRING_PROTOCOL.md"
 install -m 0644 "$ROOT/docs/PRODUCT_SPEC.md" "$DELIVERY/docs/PRODUCT_SPEC.md"
 install -m 0644 "$ROOT/docs/SECURITY.md" "$DELIVERY/docs/SECURITY.md"
@@ -117,22 +108,19 @@ install -m 0644 "$ROOT/docs/images/device-setup.png" "$DELIVERY/docs/images/devi
 
 PAYLOAD_FILES=(
   JKBridge.exe JKBridge.exe.sha256
-  jkbridge-linux.py jkbridge_agent.py jkbridge_relay.py
+  jkbridge-linux.py
   Setup-JKBridge.ps1 Add-Investment-News.ps1 Verify-JKBridge.ps1
   README.md README.zh-CN.md CONTRIBUTING.md SECURITY.md LICENSE CHANGELOG.md
-  linux/jkbridge-agentctl linux/jkbridge-agent.service
-  linux/jkbridge-agent.env.example linux/README.md
+  linux/jkbridge-ctl.py linux/jkbridge-ctl.service linux/README.md
   docs/INSTALLATION.md docs/INSTALLATION.zh-CN.md
   docs/TROUBLESHOOTING.md docs/TROUBLESHOOTING.zh-CN.md
   docs/DEVELOPMENT.md docs/ARCHITECTURE.md
-  docs/AGENT_PROTOCOL.md docs/AGENT_THREAT_MODEL.md
-  docs/AGENT_OPERATIONS.md docs/AGENT_OPERATIONS.zh-CN.md
-  docs/FIELD_ACCEPTANCE.md docs/PAIRING_PROTOCOL.md
+  docs/PAIRING_PROTOCOL.md
   docs/PRODUCT_SPEC.md docs/SECURITY.md docs/WINDOWS_ACCEPTANCE.md
   docs/images/app-icon.svg docs/images/device-setup.png
 )
 
-"$ROOT/scripts/check-agent-package.sh" "$DELIVERY"
+"$ROOT/scripts/check-public-release.sh" "$DELIVERY"
 
 (
   cd -- "$DELIVERY"

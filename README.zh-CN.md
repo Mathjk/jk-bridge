@@ -31,11 +31,11 @@
 </p>
 
 > [!NOTE]
-> 最新稳定版是 **v2.2.1**，同时提供未签名的当前用户 Windows 安装器和经过
-> 校验的便携 ZIP。本版加入可控的更新网络与下载进度、一行式 Linux 配置命令、
-> Linux 待添加服务草稿、更多服务模板和四层“连接医生”。
-> 推荐的 Linux 安装与恢复方式仍是一次性的 `jkbridge-linux.py`。可选的无 AI
-> Linux Agent 与受控中继生命周期仍属于高级/实验功能，正常使用不需要安装。
+> 最新稳定版本为 **v2.3.1**，提供未签名的每用户级 Windows 安装包和校验过的便携 ZIP。
+> 它新增每个服务的重启操作（带确认与审计）、可选的 Linux 控制守护
+> `jkbridge-ctl`（重启/日志/状态）、服务断开时的桌面提醒、可配置的健康检查间隔，
+> 以及密钥存入 Windows 凭证管理器的重启令牌。Linux 方面仍然推荐使用一次性
+> `jkbridge-linux.py` 辅助脚本完成配置与恢复。
 
 ## 为什么需要 JK Bridge？
 
@@ -199,74 +199,6 @@ python3 ~/jkbridge-linux.py pair
 
 重新配对只更新 `~/.ssh/authorized_keys` 中 JK Bridge 自己管理的那一行，并会先备份到 `~/.ssh/jkbridge-backups/`。
 
-## v2.2.1 配置与可选实验性 Agent 状态
-
-预期的 Agent 优先新设备流程是：Linux 一次性安装 Agent 后，在新电脑完成“登录
-Tailscale → 安装 JK Bridge → 添加此电脑 → 同步服务 → 连接”。可选的
-`jkbridge-agent` 应当是普通、确定性的 Linux 程序，完全不依赖 AI、模型
-API、Codex 或云端运行时。SSH 仍是受限的数据通道；每台 Windows 都有独立
-密钥，可以单独撤销而不影响其他电脑。
-
-这套可选的 Agent 优先流程 **不是 v2.2.1 的默认受支持路径**：
-
-- 源码中已有开发版 Linux Agent、加固的用户级 unit/环境文件、打包检查和已
-  配套的回环中继助手，以及已接线的 Windows 登记/管理客户端。一组已部署设备
-  已完成非 root 安装/初始化/启动/重启/状态检查、明确发现 Agent、首台管理员
-  登记、服务清单同步、精确 SSH 授权与建链；带清单验证的升级、回滚、保留状态
-  的卸载、第二台设备撤销和自动化测试已实现，干净机器现场验收与稳定发布签核
-  仍待完成；
-- 当前源码版把 Agent 初装收敛成两步：从 Windows 复制一条自包含命令，在普通
-  Linux 用户的终端执行，再把输出的 `JKBA1.` 配置码粘贴回 Windows。不需要
-  克隆仓库、进入下载目录或执行 `cd`。对已受管 Agent 重复执行同一命令就是
-  保留身份的升级，Windows 无需重新粘贴配置码。Python 3.9+、Tailscale、
-  OpenSSH Server、`socat`、`ss` 与 systemd 用户管理器仍是明确的系统前置
-  条件，命令不会通过 sudo 自动安装系统软件；
-- 任意已登记的 Agent 设备都可以通过认证 `/v1/me` 与 `/v1/services` 手动
-  同步自己的服务选择；管理员还可以查看全部设备，并在明确确认后撤销所选的
-  非当前设备，也可以在 Windows 管理界面生成 10 分钟有效、仅用一次、只能
-  登记普通设备的添加码。第一台管理员设备仍使用 Linux 初始化/恢复时打印的
-  一次性凭据，现在它会和已验证地址一起封装在 `JKBA1.` 配置码中；
-- 源码已有有界、只读的 Agent 发现引擎：只检查 Tailscale 当前已知的在线 peer
-  的 `45871` 端口，并核对节点 ID、MagicDNS、tailnet、协议与 Agent 版本。
-  v2.2.1 的设备配置页只在用户于高级区域明确点击“发现 Agent”后调用它。单个结果只会
-  预选而不会直接采用；多个结果必须手选，并且总要另外点击“使用所选地址”。
-  发现本身绝不会登记设备，仍须提供一次性代码并明确点击登记。该 GUI 尚未完成
-  干净 Windows 验收。
-
-当前源码版的“服务”页还增加了仅管理员可用的“Linux 待添加服务”收件箱。
-用户明确点击扫描后，Agent 只读取当前精确的 `127.0.0.1` TCP 监听，并进行
-有界的回环元数据探测；不会扫描磁盘或端口范围。用户也可以直接粘贴严格的
-`http(s)://127.0.0.1:端口/路径` 或 `localhost` 地址。两条路径都只创建
-停用的 Windows 草稿；粘贴地址中的查询参数与片段会被删除，Linux 清单和 SSH
-授权保持不变，直到用户查看现有差异预览并明确确认。识别模板包括 Syncthing、
-JupyterLab、Grafana、Ollama、ComfyUI、Stable Diffusion WebUI、Overleaf、
-Sub2API，并保留通用兜底模板。
-
-“诊断”页现在提供四层“连接医生”：依次定位 Tailscale/对端、SSH 信任与授权、
-隧道、服务健康，并显示具体原因、下一步建议和对应的重试/配置/服务按钮。
-
-v2.2.1 的可选实验性 Agent 还实现了仅管理员可用的“Linux 可达目标”流程：先生成只读计划
-并从 Linux 探测目标，展示规范化映射和受影响授权，再要求单独勾选确认，才允许
-创建、更新或删除。应用当前计划时，Agent 使用同包的 `jkbridge_relay.py`、
-`/usr/bin/socat` 和用户级 systemd unit，只在 Linux
-`127.0.0.1:<relayPort>` 监听，并以事务方式更新服务清单与精确 `permitopen`
-授权。它只转发一个明确主机与端口，不是 SOCKS 或通用代理。首轮现场登记期间，
-既有的人工回环中继保持在线；但 Windows 端管理的创建/更新/删除和干净机器验收
-仍待完成。
-
-上述发布门槛完成前，每台新 Windows 仍使用一次性助手配对。不要在电脑之间
-复制私钥、授权回执或整个 `config.json`。v2.2.1 Service Profile 界面只迁移
-非秘密服务选择，导入本身绝不会取得 Linux 授权。作为迁移后备，v2.2.1
-导入器也能严格验证一份 v2.1/schema v3 `config.json`，再只把其中 Services
-投影到同一预览；旧设备、服务器、密钥路径、tailnet、行为设置和授权字段全部
-丢弃。不要用旧文件覆盖新电脑配置；能导出非秘密 Service Profile 时仍应优先
-使用它。Agent 发布后，一次性配对也会
-继续作为明确的安装和恢复后备路径。
-
-安全合约和剩余发布问题记录在 [vNext Agent 协议草案](docs/AGENT_PROTOCOL.md)
-与 [Agent 威胁模型](docs/AGENT_THREAT_MODEL.md)中；它们是设计和审查文档，
-不是稳定版安装说明。
-
 ## 发布包里有什么？
 
 | 文件 | 用途 |
@@ -315,9 +247,6 @@ v2.2.1 的可选实验性 Agent 还实现了仅管理员可用的“Linux 可达
 | [系统架构](docs/ARCHITECTURE.md) | 维护者和安全审查者 |
 | [安全设计](docs/SECURITY.md) | 系统管理员和审查者 |
 | [配对协议](docs/PAIRING_PROTOCOL.md) | 开发者和协议审查者 |
-| [Agent 协议草案](docs/AGENT_PROTOCOL.md) · [威胁模型](docs/AGENT_THREAT_MODEL.md) | vNext 开发与安全审查；不是稳定版安装说明 |
-| [Agent 多设备与管理员操作](docs/AGENT_OPERATIONS.zh-CN.md) · [English](docs/AGENT_OPERATIONS.md) | 添加、更换或撤销 vNext 设备的管理员 |
-| [vNext 实机验收记录](docs/FIELD_ACCEPTANCE.md) | 区分现场证据与正式发布门槛的维护者 |
 | [开发指南](docs/DEVELOPMENT.md) | 编译、测试和发布项目的贡献者 |
 | [Windows 验收清单](docs/WINDOWS_ACCEPTANCE.md) | 发布测试人员 |
 

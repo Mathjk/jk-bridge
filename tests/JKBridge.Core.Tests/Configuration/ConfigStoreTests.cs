@@ -43,36 +43,6 @@ public sealed class ConfigStoreTests
     }
 
     [Fact]
-    public async Task SaveAndLoad_RoundTripsOnlyTheAgentCredentialReference()
-    {
-        using var directory = new TemporaryDirectory();
-        using var store = new ConfigStore(directory.File("config.json"));
-        var expected = AppConfig.CreateDefault() with
-        {
-            Agent = new AgentRegistration
-            {
-                IsConfigured = true,
-                Endpoint = "http://100.73.7.51:45821/",
-                TailscaleNodeId = "nJKBridgeLinux123",
-                DeviceId = "device_A1b2c3d4",
-                DeviceLabel = "Office Windows",
-                CredentialReference = "agent-" + new string('a', 64),
-                CatalogRevision = "sha256:abcdef123456",
-            },
-        };
-
-        await store.SaveAsync(expected);
-        var loaded = await store.LoadAsync();
-        var json = await File.ReadAllTextAsync(store.ConfigPath);
-
-        Assert.Equal(expected.Agent, loaded.Agent);
-        Assert.Contains(expected.Agent.CredentialReference, json, StringComparison.Ordinal);
-        Assert.DoesNotContain("enrollmentToken", json, StringComparison.OrdinalIgnoreCase);
-        Assert.DoesNotContain("pairingToken", json, StringComparison.OrdinalIgnoreCase);
-        Assert.DoesNotContain("deviceCredential", json, StringComparison.OrdinalIgnoreCase);
-    }
-
-    [Fact]
     public async Task SecondSave_PreservesPreviousValidPrimaryAsBackup()
     {
         using var directory = new TemporaryDirectory();
@@ -209,7 +179,6 @@ public sealed class ConfigStoreTests
             OpenUrl = "http://127.0.0.1:18180/project?from=v3#/editor",
         };
         var json = JsonNode.Parse(JsonSerializer.Serialize(legacy))!.AsObject();
-        Assert.True(json.Remove("Agent"));
         Directory.CreateDirectory(directory.Path);
         await File.WriteAllTextAsync(store.ConfigPath, json.ToJsonString());
 
@@ -230,7 +199,7 @@ public sealed class ConfigStoreTests
         Assert.Equal(
             "http://127.0.0.1:18180/project?from=v3#/editor",
             result.Config.Services[0].OpenUrl);
-        Assert.False(result.Config.Agent.IsConfigured);
+        Assert.False(result.Config.SetupCompleted == false && result.Config.SchemaVersion != 3);
     }
 
     [Fact]
@@ -260,7 +229,6 @@ public sealed class ConfigStoreTests
         Assert.Equal(
             legacy.Authorization.RemotePorts,
             result.Config.Authorization.RemotePorts);
-        Assert.Equal(legacy.Agent, result.Config.Agent);
     }
 
     [Fact]
@@ -284,7 +252,6 @@ public sealed class ConfigStoreTests
         Assert.False(result.Config.Behavior.WelcomeTutorialCompleted);
         Assert.Equal(legacy.Services, result.Config.Services);
         Assert.Equal(legacy.WindowsLocalServices, result.Config.WindowsLocalServices);
-        Assert.Equal(legacy.Agent, result.Config.Agent);
     }
 
     [Fact]

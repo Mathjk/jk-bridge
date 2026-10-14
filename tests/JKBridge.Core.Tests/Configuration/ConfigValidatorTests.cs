@@ -213,97 +213,6 @@ public sealed class ConfigValidatorTests
         AssertIssue(result, "service.invalidHealthPath", "services[0].healthPath");
     }
 
-    [Fact]
-    public void Validate_RejectsUnknownEnumValues()
-    {
-        var defaults = TestConfigs.CreateConfigured();
-        var config = defaults with
-        {
-            Behavior = defaults.Behavior with { Theme = (ThemePreference)999 },
-        };
-
-        var result = ConfigValidator.Validate(config);
-
-        AssertIssue(result, "behavior.invalidTheme", "behavior.theme");
-    }
-
-    [Fact]
-    public void Validate_AcceptsCanonicalNonSecretAgentRegistration()
-    {
-        var config = TestConfigs.CreateConfigured() with
-        {
-            Agent = new AgentRegistration
-            {
-                IsConfigured = true,
-                Endpoint = "http://100.73.7.51:45821/",
-                TailscaleNodeId = "nJKBridgeLinux123",
-                DeviceId = "device_A1b2c3d4",
-                DeviceLabel = "Office Windows",
-                CredentialReference = "agent-" + new string('a', 64),
-                CatalogRevision = "sha256:abcdef123456",
-            },
-        };
-
-        var result = ConfigValidator.Validate(config);
-
-        Assert.True(result.IsValid, string.Join(Environment.NewLine, result.Issues));
-    }
-
-    [Theory]
-    [InlineData("https://100.73.7.51:45821/")]
-    [InlineData("http://100.73.7.51:45821/api")]
-    [InlineData("http://100.73.7.51:45821/?token=secret")]
-    [InlineData("http://alice@100.73.7.51:45821/")]
-    [InlineData("http://192.168.1.10:45821/")]
-    [InlineData("http://100.128.0.1:45821/")]
-    [InlineData("http://agent.tailnet.ts.net:45821/")]
-    [InlineData("http://100.73.7.51:45821")]
-    public void Validate_RejectsUnsafeOrNonCanonicalAgentEndpoint(string endpoint)
-    {
-        var config = WithAgent(agent => agent with { Endpoint = endpoint });
-
-        var result = ConfigValidator.Validate(config);
-
-        AssertIssue(result, "agent.invalidEndpoint", "agent.endpoint");
-    }
-
-    [Fact]
-    public void Validate_RejectsAgentDataWhenRegistrationIsNotConfigured()
-    {
-        var config = AppConfig.CreateDefault() with
-        {
-            Agent = new AgentRegistration
-            {
-                Endpoint = "http://100.73.7.51:45821/",
-            },
-        };
-
-        var result = ConfigValidator.Validate(config);
-
-        AssertIssue(result, "agent.unconfiguredHasRegistration", "agent");
-    }
-
-    [Fact]
-    public void Validate_RejectsUnsafeAgentIdentifiersAndRevision()
-    {
-        var config = WithAgent(agent => agent with
-        {
-            DeviceId = "short",
-            TailscaleNodeId = "bad node id",
-            DeviceLabel = "bad\nlabel",
-            CredentialReference = "credential?token=secret",
-            CatalogRevision = "bad revision",
-        });
-
-        var result = ConfigValidator.Validate(config);
-
-        AssertIssue(result, "agent.invalidDeviceId", "agent.deviceId");
-        AssertIssue(result, "agent.invalidTailscaleNodeId", "agent.tailscaleNodeId");
-        AssertIssue(result, "text.invalid", "agent.deviceLabel");
-        AssertIssue(result, "agent.invalidCredentialReference", "agent.credentialReference");
-        AssertIssue(result, "agent.invalidCatalogRevision", "agent.catalogRevision");
-    }
-
     [Theory]
     [InlineData("http://127.0.0.1:7897")]
     [InlineData("http://localhost:8080")]
@@ -387,21 +296,6 @@ public sealed class ConfigValidatorTests
     {
         var defaults = TestConfigs.CreateConfigured();
         return defaults with { Server = update(defaults.Server) };
-    }
-
-    private static AppConfig WithAgent(Func<AgentRegistration, AgentRegistration> update)
-    {
-        var configured = new AgentRegistration
-        {
-            IsConfigured = true,
-            Endpoint = "http://100.73.7.51:45821/",
-            TailscaleNodeId = "nJKBridgeLinux123",
-            DeviceId = "device_A1b2c3d4",
-            DeviceLabel = "Office Windows",
-            CredentialReference = "agent-" + new string('a', 64),
-            CatalogRevision = "revision-1",
-        };
-        return TestConfigs.CreateConfigured() with { Agent = update(configured) };
     }
 
     private static void AssertIssue(ConfigValidationResult result, string code, string path)

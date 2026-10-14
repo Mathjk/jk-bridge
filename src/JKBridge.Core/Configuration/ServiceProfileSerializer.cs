@@ -135,7 +135,7 @@ public static class ServiceProfileSerializer
             }
 
             // This projection is the security boundary: none of the validated
-            // legacy server, key-path, Agent, or authorization fields are returned.
+            // legacy server, key-path, or authorization fields are returned.
             return Create(current, LegacyProfileDisplayName);
         }
         catch (JsonException exception)

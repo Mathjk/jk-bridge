@@ -2,7 +2,7 @@ namespace JKBridge.Core.Models;
 
 /// <summary>
 /// A browser endpoint served directly by this Windows computer. It never
-/// participates in SSH forwarding, Linux Agent catalogs, or permitopen grants.
+/// participates in SSH forwarding or permitopen grants.
 /// </summary>
 public sealed record WindowsLocalServiceDefinition
 {

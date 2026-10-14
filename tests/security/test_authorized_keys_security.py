@@ -1,8 +1,8 @@
-"""Security regression tests for the authorization substrate reused by Agent.
+"""Security regression tests for the SSH authorization substrate.
 
 All filesystem writes are contained in a TemporaryDirectory. These cases test
 the existing one-shot helper today and are intended to remain valid when its
-safe primitives are moved behind jkbridge-agent.
+safe primitives are reused by the pairing helper.
 """
 
 from __future__ import annotations

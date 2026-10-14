@@ -58,14 +58,14 @@ public partial class MainViewModel : ViewModelBase
         new(
             "首次连接",
             "第一次只需完成一次配对",
-            "若你只是连接一台 Linux 主机，使用一次性配对即可；Linux Agent 是多设备和集中管理场景的可选高级功能。",
+            "若你只是连接一台 Linux 主机，使用一次性配对即可。",
             "1 · Linux 生成配对码",
             "在目标 Linux 上运行配对脚本，得到十分钟有效、只能使用一次的 jkbridge:// 配对码。",
             "2 · Windows 完成设备配置",
             "打开“设备配置”，粘贴配对码并点击“一键配对并连接”。",
             "3 · 回到概览",
             "看到“已连接”后，直接打开常用服务；以后通常只需启动 JK Bridge。",
-            "配对码和 Agent 登记码都属于一次性凭据，不要截图、转发或写进服务网址。"),
+            "配对码属于一次性凭据，不要截图、转发或写进服务网址。"),
         new(
             "服务入口",
             "“服务”页分成 Linux 隧道与 Windows 本机",
@@ -239,12 +239,6 @@ public partial class MainViewModel : ViewModelBase
     [ObservableProperty] private bool _isLinuxServicesMode = true;
     [ObservableProperty] private bool _isWindowsLocalServiceScanning;
     [ObservableProperty] private string _serviceFeedback = "远端主机固定为 127.0.0.1，不会暴露给局域网。";
-    [ObservableProperty] private bool _isLinuxPendingServiceScanning;
-    [ObservableProperty]
-    private string _linuxPendingServiceFeedback =
-        "Agent 管理员可读取 Linux 当前 127.0.0.1 监听；不会扫描磁盘或端口范围。";
-    [ObservableProperty] private LinuxPendingServiceUiState? _selectedLinuxPendingService;
-    [ObservableProperty] private string _linuxQuickAddUrl = string.Empty;
     [ObservableProperty]
     private string _linuxQuickAddFeedback =
         "也可直接粘贴 Linux 上的 http(s)://127.0.0.1:端口/路径。";
@@ -265,60 +259,10 @@ public partial class MainViewModel : ViewModelBase
     [ObservableProperty] private string _pairingFinishStatus = "等待开始";
     [ObservableProperty] private string _configuredDeviceText = "尚未配置 Linux 设备";
 
-    // Optional Linux Agent enrollment. The recovery code stays only in this transient UI draft.
-    [ObservableProperty] private string _agentSetupCode = string.Empty;
-    [ObservableProperty] private string _agentEndpoint = string.Empty;
-    [ObservableProperty] private string _agentRecoveryCode = string.Empty;
-    [ObservableProperty] private string _agentDeviceLabel = Environment.MachineName;
-    [ObservableProperty]
-    private string _linuxAgentInstallFeedback =
-        "复制后在 Linux 终端运行；无需下载项目、进入目录或使用 sudo。";
-    [ObservableProperty] private bool _isAgentEnrolling;
-    [ObservableProperty] private string _agentEnrollmentFeedback = "Agent 是可选项；不可用时仍可使用下方的一次性配对。";
-    [ObservableProperty] private string _agentConnectionStatus = "等待开始";
-    [ObservableProperty] private string _agentKeyStatus = "等待开始";
-    [ObservableProperty] private string _agentAuthorizationStatus = "等待开始";
-    [ObservableProperty] private string _agentCatalogStatus = "等待开始";
-    [ObservableProperty] private bool _isAgentDiscovering;
-    [ObservableProperty] private string _agentDiscoveryFeedback = "可只读发现当前 tailnet 在线设备上已运行的 JK Bridge Agent。";
-    [ObservableProperty] private AgentDiscoveryCandidateUiState? _selectedAgentDiscoveryCandidate;
-    [ObservableProperty] private bool _agentEndpointRebindConfirmed;
-    [ObservableProperty] private bool _isAgentConfigured;
-    [ObservableProperty] private bool _isAgentManaging;
-    [ObservableProperty] private bool _currentAgentDeviceIsAdmin;
-    [ObservableProperty] private string _agentManagementFeedback = "完成 Agent 登记后，可在这里同步服务和管理其他设备。";
-    [ObservableProperty] private AgentDeviceUiState? _selectedAgentDevice;
-    [ObservableProperty] private bool _agentRevokeConfirmed;
-    [ObservableProperty] private string _agentRenameDeviceLabel = string.Empty;
-    [ObservableProperty] private string _agentEnrollmentCode = string.Empty;
-    [ObservableProperty] private string _agentEnrollmentCodeExpiry = string.Empty;
-    [ObservableProperty] private bool _hasAgentEnrollmentCode;
-    [ObservableProperty] private string _agentEnrollmentCodeFeedback = "管理员可生成 10 分钟内有效、仅可使用一次的普通设备添加码。";
-    [ObservableProperty] private string _agentRelaySlug = string.Empty;
-    [ObservableProperty] private string _agentRelayServiceName = string.Empty;
-    [ObservableProperty] private string _agentRelayDescription = string.Empty;
-    [ObservableProperty] private string _agentRelayLinuxPort = string.Empty;
-    [ObservableProperty] private string _agentRelayTargetHost = string.Empty;
-    [ObservableProperty] private string _agentRelayTargetPort = "443";
-    [ObservableProperty] private bool _agentRelayUseHttps = true;
-    [ObservableProperty] private string _agentRelayOpenPath = "/";
-    [ObservableProperty] private string _agentRelayWindowsPort = string.Empty;
-    [ObservableProperty] private bool _agentRelayGrantToAllDevices = true;
-    [ObservableProperty] private bool _hasAgentRelayPreview;
-    [ObservableProperty] private bool _agentRelayPlanCanApply;
-    [ObservableProperty] private bool _agentRelayConfirmed;
-    [ObservableProperty] private string _agentRelayPreviewSummary = "尚未生成只读计划。";
-    [ObservableProperty] private string _agentRelayFeedback = "高级功能：由 Linux 建立一个仅监听 127.0.0.1 的显式 TCP 中继。仅 Agent 管理员可操作。";
-    [ObservableProperty] private bool _agentCatalogApplyDefaultsToAllDevices = true;
-    [ObservableProperty] private bool _hasAgentCatalogUpdatePreview;
-    [ObservableProperty] private bool _agentCatalogUpdateCanApply;
-    [ObservableProperty] private bool _agentCatalogUpdateConfirmed;
-    [ObservableProperty] private string _agentCatalogUpdateSummary = "尚未预览本机与 Linux Agent 的服务清单差异。";
-    [ObservableProperty] private string _agentCatalogUpdateFeedback = "管理员可先只读预览，再把本机直接 Linux 回环服务清单提交给 Agent。";
     [ObservableProperty] private bool _isServiceProfileBusy;
     [ObservableProperty] private bool _hasServiceProfileImportPreview;
     [ObservableProperty] private bool _serviceProfileImportConfirmed;
-    [ObservableProperty] private string _serviceProfileFeedback = "服务配置文件只包含名称、Windows/Linux 端口、打开路径和健康检查；不会包含账号、密钥、Agent 凭据或服务器身份。";
+    [ObservableProperty] private string _serviceProfileFeedback = "服务配置文件只包含名称、Windows/Linux 端口、打开路径和健康检查；不会包含账号、密钥或服务器身份。";
     [ObservableProperty] private string _serviceProfileImportSummary = "尚未选择导入文件。";
 
     public MainViewModel()
@@ -355,9 +299,6 @@ public partial class MainViewModel : ViewModelBase
 
     public ObservableCollection<DiagnosticItemViewModel> Diagnostics { get; } = [];
 
-    public ObservableCollection<AgentDeviceUiState> AgentDevices { get; } = [];
-    public ObservableCollection<AgentDiscoveryCandidateUiState> AgentDiscoveryCandidates { get; } = [];
-    public ObservableCollection<LinuxPendingServiceUiState> LinuxPendingServices { get; } = [];
 
     public bool IsOverview => SelectedPage == AppPage.Overview;
     public bool IsSetup => SelectedPage == AppPage.Setup;
@@ -376,14 +317,6 @@ public partial class MainViewModel : ViewModelBase
     public bool HasNoIssue => !HasIssue;
     public bool IsWindowsLocalServicesMode => !IsLinuxServicesMode;
     public bool CanScanWindowsLocalServices => !IsWindowsLocalServiceScanning;
-    public bool CanScanLinuxPendingServices =>
-        IsAgentConfigured && CurrentAgentDeviceIsAdmin &&
-        !IsLinuxPendingServiceScanning && !IsAgentManaging;
-    public bool CanAddSelectedLinuxPendingService =>
-        CanScanLinuxPendingServices && SelectedLinuxPendingService is not null;
-    public bool CanAddLinuxUrlDraft =>
-        !string.IsNullOrWhiteSpace(LinuxQuickAddUrl) && !IsAgentManaging;
-    public bool HasLinuxPendingServices => LinuxPendingServices.Count > 0;
     public bool HasDiscoveredWindowsLocalServices => DiscoveredWindowsLocalServices.Count > 0;
     public bool CanExportDiagnosticBundle => !IsDiagnosticBundleBusy;
     public bool CanCheckForUpdates => !IsUpdateChecking;
@@ -391,8 +324,7 @@ public partial class MainViewModel : ViewModelBase
         HasUpdateInstaller && !IsUpdateChecking && !IsUpdateReadyToInstall;
     public bool CanCancelReleaseUpdate => IsUpdateChecking && !IsUpdateReadyToInstall;
     public bool CanLaunchDownloadedReleaseInstaller => IsUpdateReadyToInstall && !IsUpdateChecking;
-    public bool CanStartPairing =>
-        !IsPairing && !IsAgentEnrolling && !IsAgentDiscovering && !IsAgentManaging && !IsServiceProfileBusy;
+    public bool CanStartPairing => !IsPairing && !IsServiceProfileBusy;
     public bool IsManualUpdateProxy => UpdateNetworkModeIndex == 1;
     public string UpdateNetworkModeDescription =>
         UpdateNetworkModeIndex switch
@@ -402,37 +334,9 @@ public partial class MainViewModel : ViewModelBase
             _ => "跟随 Windows/.NET 系统代理；系统没有代理时会直接连接。",
         };
     public string LinuxQuickPairCommand => LinuxPairingBootstrap.PairCommand;
-    public string LinuxAgentInstallCommand => LinuxAgentBootstrap.InstallCommand;
-    public bool CanStartAgentEnrollment =>
-        !IsAgentEnrolling && !IsAgentDiscovering && !IsPairing && !IsAgentManaging && !IsServiceProfileBusy;
-    public bool CanManageAgent =>
-        IsAgentConfigured && !IsAgentManaging && !IsAgentEnrolling && !IsAgentDiscovering && !IsPairing && !IsServiceProfileBusy;
-    public bool CanRevokeAgentDevice =>
-        CanManageAgent &&
-        CurrentAgentDeviceIsAdmin &&
-        AgentRevokeConfirmed &&
-        SelectedAgentDevice is { IsCurrent: false, IsRevoked: false };
-    public bool CanRenameAgentDevice =>
-        CanManageAgent && CurrentAgentDeviceIsAdmin &&
-        SelectedAgentDevice is { IsRevoked: false } selected &&
-        !string.IsNullOrWhiteSpace(AgentRenameDeviceLabel) &&
-        !string.Equals(selected.DeviceLabel, AgentRenameDeviceLabel, StringComparison.Ordinal);
-    public bool CanTransferServiceProfile =>
-        !IsServiceProfileBusy && !IsPairing && !IsAgentEnrolling && !IsAgentDiscovering && !IsAgentManaging;
+    public bool CanTransferServiceProfile => !IsServiceProfileBusy && !IsPairing;
     public bool CanApplyServiceProfileImport =>
         CanTransferServiceProfile && HasServiceProfileImportPreview && ServiceProfileImportConfirmed;
-    public bool CanApplyAgentRelayPlan =>
-        CanManageAgent && HasAgentRelayPreview && AgentRelayPlanCanApply && AgentRelayConfirmed;
-    public bool CanCopyAgentEnrollmentCode => HasAgentEnrollmentCode && !string.IsNullOrWhiteSpace(AgentEnrollmentCode);
-    public bool CanDiscoverAgents =>
-        !IsAgentDiscovering && !IsPairing && !IsAgentEnrolling && !IsAgentManaging && !IsServiceProfileBusy;
-    public bool CanUseDiscoveredAgent =>
-        CanDiscoverAgents && SelectedAgentDiscoveryCandidate is not null;
-    public bool CanRebindAgentEndpoint =>
-        IsAgentConfigured && CanUseDiscoveredAgent && AgentEndpointRebindConfirmed;
-    public bool CanApplyAgentCatalogUpdate =>
-        CanManageAgent && HasAgentCatalogUpdatePreview &&
-        AgentCatalogUpdateCanApply && AgentCatalogUpdateConfirmed;
 
     partial void OnSelectedPageChanged(AppPage value)
     {
@@ -441,17 +345,10 @@ public partial class MainViewModel : ViewModelBase
         OnPropertyChanged(nameof(IsServices));
         OnPropertyChanged(nameof(IsDiagnostics));
         OnPropertyChanged(nameof(IsSettings));
-        if (value != AppPage.Setup && HasAgentEnrollmentCode)
-        {
-            ClearAgentEnrollmentCode("添加码已从界面清除；如仍需添加设备，请重新生成。");
-        }
         if (value != AppPage.Setup)
         {
             _actions.InvalidateTransientSetupState();
-            ClearAgentRelayPreview();
-            ClearAgentCatalogUpdatePreview();
             ClearServiceProfilePreview();
-            AgentEndpointRebindConfirmed = false;
         }
     }
 
@@ -521,15 +418,8 @@ public partial class MainViewModel : ViewModelBase
     partial void OnIsPairingChanged(bool value)
     {
         OnPropertyChanged(nameof(CanStartPairing));
-        OnPropertyChanged(nameof(CanStartAgentEnrollment));
-        OnPropertyChanged(nameof(CanManageAgent));
-        OnPropertyChanged(nameof(CanRevokeAgentDevice));
         OnPropertyChanged(nameof(CanTransferServiceProfile));
         OnPropertyChanged(nameof(CanApplyServiceProfileImport));
-        OnPropertyChanged(nameof(CanApplyAgentRelayPlan));
-        OnPropertyChanged(nameof(CanDiscoverAgents));
-        OnPropertyChanged(nameof(CanUseDiscoveredAgent));
-        OnPropertyChanged(nameof(CanApplyAgentCatalogUpdate));
     }
 
     partial void OnUpdateNetworkModeIndexChanged(int value)
@@ -541,104 +431,19 @@ public partial class MainViewModel : ViewModelBase
     partial void OnHealthCheckIntervalSecondsChanged(int value) =>
         OnPropertyChanged(nameof(HealthCheckIntervalIndex));
 
-    partial void OnIsAgentEnrollingChanged(bool value)
-    {
-        OnPropertyChanged(nameof(CanStartPairing));
-        OnPropertyChanged(nameof(CanStartAgentEnrollment));
-        OnPropertyChanged(nameof(CanManageAgent));
-        OnPropertyChanged(nameof(CanRevokeAgentDevice));
-        OnPropertyChanged(nameof(CanTransferServiceProfile));
-        OnPropertyChanged(nameof(CanApplyServiceProfileImport));
-        OnPropertyChanged(nameof(CanApplyAgentRelayPlan));
-        OnPropertyChanged(nameof(CanDiscoverAgents));
-        OnPropertyChanged(nameof(CanUseDiscoveredAgent));
-        OnPropertyChanged(nameof(CanApplyAgentCatalogUpdate));
-    }
 
-    partial void OnIsAgentConfiguredChanged(bool value)
-    {
-        OnPropertyChanged(nameof(CanManageAgent));
-        OnPropertyChanged(nameof(CanRevokeAgentDevice));
-        OnPropertyChanged(nameof(CanRenameAgentDevice));
-        OnPropertyChanged(nameof(CanApplyAgentRelayPlan));
-        OnPropertyChanged(nameof(CanDiscoverAgents));
-        OnPropertyChanged(nameof(CanUseDiscoveredAgent));
-        OnPropertyChanged(nameof(CanApplyAgentCatalogUpdate));
-        OnPropertyChanged(nameof(CanRebindAgentEndpoint));
-        OnPropertyChanged(nameof(CanScanLinuxPendingServices));
-        OnPropertyChanged(nameof(CanAddSelectedLinuxPendingService));
-    }
 
-    partial void OnIsAgentManagingChanged(bool value)
-    {
-        OnPropertyChanged(nameof(CanStartPairing));
-        OnPropertyChanged(nameof(CanStartAgentEnrollment));
-        OnPropertyChanged(nameof(CanManageAgent));
-        OnPropertyChanged(nameof(CanRevokeAgentDevice));
-        OnPropertyChanged(nameof(CanRenameAgentDevice));
-        OnPropertyChanged(nameof(CanTransferServiceProfile));
-        OnPropertyChanged(nameof(CanApplyServiceProfileImport));
-        OnPropertyChanged(nameof(CanApplyAgentRelayPlan));
-        OnPropertyChanged(nameof(CanDiscoverAgents));
-        OnPropertyChanged(nameof(CanUseDiscoveredAgent));
-        OnPropertyChanged(nameof(CanApplyAgentCatalogUpdate));
-        OnPropertyChanged(nameof(CanRebindAgentEndpoint));
-        OnPropertyChanged(nameof(CanScanLinuxPendingServices));
-        OnPropertyChanged(nameof(CanAddSelectedLinuxPendingService));
-        OnPropertyChanged(nameof(CanAddLinuxUrlDraft));
-    }
 
-    partial void OnCurrentAgentDeviceIsAdminChanged(bool value)
-    {
-        OnPropertyChanged(nameof(CanRevokeAgentDevice));
-        OnPropertyChanged(nameof(CanRenameAgentDevice));
-        OnPropertyChanged(nameof(CanApplyAgentRelayPlan));
-        OnPropertyChanged(nameof(CanDiscoverAgents));
-        OnPropertyChanged(nameof(CanUseDiscoveredAgent));
-        OnPropertyChanged(nameof(CanApplyAgentCatalogUpdate));
-        OnPropertyChanged(nameof(CanScanLinuxPendingServices));
-        OnPropertyChanged(nameof(CanAddSelectedLinuxPendingService));
-    }
 
-    partial void OnIsLinuxPendingServiceScanningChanged(bool value)
-    {
-        OnPropertyChanged(nameof(CanScanLinuxPendingServices));
-        OnPropertyChanged(nameof(CanAddSelectedLinuxPendingService));
-    }
 
-    partial void OnSelectedLinuxPendingServiceChanged(LinuxPendingServiceUiState? value) =>
-        OnPropertyChanged(nameof(CanAddSelectedLinuxPendingService));
 
-    partial void OnLinuxQuickAddUrlChanged(string value) =>
-        OnPropertyChanged(nameof(CanAddLinuxUrlDraft));
 
-    partial void OnSelectedAgentDeviceChanged(AgentDeviceUiState? value)
-    {
-        AgentRevokeConfirmed = false;
-        AgentRenameDeviceLabel = value?.DeviceLabel ?? string.Empty;
-        OnPropertyChanged(nameof(CanRevokeAgentDevice));
-        OnPropertyChanged(nameof(CanRenameAgentDevice));
-    }
-
-    partial void OnAgentRevokeConfirmedChanged(bool value) =>
-        OnPropertyChanged(nameof(CanRevokeAgentDevice));
-
-    partial void OnAgentRenameDeviceLabelChanged(string value) =>
-        OnPropertyChanged(nameof(CanRenameAgentDevice));
 
     partial void OnIsServiceProfileBusyChanged(bool value)
     {
         OnPropertyChanged(nameof(CanStartPairing));
-        OnPropertyChanged(nameof(CanStartAgentEnrollment));
         OnPropertyChanged(nameof(CanTransferServiceProfile));
         OnPropertyChanged(nameof(CanApplyServiceProfileImport));
-        OnPropertyChanged(nameof(CanManageAgent));
-        OnPropertyChanged(nameof(CanRevokeAgentDevice));
-        OnPropertyChanged(nameof(CanRenameAgentDevice));
-        OnPropertyChanged(nameof(CanApplyAgentRelayPlan));
-        OnPropertyChanged(nameof(CanDiscoverAgents));
-        OnPropertyChanged(nameof(CanUseDiscoveredAgent));
-        OnPropertyChanged(nameof(CanApplyAgentCatalogUpdate));
     }
 
     partial void OnHasServiceProfileImportPreviewChanged(bool value) =>
@@ -647,78 +452,20 @@ public partial class MainViewModel : ViewModelBase
     partial void OnServiceProfileImportConfirmedChanged(bool value) =>
         OnPropertyChanged(nameof(CanApplyServiceProfileImport));
 
-    partial void OnHasAgentRelayPreviewChanged(bool value) =>
-        OnPropertyChanged(nameof(CanApplyAgentRelayPlan));
 
-    partial void OnAgentRelayPlanCanApplyChanged(bool value) =>
-        OnPropertyChanged(nameof(CanApplyAgentRelayPlan));
 
-    partial void OnAgentRelayConfirmedChanged(bool value) =>
-        OnPropertyChanged(nameof(CanApplyAgentRelayPlan));
 
-    partial void OnHasAgentCatalogUpdatePreviewChanged(bool value) =>
-        OnPropertyChanged(nameof(CanApplyAgentCatalogUpdate));
 
-    partial void OnAgentCatalogUpdateCanApplyChanged(bool value) =>
-        OnPropertyChanged(nameof(CanApplyAgentCatalogUpdate));
 
-    partial void OnAgentCatalogUpdateConfirmedChanged(bool value) =>
-        OnPropertyChanged(nameof(CanApplyAgentCatalogUpdate));
 
-    partial void OnAgentCatalogApplyDefaultsToAllDevicesChanged(bool value)
-    {
-        if (HasAgentCatalogUpdatePreview)
-        {
-            _actions.InvalidateTransientSetupState();
-            ClearAgentRelayPreview();
-            ClearAgentCatalogUpdatePreview();
-            ClearServiceProfilePreview();
-            AgentCatalogUpdateFeedback = "授权范围已改变，请重新生成只读差异预览。";
-        }
-    }
 
-    partial void OnHasAgentEnrollmentCodeChanged(bool value) =>
-        OnPropertyChanged(nameof(CanCopyAgentEnrollmentCode));
 
-    partial void OnAgentEnrollmentCodeChanged(string value) =>
-        OnPropertyChanged(nameof(CanCopyAgentEnrollmentCode));
 
-    partial void OnIsAgentDiscoveringChanged(bool value)
-    {
-        OnPropertyChanged(nameof(CanStartPairing));
-        OnPropertyChanged(nameof(CanStartAgentEnrollment));
-        OnPropertyChanged(nameof(CanManageAgent));
-        OnPropertyChanged(nameof(CanTransferServiceProfile));
-        OnPropertyChanged(nameof(CanDiscoverAgents));
-        OnPropertyChanged(nameof(CanUseDiscoveredAgent));
-        OnPropertyChanged(nameof(CanRebindAgentEndpoint));
-    }
 
-    partial void OnSelectedAgentDiscoveryCandidateChanged(AgentDiscoveryCandidateUiState? value) =>
-        UpdateDiscoveredAgentSelection();
 
-    partial void OnAgentEndpointRebindConfirmedChanged(bool value) =>
-        OnPropertyChanged(nameof(CanRebindAgentEndpoint));
 
-    partial void OnAgentRelaySlugChanged(string value) => InvalidateAgentRelayPreview();
-    partial void OnAgentRelayServiceNameChanged(string value) => InvalidateAgentRelayPreview();
-    partial void OnAgentRelayDescriptionChanged(string value) => InvalidateAgentRelayPreview();
-    partial void OnAgentRelayLinuxPortChanged(string value) => InvalidateAgentRelayPreview();
-    partial void OnAgentRelayTargetHostChanged(string value) => InvalidateAgentRelayPreview();
-    partial void OnAgentRelayTargetPortChanged(string value) => InvalidateAgentRelayPreview();
-    partial void OnAgentRelayUseHttpsChanged(bool value) => InvalidateAgentRelayPreview();
-    partial void OnAgentRelayOpenPathChanged(string value) => InvalidateAgentRelayPreview();
-    partial void OnAgentRelayWindowsPortChanged(string value) => InvalidateAgentRelayPreview();
-    partial void OnAgentRelayGrantToAllDevicesChanged(bool value) => InvalidateAgentRelayPreview();
 
-    private void UpdateDiscoveredAgentSelection()
-    {
-        AgentEndpointRebindConfirmed = false;
-        OnPropertyChanged(nameof(CanUseDiscoveredAgent));
-        OnPropertyChanged(nameof(CanRebindAgentEndpoint));
-    }
-
-    [RelayCommand]
+        [RelayCommand]
     private void ShowWelcomeTutorial()
     {
         WelcomeTutorialStepIndex = 0;
@@ -855,165 +602,6 @@ public partial class MainViewModel : ViewModelBase
     [RelayCommand]
     private Task CopyLinuxQuickPairCommandAsync() => _actions.CopyLinuxQuickPairCommandAsync();
 
-    [RelayCommand]
-    private Task CopyLinuxAgentInstallCommandAsync() =>
-        _actions.CopyLinuxAgentInstallCommandAsync();
-
-    [RelayCommand]
-    private async Task PairDeviceAsync()
-    {
-        if (!CanStartPairing)
-        {
-            return;
-        }
-
-        await _actions.PairDeviceAsync(new PairingDraft(PairingCode, PairingIdentityFile));
-    }
-
-    [RelayCommand]
-    private async Task EnrollWithAgentAsync()
-    {
-        if (!CanStartAgentEnrollment)
-        {
-            return;
-        }
-
-        await _actions.EnrollWithAgentAsync(new AgentEnrollmentDraft(
-            AgentEndpoint,
-            AgentRecoveryCode,
-            AgentDeviceLabel,
-            PairingIdentityFile,
-            AgentSetupCode));
-    }
-
-    [RelayCommand]
-    private Task SyncAgentCatalogAsync() =>
-        CanManageAgent ? _actions.SyncAgentCatalogAsync() : Task.CompletedTask;
-
-    [RelayCommand]
-    private Task RefreshAgentDevicesAsync() =>
-        CanManageAgent ? _actions.RefreshAgentDevicesAsync() : Task.CompletedTask;
-
-    [RelayCommand]
-    private Task RevokeAgentDeviceAsync() =>
-        CanRevokeAgentDevice && SelectedAgentDevice is not null
-            ? _actions.RevokeAgentDeviceAsync(SelectedAgentDevice.DeviceId, AgentRevokeConfirmed)
-            : Task.CompletedTask;
-
-    [RelayCommand]
-    private Task RenameAgentDeviceAsync() =>
-        CanRenameAgentDevice && SelectedAgentDevice is not null
-            ? _actions.RenameAgentDeviceAsync(
-                SelectedAgentDevice.DeviceId,
-                AgentRenameDeviceLabel)
-            : Task.CompletedTask;
-
-    [RelayCommand]
-    private Task ExportServiceProfileAsync() =>
-        CanTransferServiceProfile ? _actions.ExportServiceProfileAsync() : Task.CompletedTask;
-
-    [RelayCommand]
-    private Task PreviewServiceProfileImportAsync() =>
-        CanTransferServiceProfile ? _actions.PreviewServiceProfileImportAsync() : Task.CompletedTask;
-
-    [RelayCommand]
-    private Task ApplyServiceProfileImportAsync() =>
-        CanApplyServiceProfileImport
-            ? _actions.ApplyServiceProfileImportAsync(ServiceProfileImportConfirmed)
-            : Task.CompletedTask;
-
-    [RelayCommand]
-    private Task PlanAgentRelayAsync() =>
-        CanManageAgent
-            ? _actions.PlanAgentRelayAsync(new AgentRelayDraft(
-                AgentRelaySlug,
-                AgentRelayServiceName,
-                AgentRelayDescription,
-                AgentRelayLinuxPort,
-                AgentRelayTargetHost,
-                AgentRelayTargetPort,
-                AgentRelayUseHttps,
-                AgentRelayOpenPath,
-                AgentRelayWindowsPort,
-                AgentRelayGrantToAllDevices))
-            : Task.CompletedTask;
-
-    [RelayCommand]
-    private Task PlanAgentRelayDeletionAsync() =>
-        CanManageAgent
-            ? _actions.PlanAgentRelayDeletionAsync(AgentRelaySlug)
-            : Task.CompletedTask;
-
-    [RelayCommand]
-    private Task ApplyAgentRelayPlanAsync() =>
-        CanApplyAgentRelayPlan
-            ? _actions.ApplyAgentRelayPlanAsync(AgentRelayConfirmed)
-            : Task.CompletedTask;
-
-    [RelayCommand]
-    private Task GenerateAgentEnrollmentCodeAsync() =>
-        CanManageAgent ? _actions.GenerateAgentEnrollmentCodeAsync() : Task.CompletedTask;
-
-    [RelayCommand]
-    private Task CopyAgentEnrollmentCodeAsync() =>
-        CanCopyAgentEnrollmentCode
-            ? _actions.CopyAgentEnrollmentCodeAsync(AgentEnrollmentCode)
-            : Task.CompletedTask;
-
-    [RelayCommand]
-    private Task DiscoverAgentsAsync() =>
-        CanDiscoverAgents ? _actions.DiscoverAgentsAsync() : Task.CompletedTask;
-
-    [RelayCommand]
-    private void UseDiscoveredAgent()
-    {
-        if (!CanUseDiscoveredAgent || SelectedAgentDiscoveryCandidate is null)
-        {
-            return;
-        }
-
-        AgentEndpoint = SelectedAgentDiscoveryCandidate.Endpoint;
-        AgentDiscoveryFeedback = "已明确填入所选 Agent 地址；仍需提供一次性添加码并点击登记，发现操作本身不会登记设备。";
-    }
-
-    [RelayCommand]
-    private Task RebindAgentEndpointAsync() =>
-        CanRebindAgentEndpoint && SelectedAgentDiscoveryCandidate is not null
-            ? _actions.RebindAgentEndpointAsync(
-                SelectedAgentDiscoveryCandidate,
-                AgentEndpointRebindConfirmed)
-            : Task.CompletedTask;
-
-    [RelayCommand]
-    private Task PreviewAgentCatalogUpdateAsync() =>
-        CanManageAgent
-            ? _actions.PreviewAgentCatalogUpdateAsync(AgentCatalogApplyDefaultsToAllDevices)
-            : Task.CompletedTask;
-
-    [RelayCommand]
-    private Task ApplyAgentCatalogUpdateAsync() =>
-        CanApplyAgentCatalogUpdate
-            ? _actions.ApplyAgentCatalogUpdateAsync(AgentCatalogUpdateConfirmed)
-            : Task.CompletedTask;
-
-    [RelayCommand]
-    private Task CopyDiagnosticSummaryAsync() => _actions.CopyDiagnosticSummaryAsync();
-
-    [RelayCommand]
-    private Task OpenLogFolderAsync() => _actions.OpenLogFolderAsync();
-
-    [RelayCommand]
-    private async Task SaveSettingsAsync()
-    {
-        var draft = new SettingsDraft(
-            LinuxHost, LinuxUser, SshPort, IdentityFile, PinnedHostKey,
-            AutoConnect, AutoReconnect, CloseToTray, StartWithWindows,
-            ThemeIndex, UpdateNetworkModeIndex,
-            UpdateManualProxyUrl, HealthCheckIntervalSeconds);
-
-        await _actions.SaveSettingsAsync(draft);
-    }
-
     private static ThemePreference ThemeFromIndex(int index) =>
         index switch
         {
@@ -1076,65 +664,61 @@ public partial class MainViewModel : ViewModelBase
         _actions.AddWindowsLocalServiceAsync();
 
     [RelayCommand]
-    private async Task ScanLinuxPendingServicesAsync()
-    {
-        if (!CanScanLinuxPendingServices)
-        {
-            return;
-        }
-
-        IsLinuxPendingServiceScanning = true;
-        LinuxPendingServiceFeedback = "正在让 Linux Agent 读取当前回环监听并做有限网页识别…";
-        try
-        {
-            await _actions.ScanLinuxPendingServicesAsync();
-        }
-        finally
-        {
-            IsLinuxPendingServiceScanning = false;
-        }
-    }
-
-    [RelayCommand]
-    private Task AddSelectedLinuxPendingServiceAsync() =>
-        CanAddSelectedLinuxPendingService && SelectedLinuxPendingService is not null
-            ? _actions.AddLinuxPendingServiceAsync(SelectedLinuxPendingService)
-            : Task.CompletedTask;
-
-    [RelayCommand]
-    private async Task AddLinuxUrlDraftAsync()
-    {
-        if (!CanAddLinuxUrlDraft)
-        {
-            return;
-        }
-
-        await _actions.AddLinuxUrlDraftAsync(LinuxQuickAddUrl);
-    }
-
-    [RelayCommand]
     private Task SaveSelectedServiceAsync() =>
         SelectedService is null ? Task.CompletedTask : SaveServiceDraftAsync(SelectedService);
 
     [RelayCommand]
     private Task RemoveSelectedServiceAsync() =>
         SelectedService is null ? Task.CompletedTask : _actions.RemoveServiceAsync(SelectedService.Id);
-
-    public void ApplyLinuxPendingServices(
-        IEnumerable<LinuxPendingServiceUiState> services,
-        string feedback)
+    [RelayCommand]
+    private async Task PairDeviceAsync()
     {
-        LinuxPendingServices.Clear();
-        foreach (var service in services)
+        if (!CanStartPairing)
         {
-            LinuxPendingServices.Add(service);
+            return;
         }
-        SelectedLinuxPendingService = LinuxPendingServices.FirstOrDefault();
-        IsAgentManaging = false;
-        LinuxPendingServiceFeedback = feedback;
-        OnPropertyChanged(nameof(HasLinuxPendingServices));
-        OnPropertyChanged(nameof(CanAddSelectedLinuxPendingService));
+
+        await _actions.PairDeviceAsync(new PairingDraft(PairingCode, PairingIdentityFile));
     }
+
+
+    [RelayCommand]
+    private async Task SaveSettingsAsync()
+    {
+        var draft = new SettingsDraft(
+            LinuxHost, LinuxUser, SshPort, IdentityFile, PinnedHostKey,
+            AutoConnect, AutoReconnect, CloseToTray, StartWithWindows,
+            ThemeIndex, UpdateNetworkModeIndex,
+            UpdateManualProxyUrl, HealthCheckIntervalSeconds);
+
+        await _actions.SaveSettingsAsync(draft);
+    }
+
+
+    [RelayCommand]
+    private Task OpenLogFolderAsync() => _actions.OpenLogFolderAsync();
+
+
+    [RelayCommand]
+    private Task CopyDiagnosticSummaryAsync() => _actions.CopyDiagnosticSummaryAsync();
+
+
+    [RelayCommand]
+    private Task ExportServiceProfileAsync() =>
+        CanTransferServiceProfile ? _actions.ExportServiceProfileAsync() : Task.CompletedTask;
+
+
+    [RelayCommand]
+    private Task PreviewServiceProfileImportAsync() =>
+        CanTransferServiceProfile ? _actions.PreviewServiceProfileImportAsync() : Task.CompletedTask;
+
+
+    [RelayCommand]
+    private Task ApplyServiceProfileImportAsync() =>
+        CanApplyServiceProfileImport
+            ? _actions.ApplyServiceProfileImportAsync(ServiceProfileImportConfirmed)
+            : Task.CompletedTask;
+
 
     public void ApplyBridgeState(BridgeUiState state)
     {
@@ -1366,293 +950,7 @@ public partial class MainViewModel : ViewModelBase
         SetupFeedback = detail;
     }
 
-    public void BeginAgentEnrollment()
-    {
-        IsAgentEnrolling = true;
-        AgentConnectionStatus = "检查中";
-        AgentKeyStatus = "等待";
-        AgentAuthorizationStatus = "等待";
-        AgentCatalogStatus = "等待";
-        AgentEnrollmentFeedback = "正在验证 Agent 地址与 Tailscale 连接…";
-    }
-
-    public void ApplyAgentEnrollmentProgress(AgentEnrollmentStage stage, string detail)
-    {
-        AgentEnrollmentFeedback = detail;
-        switch (stage)
-        {
-            case AgentEnrollmentStage.CheckingAgent:
-                AgentConnectionStatus = "进行中";
-                break;
-            case AgentEnrollmentStage.PreparingKey:
-                AgentConnectionStatus = "完成";
-                AgentKeyStatus = "进行中";
-                break;
-            case AgentEnrollmentStage.AwaitingAuthorization:
-                AgentConnectionStatus = "完成";
-                AgentKeyStatus = "完成";
-                AgentAuthorizationStatus = "等待确认";
-                break;
-            case AgentEnrollmentStage.FetchingCatalog:
-                AgentConnectionStatus = "完成";
-                AgentKeyStatus = "完成";
-                AgentAuthorizationStatus = "完成";
-                AgentCatalogStatus = "同步中";
-                break;
-            case AgentEnrollmentStage.Completed:
-                AgentConnectionStatus = "完成";
-                AgentKeyStatus = "完成";
-                AgentAuthorizationStatus = "完成";
-                AgentCatalogStatus = "完成";
-                break;
-        }
-    }
-
-    public void CompleteAgentEnrollment(string deviceText)
-    {
-        IsAgentEnrolling = false;
-        SetupCompleted = true;
-        ConfiguredDeviceText = deviceText;
-        AgentConnectionStatus = "完成";
-        AgentKeyStatus = "完成";
-        AgentAuthorizationStatus = "完成";
-        AgentCatalogStatus = "完成";
-        AgentRecoveryCode = string.Empty;
-        AgentEnrollmentFeedback = "设备已登记，服务清单已同步，正在建立安全隧道。";
-        IsAgentConfigured = true;
-    }
-
-    public void BeginAgentDiscovery()
-    {
-        IsAgentDiscovering = true;
-        AgentDiscoveryCandidates.Clear();
-        SelectedAgentDiscoveryCandidate = null;
-        AgentDiscoveryFeedback = "正在只读检查当前 tailnet 的在线 peer；不会扫描网段或登记设备。";
-    }
-
-    public void ApplyAgentDiscovery(
-        IEnumerable<AgentDiscoveryCandidateUiState> candidates,
-        string feedback)
-    {
-        AgentDiscoveryCandidates.Clear();
-        foreach (var candidate in candidates)
-        {
-            AgentDiscoveryCandidates.Add(candidate);
-        }
-
-        SelectedAgentDiscoveryCandidate = AgentDiscoveryCandidates.Count == 1
-            ? AgentDiscoveryCandidates[0]
-            : null;
-        IsAgentDiscovering = false;
-        AgentDiscoveryFeedback = feedback;
-    }
-
-    public void FailAgentDiscovery(string detail)
-    {
-        AgentDiscoveryCandidates.Clear();
-        SelectedAgentDiscoveryCandidate = null;
-        IsAgentDiscovering = false;
-        AgentDiscoveryFeedback = detail;
-    }
-
-    public void FailAgentEnrollment(string detail)
-    {
-        IsAgentEnrolling = false;
-        AgentEnrollmentFeedback = detail;
-        if (AgentConnectionStatus == "进行中")
-        {
-            AgentConnectionStatus = "需要处理";
-        }
-        else if (AgentKeyStatus == "进行中")
-        {
-            AgentKeyStatus = "需要处理";
-        }
-        else if (AgentAuthorizationStatus == "等待确认")
-        {
-            AgentAuthorizationStatus = "未授权";
-        }
-        else
-        {
-            AgentCatalogStatus = "需要处理";
-        }
-    }
-
-    public void ApplyAgentRegistration(bool configured)
-    {
-        IsAgentConfigured = configured;
-        if (!configured)
-        {
-            AgentDevices.Clear();
-            SelectedAgentDevice = null;
-            CurrentAgentDeviceIsAdmin = false;
-            ClearAgentEnrollmentCode("完成 Agent 登记后，管理员可在这里生成新设备添加码。");
-            ClearAgentRelayPreview();
-        }
-    }
-
-    public void BeginAgentManagement(string detail)
-    {
-        IsAgentManaging = true;
-        AgentManagementFeedback = detail;
-    }
-
-    public void ApplyAgentDevices(
-        IEnumerable<AgentDeviceUiState> devices,
-        string currentDeviceRole,
-        string feedback)
-    {
-        var selectedId = SelectedAgentDevice?.DeviceId;
-        AgentDevices.Clear();
-        foreach (var device in devices)
-        {
-            AgentDevices.Add(device);
-        }
-
-        SelectedAgentDevice = AgentDevices.FirstOrDefault(device => device.DeviceId == selectedId)
-                              ?? AgentDevices.FirstOrDefault(device => !device.IsCurrent && !device.IsRevoked)
-                              ?? AgentDevices.FirstOrDefault();
-        CurrentAgentDeviceIsAdmin = string.Equals(currentDeviceRole, "admin", StringComparison.Ordinal);
-        AgentRevokeConfirmed = false;
-        IsAgentManaging = false;
-        AgentManagementFeedback = feedback;
-    }
-
-    public void FailAgentManagement(string detail)
-    {
-        IsAgentManaging = false;
-        AgentRevokeConfirmed = false;
-        AgentManagementFeedback = detail;
-    }
-
-    public void BeginAgentRelayOperation(string detail)
-    {
-        IsAgentManaging = true;
-        AgentRelayConfirmed = false;
-        AgentRelayFeedback = detail;
-    }
-
-    public void ApplyAgentRelayPreview(string summary, bool canApply)
-    {
-        IsAgentManaging = false;
-        AgentRelayPreviewSummary = summary;
-        AgentRelayPlanCanApply = canApply;
-        HasAgentRelayPreview = true;
-        AgentRelayConfirmed = false;
-        AgentRelayFeedback = canApply
-            ? "只读计划与探测已完成。核对映射和授权影响后，明确勾选确认才会修改 Linux。"
-            : "计划或探测表明当前不能安全应用；Linux 尚未改变。";
-    }
-
-    public void CompleteAgentRelayOperation(string detail)
-    {
-        IsAgentManaging = false;
-        AgentRelayFeedback = detail;
-        ClearAgentRelayPreview();
-    }
-
-    public void FailAgentRelayOperation(string detail, bool preservePreview)
-    {
-        IsAgentManaging = false;
-        AgentRelayFeedback = detail;
-        AgentRelayConfirmed = false;
-        if (!preservePreview)
-        {
-            ClearAgentRelayPreview();
-        }
-    }
-
-    public void BeginAgentCatalogUpdate(string detail)
-    {
-        IsAgentManaging = true;
-        AgentCatalogUpdateConfirmed = false;
-        AgentCatalogUpdateFeedback = detail;
-    }
-
-    public void ApplyAgentCatalogUpdatePreview(
-        string summary,
-        bool canApply,
-        string feedback)
-    {
-        IsAgentManaging = false;
-        AgentCatalogUpdateSummary = summary;
-        AgentCatalogUpdateCanApply = canApply;
-        HasAgentCatalogUpdatePreview = true;
-        AgentCatalogUpdateConfirmed = false;
-        AgentCatalogUpdateFeedback = feedback;
-    }
-
-    public void CompleteAgentCatalogUpdate(string detail)
-    {
-        IsAgentManaging = false;
-        AgentCatalogUpdateFeedback = detail;
-        ClearAgentCatalogUpdatePreview();
-    }
-
-    public void FailAgentCatalogUpdate(string detail, bool preservePreview)
-    {
-        IsAgentManaging = false;
-        AgentCatalogUpdateFeedback = detail;
-        AgentCatalogUpdateConfirmed = false;
-        if (!preservePreview)
-        {
-            ClearAgentCatalogUpdatePreview();
-        }
-    }
-
-    private void ClearAgentCatalogUpdatePreview()
-    {
-        HasAgentCatalogUpdatePreview = false;
-        AgentCatalogUpdateCanApply = false;
-        AgentCatalogUpdateConfirmed = false;
-        AgentCatalogUpdateSummary = "尚未预览本机与 Linux Agent 的服务清单差异。";
-    }
-
-    public void ShowAgentEnrollmentCode(string code, string expiryText)
-    {
-        AgentEnrollmentCode = code;
-        AgentEnrollmentCodeExpiry = expiryText;
-        HasAgentEnrollmentCode = true;
-        IsAgentManaging = false;
-        AgentEnrollmentCodeFeedback = "添加码只显示到过期；复制后请立即发送给目标 Windows，剪贴板内容需自行覆盖。";
-    }
-
-    public void SetAgentEnrollmentCodeFeedback(string detail)
-    {
-        IsAgentManaging = false;
-        AgentEnrollmentCodeFeedback = detail;
-    }
-
-    public void ClearAgentEnrollmentCode(string detail)
-    {
-        AgentEnrollmentCode = string.Empty;
-        AgentEnrollmentCodeExpiry = string.Empty;
-        HasAgentEnrollmentCode = false;
-        AgentEnrollmentCodeFeedback = detail;
-    }
-
-    private void InvalidateAgentRelayPreview()
-    {
-        if (!HasAgentRelayPreview)
-        {
-            return;
-        }
-
-        _actions.InvalidateTransientSetupState();
-        ClearAgentRelayPreview();
-        ClearAgentCatalogUpdatePreview();
-        ClearServiceProfilePreview();
-        AgentRelayFeedback = "输入已改变。请重新生成只读计划和探测结果。";
-    }
-
-    private void ClearAgentRelayPreview()
-    {
-        HasAgentRelayPreview = false;
-        AgentRelayPlanCanApply = false;
-        AgentRelayConfirmed = false;
-        AgentRelayPreviewSummary = "尚未生成只读计划。";
-    }
-
-    public void BeginServiceProfileAction(string detail)
+                                                                                                        public void BeginServiceProfileAction(string detail)
     {
         IsServiceProfileBusy = true;
         ServiceProfileFeedback = detail;
