@@ -24,7 +24,6 @@ jobs:
         run: ./scripts/check-public-release.sh
       - name: Documentation link check
         run: ./scripts/check-doc-links.sh
-      - name: Public-release privacy scan
       - name: Python helper tests
         run: python3 -m unittest discover -s tests/linux -p 'test_*.py'
       - name: Security regression tests
