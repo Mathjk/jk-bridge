@@ -294,7 +294,7 @@ public sealed class ServiceRestartActionTests
     }
 
     [Fact]
-    public void ConfirmAsync_WithoutOwnerWindowFailsSafe()
+    public async Task ConfirmAsync_WithoutOwnerWindowFailsSafe()
     {
         var directory = CreateControllerDirectory();
         var controller = CreateController(new HttpClient(new CapturingHandler()), directory);
@@ -302,13 +302,13 @@ public sealed class ServiceRestartActionTests
         try
         {
             // The test host has no main window, so a destructive action must not proceed.
-            var confirmed = controller.ConfirmAsync(new ConfirmRequest("t", "m")).GetAwaiter().GetResult();
+            var confirmed = await controller.ConfirmAsync(new ConfirmRequest("t", "m"));
 
             Assert.False(confirmed);
         }
         finally
         {
-            controller.DisposeAsync().GetAwaiter().GetResult();
+            await controller.DisposeAsync();
             if (Directory.Exists(directory))
             {
                 Directory.Delete(directory, recursive: true);
