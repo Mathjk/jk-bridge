@@ -36,6 +36,7 @@ COMMAND_TIMEOUT_SECONDS = 120
 # Fixed allow-list: target -> restart command. An empty list means the target is
 # not restartable through this daemon.
 RESTART_TARGETS = {
+    "jkbridge-ctl": ["systemctl", "--user", "restart", "jkbridge-ctl"],
     "gpu-dashboard": ["systemctl", "--user", "restart", "gpu-dashboard"],
     "investment-news": ["systemctl", "--user", "restart", "investment-news"],
     "cn-fund-backtest": ["systemctl", "--user", "restart", "cn-fund-backtest"],
@@ -47,6 +48,7 @@ RESTART_TARGETS = {
 
 # Fixed allow-list: target -> log command factory. Read-only, bounded output.
 LOG_TARGETS = {
+    "jkbridge-ctl": lambda lines: ["journalctl", "--user", "-u", "jkbridge-ctl", "-n", str(lines), "--no-pager"],
     "gpu-dashboard": lambda lines: ["journalctl", "--user", "-u", "gpu-dashboard", "-n", str(lines), "--no-pager"],
     "investment-news": lambda lines: ["journalctl", "--user", "-u", "investment-news", "-n", str(lines), "--no-pager"],
     "cn-fund-backtest": lambda lines: ["journalctl", "--user", "-u", "cn-fund-backtest", "-n", str(lines), "--no-pager"],
@@ -58,6 +60,7 @@ LOG_TARGETS = {
 
 # Fixed allow-list: target -> status probe. Read-only.
 STATUS_TARGETS = {
+    "jkbridge-ctl": ("systemd", "jkbridge-ctl"),
     "gpu-dashboard": ("systemd", "gpu-dashboard"),
     "investment-news": ("systemd", "investment-news"),
     "cn-fund-backtest": ("systemd", "cn-fund-backtest"),

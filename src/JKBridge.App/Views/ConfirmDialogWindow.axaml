@@ -4,7 +4,7 @@
         x:Class="JKBridge.App.Views.ConfirmDialogWindow"
         x:DataType="vm:ConfirmDialogViewModel"
         Title="{Binding Title}"
-        Width="440" SizeToContent="Height"
+        Width="460" Height="280"
         WindowStartupLocation="CenterOwner"
         CanResize="False"
         ShowInTaskbar="False"

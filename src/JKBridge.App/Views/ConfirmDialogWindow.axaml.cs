@@ -13,10 +13,10 @@ public partial class ConfirmDialogWindow : Window
     }
 
     public ConfirmDialogWindow(ConfirmDialogViewModel viewModel)
-        : this()
     {
+        // Compiled bindings resolve during InitializeComponent, so the data
+        // context must already be in place when the XAML loads.
         DataContext = viewModel;
+        InitializeComponent();
     }
-
-    private void InitializeComponent() => AvaloniaXamlLoader.Load(this);
 }
