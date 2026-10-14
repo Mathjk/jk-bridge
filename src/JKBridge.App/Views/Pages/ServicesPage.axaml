@@ -327,8 +327,9 @@
                             <Grid ColumnDefinitions="Auto,*,Auto">
                                 <Button Content="删除" Classes="ghost" Foreground="{DynamicResource JkErrorBrush}"
                                         Command="{Binding RemoveCommand}" />
-                                <Button Grid.Column="0" Content="查看 Linux 日志" Classes="ghost"
-                                        Command="{Binding OpenLogCommand}" Margin="0,0,8,0" />
+                                <Button Grid.Column="1" Content="查看 Linux 日志" Classes="ghost"
+                                        Command="{Binding OpenLogCommand}" Margin="8,0,8,0"
+                                        HorizontalAlignment="Center" />
                                 <Button Grid.Column="2" Content="保存更改" Classes="primary"
                                         Command="{Binding SaveCommand}" />
                             </Grid>

@@ -732,9 +732,22 @@ public partial class MainViewModel : ViewModelBase
         LinuxPeerDnsName = state.PeerDnsName;
         AvailableServicesText = state.AvailableServicesText;
         LastUpdatedText = state.LastUpdatedText;
-        HasIssue = state.HasIssue;
-        IssueTitle = state.IssueTitle;
-        IssueDetail = state.IssueDetail;
+
+        // A real tunnel problem replaces any pending action notice; a healthy
+        // snapshot must not erase one (health checks run every few seconds).
+        if (state.HasIssue)
+        {
+            _hasActionNotice = false;
+            HasIssue = true;
+            IssueTitle = state.IssueTitle;
+            IssueDetail = state.IssueDetail;
+        }
+        else if (!_hasActionNotice)
+        {
+            HasIssue = false;
+            IssueTitle = "连接运行正常";
+            IssueDetail = string.Empty;
+        }
     }
 
     public void SetServices(IEnumerable<ServiceUiState> services)
@@ -876,8 +889,11 @@ public partial class MainViewModel : ViewModelBase
         }
     }
 
+    private bool _hasActionNotice;
+
     public void ShowNotice(string title, string detail)
     {
+        _hasActionNotice = true;
         HasIssue = true;
         IssueTitle = title;
         IssueDetail = detail;
