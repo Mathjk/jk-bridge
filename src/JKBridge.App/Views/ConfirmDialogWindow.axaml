@@ -8,7 +8,7 @@
         WindowStartupLocation="CenterOwner"
         CanResize="False"
         ShowInTaskbar="False"
-        SystemDecorations="None"
+        WindowDecorations="None"
         Background="{DynamicResource JkWindowBrush}">
     <Border Classes="card" Padding="22" Margin="16">
         <StackPanel>
