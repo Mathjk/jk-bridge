@@ -209,6 +209,30 @@ public partial class MainViewModel : ViewModelBase
     [ObservableProperty] private string _updateReleaseUrl = string.Empty;
     [ObservableProperty] private int _updateNetworkModeIndex;
     [ObservableProperty] private string _updateManualProxyUrl = string.Empty;
+    [ObservableProperty] private int _healthCheckIntervalSeconds = 20;
+
+    /// <summary>
+    /// ComboBox index for the preset health-check intervals.
+    /// </summary>
+    public int HealthCheckIntervalIndex
+    {
+        get => HealthCheckIntervalSeconds switch
+        {
+            <= 10 => 0,
+            <= 20 => 1,
+            <= 30 => 2,
+            <= 60 => 3,
+            _ => 4,
+        };
+        set => HealthCheckIntervalSeconds = value switch
+        {
+            0 => 10,
+            1 => 20,
+            2 => 30,
+            3 => 60,
+            _ => 120,
+        };
+    }
     [ObservableProperty]
     private string _linuxQuickPairFeedback =
         "复制到 Linux 终端运行；只需 Python 3，无需 Linux 外网、下载项目或切换目录。";
@@ -513,6 +537,9 @@ public partial class MainViewModel : ViewModelBase
         OnPropertyChanged(nameof(IsManualUpdateProxy));
         OnPropertyChanged(nameof(UpdateNetworkModeDescription));
     }
+
+    partial void OnHealthCheckIntervalSecondsChanged(int value) =>
+        OnPropertyChanged(nameof(HealthCheckIntervalIndex));
 
     partial void OnIsAgentEnrollingChanged(bool value)
     {
@@ -982,7 +1009,7 @@ public partial class MainViewModel : ViewModelBase
             LinuxHost, LinuxUser, SshPort, IdentityFile, PinnedHostKey,
             AutoConnect, AutoReconnect, CloseToTray, StartWithWindows,
             ThemeIndex, UpdateNetworkModeIndex,
-            UpdateManualProxyUrl);
+            UpdateManualProxyUrl, HealthCheckIntervalSeconds);
 
         await _actions.SaveSettingsAsync(draft);
     }
@@ -1137,6 +1164,7 @@ public partial class MainViewModel : ViewModelBase
                 service => _actions.OpenServiceAsync(service.Id, service.LocalUrl),
                 service => _actions.RetryServiceAsync(service.Id),
                 RestartWithConfirmationAsync,
+                service => _actions.OpenServiceLogAsync(service.Id),
                 service => _actions.CopyAddressAsync(service.LocalUrl),
                 (service, enabled) => SaveServiceDraftAsync(service),
                 SaveServiceDraftAsync,

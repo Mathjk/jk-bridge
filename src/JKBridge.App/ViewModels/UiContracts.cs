@@ -47,6 +47,15 @@ public sealed record ConfirmRequest(
     string ConfirmText = "确认",
     bool IsDangerous = true);
 
+/// <summary>
+/// A service that just transitioned into a broken phase.
+/// </summary>
+public sealed record ServiceAlert(
+    string ServiceId,
+    string ServiceName,
+    string Title,
+    string Detail);
+
 public sealed record WindowsLocalServiceUiState(
     string Id,
     string Name,
@@ -107,7 +116,8 @@ public sealed record SettingsDraft(
     bool StartWithWindows,
     int ThemeIndex,
     int UpdateNetworkModeIndex,
-    string UpdateManualProxyUrl);
+    string UpdateManualProxyUrl,
+    int HealthCheckIntervalSeconds = 20);
 
 public sealed record PairingDraft(
     string PairingCode,
@@ -190,6 +200,7 @@ public interface IBridgeUiActions
     Task OpenServiceAsync(string serviceId, string localUrl);
     Task RetryServiceAsync(string serviceId);
     Task RestartServiceAsync(string serviceId);
+    Task OpenServiceLogAsync(string serviceId);
     Task<bool> ConfirmAsync(ConfirmRequest request);
     Task CopyAddressAsync(string localUrl);
     Task SetServiceEnabledAsync(string serviceId, bool enabled);
@@ -276,6 +287,7 @@ internal sealed class NullBridgeUiActions : IBridgeUiActions
     public Task OpenServiceAsync(string serviceId, string localUrl) => Task.CompletedTask;
     public Task RetryServiceAsync(string serviceId) => Task.CompletedTask;
     public Task RestartServiceAsync(string serviceId) => Task.CompletedTask;
+    public Task OpenServiceLogAsync(string serviceId) => Task.CompletedTask;
     public Task<bool> ConfirmAsync(ConfirmRequest request) => Task.FromResult(false);
     public Task CopyAddressAsync(string localUrl) => Task.CompletedTask;
     public Task SetServiceEnabledAsync(string serviceId, bool enabled) => Task.CompletedTask;

@@ -23,6 +23,11 @@ public interface IBridgeRuntime : IAsyncDisposable
     Task RestartAsync(AppConfig config, CancellationToken cancellationToken = default);
 
     Task RefreshAsync(AppConfig config, CancellationToken cancellationToken = default);
+
+    /// <summary>
+    /// Adjusts the service health-check interval without reconnecting.
+    /// </summary>
+    void SetHealthCheckInterval(TimeSpan interval);
 }
 
 /// <summary>
@@ -103,6 +108,21 @@ public sealed class BridgeRuntime : IBridgeRuntime
     }
 
     public event EventHandler<TunnelSnapshot>? SnapshotChanged;
+
+    private TimeSpan? _healthIntervalOverride;
+
+    /// <summary>
+    /// Adjusts the service health-check interval without reconnecting. The
+    /// supervisor loop reads the override on every iteration.
+    /// </summary>
+    public void SetHealthCheckInterval(TimeSpan interval)
+    {
+        ArgumentOutOfRangeException.ThrowIfLessThanOrEqual(interval, TimeSpan.Zero);
+        _healthIntervalOverride = interval;
+    }
+
+    public TimeSpan EffectiveHealthCheckInterval =>
+        _healthIntervalOverride ?? _options.HealthCheckInterval;
 
     public TunnelSnapshot Snapshot
     {
@@ -616,7 +636,7 @@ public sealed class BridgeRuntime : IBridgeRuntime
                         cancellationToken)
                     .ConfigureAwait(false);
 
-                var intervalTask = _delay.DelayAsync(_options.HealthCheckInterval, cancellationToken);
+                var intervalTask = _delay.DelayAsync(EffectiveHealthCheckInterval, cancellationToken);
                 var completed = await Task.WhenAny(exitTask, intervalTask).ConfigureAwait(false);
                 if (completed == exitTask)
                 {

@@ -1,3 +1,4 @@
+using System.ComponentModel;
 using Avalonia;
 using Avalonia.Controls;
 using Avalonia.Controls.ApplicationLifetimes;
@@ -68,6 +69,7 @@ public partial class App : Application
 
             _mainWindow = new MainWindow { DataContext = _controller.ViewModel };
             _mainWindow.Closing += MainWindow_OnClosing;
+            _controller.ServiceAlert += Controller_OnServiceAlert;
             desktop.MainWindow = _mainWindow;
             desktop.Exit += Desktop_OnExit;
 
@@ -122,6 +124,26 @@ public partial class App : Application
     }
 
     private void TrayIcon_OnClicked(object? sender, EventArgs eventArgs) => ShowMainWindow();
+
+    private void Controller_OnServiceAlert(object? sender, ServiceAlert alert)
+    {
+        if (!WindowsNotifier.IsSupported)
+        {
+            return;
+        }
+
+        try
+        {
+            WindowsNotifier.ShowBalloon(
+                $"{alert.ServiceName}：{alert.Title}",
+                alert.Detail);
+        }
+        catch (Exception exception) when (exception is
+            InvalidOperationException or Win32Exception or NotSupportedException)
+        {
+            // Notification support is optional; the in-app banner still shows.
+        }
+    }
 
     private void ShowMenuItem_OnClick(object? sender, EventArgs eventArgs) => ShowMainWindow();
 

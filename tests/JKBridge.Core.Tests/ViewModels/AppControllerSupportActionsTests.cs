@@ -495,6 +495,9 @@ public sealed class AppControllerSupportActionsTests
         public Task StopAsync(CancellationToken cancellationToken = default) => Task.CompletedTask;
         public Task RestartAsync(AppConfig config, CancellationToken cancellationToken = default) => Task.CompletedTask;
         public Task RefreshAsync(AppConfig config, CancellationToken cancellationToken = default) => Task.CompletedTask;
+        public void SetHealthCheckInterval(TimeSpan interval)
+        {
+        }
         public ValueTask DisposeAsync() => ValueTask.CompletedTask;
     }
 }

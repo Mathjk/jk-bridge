@@ -110,6 +110,7 @@ public sealed class ServiceRestartActionTests
             Path.GetTempPath(),
             $"jkbridge-restart-{Guid.NewGuid():N}");
         Directory.CreateDirectory(directory);
+        var store = new InMemoryRestartTokenStore();
         var controller = new AppController(
             new ConfigStore(Path.Combine(directory, "config.json")),
             new RollingFileLogger(Path.Combine(directory, "logs")),
@@ -118,7 +119,8 @@ public sealed class ServiceRestartActionTests
             new StartupRegistration($"JK Bridge Test {Guid.NewGuid():N}"),
             Path.Combine(directory, "logs"),
             () => null,
-            dispatchUi: action => action());
+            dispatchUi: action => action(),
+            restartTokenStore: store);
 
         try
         {
@@ -144,7 +146,10 @@ public sealed class ServiceRestartActionTests
 
             var saved = controller.CurrentConfig.Services.Single(service => service.Id == "gpu-dashboard");
             Assert.Equal("/api/restart", saved.RestartPath);
-            Assert.Equal("super-secret-token", saved.RestartToken);
+            // The secret lives in the credential store; config keeps only the reference.
+            Assert.Empty(saved.RestartToken);
+            Assert.Equal("restart-gpu-dashboard", saved.RestartTokenReference);
+            Assert.Equal("super-secret-token", await store.LoadAsync(saved.RestartTokenReference));
             Assert.True(saved.HasRestartAction);
 
             var draft = controller.ViewModel.Services.Single(service => service.Id == "gpu-dashboard");
@@ -421,7 +426,10 @@ public sealed class ServiceRestartActionTests
         return directory;
     }
 
-    private static AppController CreateController(HttpClient client, string directory) =>
+    private static AppController CreateController(
+        HttpClient client,
+        string directory,
+        IRestartTokenStore? tokenStore = null) =>
         new(
             new ConfigStore(Path.Combine(directory, "config.json")),
             new RollingFileLogger(Path.Combine(directory, "logs")),
@@ -431,7 +439,8 @@ public sealed class ServiceRestartActionTests
             Path.Combine(directory, "logs"),
             () => null,
             dispatchUi: action => action(),
-            restartHttpClient: client);
+            restartHttpClient: client,
+            restartTokenStore: tokenStore ?? new InMemoryRestartTokenStore());
 
     private sealed class CapturingHandler(HttpStatusCode status = HttpStatusCode.OK) : HttpMessageHandler
     {
@@ -492,6 +501,10 @@ public sealed class ServiceRestartActionTests
         public Task RefreshAsync(AppConfig config, CancellationToken cancellationToken = default) =>
             Task.CompletedTask;
 
+        public void SetHealthCheckInterval(TimeSpan interval)
+        {
+        }
+
         public ValueTask DisposeAsync() => ValueTask.CompletedTask;
     }
 
@@ -517,6 +530,7 @@ public sealed class ServiceRestartActionTests
             restartToken);
         return new ServiceCardViewModel(
             state,
+            _ => Task.CompletedTask,
             _ => Task.CompletedTask,
             _ => Task.CompletedTask,
             _ => Task.CompletedTask,
@@ -554,6 +568,30 @@ public sealed class ServiceRestartActionTests
         Assert.Contains(result.Issues, issue => issue.Code == code && issue.Path == path);
     }
 
+    private sealed class InMemoryRestartTokenStore : IRestartTokenStore
+    {
+        private readonly Dictionary<string, string> _tokens = new(StringComparer.Ordinal);
+
+        public Task<string> SaveAsync(
+            string serviceId,
+            string token,
+            CancellationToken cancellationToken = default)
+        {
+            var reference = "restart-" + serviceId;
+            _tokens[reference] = token;
+            return Task.FromResult(reference);
+        }
+
+        public Task<string?> LoadAsync(string reference, CancellationToken cancellationToken = default) =>
+            Task.FromResult(_tokens.TryGetValue(reference, out var token) ? token : null);
+
+        public Task DeleteAsync(string reference, CancellationToken cancellationToken = default)
+        {
+            _tokens.Remove(reference);
+            return Task.CompletedTask;
+        }
+    }
+
     private sealed class FakePairingService : IDevicePairingService
     {
         public Task<DevicePairingResult> PairAsync(
@@ -583,6 +621,10 @@ public sealed class ServiceRestartActionTests
 
         public Task RefreshAsync(AppConfig config, CancellationToken cancellationToken = default) =>
             Task.CompletedTask;
+
+        public void SetHealthCheckInterval(TimeSpan interval)
+        {
+        }
 
         public ValueTask DisposeAsync() => ValueTask.CompletedTask;
     }

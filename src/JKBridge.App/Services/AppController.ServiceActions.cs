@@ -1,3 +1,4 @@
+using System.ComponentModel;
 using System.Text;
 using JKBridge.App.ViewModels;
 using JKBridge.App.Views;
@@ -20,7 +21,157 @@ public sealed partial class AppController
 
     private static readonly TimeSpan RestartSettleDelay = TimeSpan.FromSeconds(3);
 
+    private static readonly TimeSpan LogRequestTimeout = TimeSpan.FromSeconds(20);
+
+    /// <summary>
+    /// Service id of the optional Linux control daemon (jkbridge-ctl). Its entry
+    /// carries the shared control token and owns the restart/log tunnel port.
+    /// </summary>
+    private const string ControlServiceId = "jkbridge-ctl";
+
     private readonly Dictionary<string, DateTimeOffset> _lastSuccessfulRestarts = new(StringComparer.Ordinal);
+
+    private readonly Dictionary<string, string> _restartTokenCache = new(StringComparer.Ordinal);
+
+    /// <summary>
+    /// Synchronous view of the effective restart token for UI state mapping.
+    /// Populated by migration, warm-up, and saves.
+    /// </summary>
+    private string CachedRestartToken(ServiceDefinition service)
+    {
+        if (!string.IsNullOrWhiteSpace(service.RestartToken))
+        {
+            return service.RestartToken.Trim();
+        }
+
+        if (string.IsNullOrWhiteSpace(service.RestartTokenReference))
+        {
+            return string.Empty;
+        }
+
+        lock (_restartTokenCache)
+        {
+            return _restartTokenCache.TryGetValue(service.RestartTokenReference, out var token)
+                ? token
+                : string.Empty;
+        }
+    }
+
+    /// <summary>
+    /// Loads credential-store tokens into the cache so card state can show them.
+    /// </summary>
+    private async Task WarmRestartTokenCacheAsync(CancellationToken cancellationToken)
+    {
+        foreach (var service in _config.Services)
+        {
+            if (string.IsNullOrWhiteSpace(service.RestartTokenReference))
+            {
+                continue;
+            }
+
+            try
+            {
+                var token = await _restartTokenStore
+                    .LoadAsync(service.RestartTokenReference, cancellationToken)
+                    .ConfigureAwait(false);
+                lock (_restartTokenCache)
+                {
+                    if (string.IsNullOrEmpty(token))
+                    {
+                        _restartTokenCache.Remove(service.RestartTokenReference);
+                    }
+                    else
+                    {
+                        _restartTokenCache[service.RestartTokenReference] = token;
+                    }
+                }
+            }
+            catch (Exception exception) when (exception is
+                InvalidOperationException or PlatformNotSupportedException or Win32Exception)
+            {
+                // Leave the cache empty; the restart action reports the failure.
+            }
+        }
+    }
+
+    /// <summary>
+    /// Opens the Linux service log viewer. Logs travel through the control
+    /// daemon's tunnel as bounded, read-only text.
+    /// </summary>
+    public async Task OpenServiceLogAsync(string serviceId)
+    {
+        if (Volatile.Read(ref _disposed) != 0)
+        {
+            return;
+        }
+
+        var service = _config.Services.FirstOrDefault(item => item.Id == serviceId);
+        var control = _config.Services.FirstOrDefault(item => item.Id == ControlServiceId);
+        if (service is null || control is null || !control.Enabled)
+        {
+            ShowControllerError(
+                "\u65e0\u6cd5\u67e5\u770b\u65e5\u5fd7",
+                "\u672a\u914d\u7f6e\u201c\u91cd\u542f\u63a7\u5236\u201d\u670d\u52a1\u3002\u8bf7\u5728\u670d\u52a1\u9875\u9762\u6dfb\u52a0 id \u4e3a jkbridge-ctl \u7684\u670d\u52a1"
+                + "\uff08Windows \u4e0e Linux \u7aef\u53e3\u5747\u4e3a 8890\uff09\uff0c\u5e76\u5728 Linux \u4e0a\u5b89\u88c5 jkbridge-ctl \u5b88\u62a4\u8fdb\u7a0b\u3002");
+            return;
+        }
+
+        var route = ServiceRouteDefinition.Evaluate(control).Route;
+        var snapshot = _runtime.Snapshot.Services.FirstOrDefault(item => item.ServiceId == control.Id);
+        if (route is null || !_runtime.Snapshot.IsConnected || snapshot is null || !snapshot.CanOpen)
+        {
+            ShowControllerError(
+                "\u65e0\u6cd5\u67e5\u770b\u65e5\u5fd7",
+                "\u91cd\u542f\u63a7\u5236\u670d\u52a1\u7684\u96a7\u9053\u5c1a\u672a\u5c31\u7ee3\uff0c\u8bf7\u5148\u5efa\u7acb\u8fde\u63a5\u3002");
+            return;
+        }
+
+        var owner = _getWindow();
+        if (owner is null)
+        {
+            return;
+        }
+
+        var logPath = $"/api/log/{service.Id}";
+        var viewModel = new LogWindowViewModel(lines => FetchServiceLogAsync(control, logPath, lines))
+        {
+            Title = $"Linux \u65e5\u5fd7 \u00b7 {service.Name}",
+        };
+        var window = new LogWindow(viewModel);
+        window.Show(owner);
+        await viewModel.RefreshCommand.ExecuteAsync(null).ConfigureAwait(false);
+    }
+
+    private async Task<string> FetchServiceLogAsync(
+        ServiceDefinition control,
+        string logPath,
+        int lines)
+    {
+        var route = ServiceRouteDefinition.Evaluate(control).Route
+            ?? throw new InvalidOperationException("\u91cd\u542f\u63a7\u5236\u670d\u52a1\u7684\u5730\u5740\u65e0\u6548\u3002");
+        var token = await ResolveRestartTokenAsync(control, CancellationToken.None).ConfigureAwait(false);
+        var uri = new UriBuilder(route.OpenUri.Scheme, ServiceDefinition.LoopbackHost, control.LocalPort, logPath)
+        {
+            Query = $"lines={Math.Clamp(lines, 1, 500)}",
+        }.Uri;
+
+        using var client = new HttpClient(new HttpClientHandler { UseProxy = false });
+        using var request = new HttpRequestMessage(HttpMethod.Get, uri);
+        if (!string.IsNullOrWhiteSpace(token))
+        {
+            request.Headers.Add(RestartTokenHeader, token);
+        }
+
+        using var timeout = new CancellationTokenSource(LogRequestTimeout);
+        using var response = await client.SendAsync(request, timeout.Token).ConfigureAwait(false);
+        var body = await response.Content.ReadAsStringAsync(timeout.Token).ConfigureAwait(false);
+        if (!response.IsSuccessStatusCode)
+        {
+            throw new InvalidOperationException($"HTTP {(int)response.StatusCode} {body}".Trim());
+        }
+
+        return body;
+    }
 
     /// <summary>
     /// Shows the reusable modal confirmation dialog. Returns false when no owner
@@ -79,6 +230,7 @@ public sealed partial class AppController
 
         var ownsClient = _restartHttpClient is null;
         var client = _restartHttpClient ?? new HttpClient(new HttpClientHandler { UseProxy = false });
+        var token = await ResolveRestartTokenAsync(service, CancellationToken.None).ConfigureAwait(false);
         try
         {
             using var timeout = new CancellationTokenSource(RestartRequestTimeout);
@@ -91,9 +243,9 @@ public sealed partial class AppController
                 Content = new StringContent("{}", Encoding.UTF8, "application/json"),
             })
             {
-                if (!string.IsNullOrWhiteSpace(service.RestartToken))
+                if (!string.IsNullOrWhiteSpace(token))
                 {
-                    request.Headers.Add(RestartTokenHeader, service.RestartToken.Trim());
+                    request.Headers.Add(RestartTokenHeader, token);
                 }
 
                 try

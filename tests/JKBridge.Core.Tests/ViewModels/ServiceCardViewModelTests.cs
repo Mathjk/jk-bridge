@@ -65,6 +65,7 @@ public sealed class ServiceCardViewModelTests
         _ => Task.CompletedTask,
         _ => Task.CompletedTask,
         _ => Task.CompletedTask,
+        _ => Task.CompletedTask,
         (_, _) => Task.CompletedTask,
         _ => Task.CompletedTask,
         _ => Task.CompletedTask);

@@ -290,6 +290,7 @@ public sealed class ServiceRouteEditorViewModelTests
             _ => Task.CompletedTask,
             _ => Task.CompletedTask,
             _ => Task.CompletedTask,
+            _ => Task.CompletedTask,
             (_, _) => Task.CompletedTask,
             _ => Task.CompletedTask,
             _ => Task.CompletedTask,

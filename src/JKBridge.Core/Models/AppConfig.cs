@@ -110,6 +110,12 @@ public sealed record BehaviorSettings
 
     [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingDefault)]
     public bool WelcomeTutorialCompleted { get; init; }
+
+    /// <summary>
+    /// Service health-check interval in seconds. Applied to the running
+    /// supervisor without reconnecting.
+    /// </summary>
+    public int HealthCheckIntervalSeconds { get; init; } = 20;
 }
 
 public sealed record UpdateNetworkSettings
@@ -204,6 +210,13 @@ public sealed record ServiceDefinition
     /// installation's config only.
     /// </summary>
     public string RestartToken { get; init; } = string.Empty;
+
+    /// <summary>
+    /// Opaque reference to the restart token inside the operating-system
+    /// credential store. When set, <see cref="RestartToken"/> stays empty and
+    /// config.json never carries the secret.
+    /// </summary>
+    public string RestartTokenReference { get; init; } = string.Empty;
 
     [JsonIgnore(Condition = JsonIgnoreCondition.Always)]
     public bool HasRestartAction => !string.IsNullOrWhiteSpace(RestartPath);

@@ -11,6 +11,7 @@ public partial class ServiceCardViewModel : ViewModelBase
     private readonly Func<ServiceCardViewModel, Task> _open;
     private readonly Func<ServiceCardViewModel, Task> _retry;
     private readonly Func<ServiceCardViewModel, Task> _restart;
+    private readonly Func<ServiceCardViewModel, Task> _openLog;
     private readonly Func<ServiceCardViewModel, Task> _copy;
     private readonly Func<ServiceCardViewModel, bool, Task> _setEnabled;
     private readonly Func<ServiceCardViewModel, Task> _save;
@@ -63,6 +64,7 @@ public partial class ServiceCardViewModel : ViewModelBase
         Func<ServiceCardViewModel, Task> open,
         Func<ServiceCardViewModel, Task> retry,
         Func<ServiceCardViewModel, Task> restart,
+        Func<ServiceCardViewModel, Task> openLog,
         Func<ServiceCardViewModel, Task> copy,
         Func<ServiceCardViewModel, bool, Task> setEnabled,
         Func<ServiceCardViewModel, Task> save,
@@ -120,6 +122,7 @@ public partial class ServiceCardViewModel : ViewModelBase
         _open = open;
         _retry = retry;
         _restart = restart;
+        _openLog = openLog;
         _copy = copy;
         _setEnabled = setEnabled;
         _save = save;
@@ -259,6 +262,9 @@ public partial class ServiceCardViewModel : ViewModelBase
 
     [RelayCommand]
     private Task RestartAsync() => _restart(this);
+
+    [RelayCommand]
+    private Task OpenLogAsync() => _openLog(this);
 
     [RelayCommand]
     private Task CopyAddressAsync() => _copy(this);
@@ -426,7 +432,7 @@ public partial class ServiceCardViewModel : ViewModelBase
 
             return string.IsNullOrWhiteSpace(RestartTokenText)
                 ? $"未设置令牌：任何能访问该 Windows 端口的程序都可以触发重启。{portHint}"
-                : $"重启请求会经现有隧道 POST 到该路径，并携带令牌头。{portHint}";
+                : $"重启请求会经现有隧道 POST 到该路径，并携带令牌头；令牌保存在 Windows 凭据管理器中。{portHint}";
         }
     }
 

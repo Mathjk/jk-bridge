@@ -59,6 +59,7 @@ public sealed partial class AppController : IBridgeUiActions, IAsyncDisposable
     private readonly string _updateDirectory;
     private readonly StartupRegistration _startupRegistration;
     private readonly HttpClient? _restartHttpClient;
+    private readonly IRestartTokenStore _restartTokenStore;
     private readonly Func<Window?> _getWindow;
     private readonly Action<Action> _dispatchUi;
     private readonly string _logDirectory;
@@ -109,7 +110,8 @@ public sealed partial class AppController : IBridgeUiActions, IAsyncDisposable
         Action<string>? installerLauncher = null,
         IWindowsLocalServiceDiscovery? windowsLocalDiscovery = null,
         Func<Task>? applicationExitRequester = null,
-        HttpClient? restartHttpClient = null)
+        HttpClient? restartHttpClient = null,
+        IRestartTokenStore? restartTokenStore = null)
     {
         _configStore = configStore ?? throw new ArgumentNullException(nameof(configStore));
         _logger = logger ?? throw new ArgumentNullException(nameof(logger));
@@ -150,6 +152,7 @@ public sealed partial class AppController : IBridgeUiActions, IAsyncDisposable
         _installerLauncher = installerLauncher ?? LaunchInstaller;
         _applicationExitRequester = applicationExitRequester ?? (() => Task.CompletedTask);
         _restartHttpClient = restartHttpClient;
+        _restartTokenStore = restartTokenStore ?? new WindowsRestartTokenStore();
         _updateDirectory = Path.Combine(
             Path.GetDirectoryName(_logDirectory) ?? _logDirectory,
             "Updates");
@@ -166,6 +169,100 @@ public sealed partial class AppController : IBridgeUiActions, IAsyncDisposable
 
     public AppConfig CurrentConfig => _config;
 
+    private async Task<AppConfig> MigrateRestartTokensAsync(
+        AppConfig config,
+        CancellationToken cancellationToken)
+    {
+        var pending = config.Services
+            .Where(service =>
+                !string.IsNullOrWhiteSpace(service.RestartToken) &&
+                string.IsNullOrWhiteSpace(service.RestartTokenReference))
+            .ToArray();
+        if (pending.Length == 0)
+        {
+            return config;
+        }
+
+        try
+        {
+            var migrated = new List<ServiceDefinition>();
+            foreach (var service in pending)
+            {
+                var reference = await _restartTokenStore
+                    .SaveAsync(service.Id, service.RestartToken.Trim(), cancellationToken)
+                    .ConfigureAwait(false);
+                lock (_restartTokenCache)
+                {
+                    _restartTokenCache[reference] = service.RestartToken.Trim();
+                }
+
+                migrated.Add(service with { RestartToken = string.Empty, RestartTokenReference = reference });
+            }
+
+            var next = config with
+            {
+                Services = config.Services
+                    .Select(service => migrated.FirstOrDefault(item => item.Id == service.Id) ?? service with { })
+                    .ToList(),
+            };
+            await _configStore.SaveAsync(next, cancellationToken).ConfigureAwait(false);
+            await SafeLogAsync(
+                DiagnosticSeverity.Information,
+                "Security",
+                $"Moved {migrated.Count} restart token(s) into the Windows credential store.")
+                .ConfigureAwait(false);
+            return next;
+        }
+        catch (Exception exception) when (exception is
+            InvalidOperationException or PlatformNotSupportedException or IOException or
+                UnauthorizedAccessException or Win32Exception)
+        {
+            // Keep the plaintext token working when the credential store is unavailable.
+            await SafeLogAsync(
+                DiagnosticSeverity.Warning,
+                "Security",
+                "Restart tokens could not be moved into the Windows credential store.",
+                exception.Message)
+                .ConfigureAwait(false);
+            return config;
+        }
+    }
+
+    /// <summary>
+    /// Resolves the effective restart token: credential-store reference first,
+    /// then the legacy plaintext field.
+    /// </summary>
+    private async Task<string> ResolveRestartTokenAsync(
+        ServiceDefinition service,
+        CancellationToken cancellationToken)
+    {
+        if (!string.IsNullOrWhiteSpace(service.RestartTokenReference))
+        {
+            try
+            {
+                var stored = await _restartTokenStore
+                    .LoadAsync(service.RestartTokenReference, cancellationToken)
+                    .ConfigureAwait(false);
+                if (!string.IsNullOrEmpty(stored))
+                {
+                    return stored;
+                }
+            }
+            catch (Exception exception) when (exception is
+                InvalidOperationException or PlatformNotSupportedException or Win32Exception)
+            {
+                await SafeLogAsync(
+                    DiagnosticSeverity.Warning,
+                    "Service",
+                    $"Could not read the restart token for {service.Name}.",
+                    exception.Message)
+                    .ConfigureAwait(false);
+            }
+        }
+
+        return service.RestartToken.Trim();
+    }
+
     public bool CloseToTray => _config.Behavior.CloseToTray;
 
     public async Task InitializeAsync(CancellationToken cancellationToken = default)
@@ -173,7 +270,7 @@ public sealed partial class AppController : IBridgeUiActions, IAsyncDisposable
         try
         {
             var loaded = await _configStore.LoadWithResultAsync(cancellationToken).ConfigureAwait(false);
-            _config = loaded.Config;
+            _config = await MigrateRestartTokensAsync(loaded.Config, cancellationToken).ConfigureAwait(false);
             ConfigureReleaseUpdateNetwork(_config.UpdateNetwork);
             if (loaded.Source == ConfigLoadSource.Defaults || loaded.WasMigrated)
             {
@@ -181,6 +278,10 @@ public sealed partial class AppController : IBridgeUiActions, IAsyncDisposable
             }
 
             await RepairStartupRegistrationAsync(cancellationToken).ConfigureAwait(false);
+
+            await WarmRestartTokenCacheAsync(cancellationToken).ConfigureAwait(false);
+
+            ApplyHealthCheckInterval();
 
             await _logger.WriteAsync(
                 DiagnosticSeverity.Information,
@@ -2632,6 +2733,7 @@ public sealed partial class AppController : IBridgeUiActions, IAsyncDisposable
 
     public async Task SaveServiceAsync(ServiceUiState state)
     {
+        string? tokenStoreWarning = null;
         try
         {
             await SaveConfigAsync(
@@ -2651,9 +2753,56 @@ public sealed partial class AppController : IBridgeUiActions, IAsyncDisposable
                         HealthKind = state.HealthKind,
                         Enabled = state.IsEnabled,
                         RestartPath = state.RestartPath.Trim(),
-                        RestartToken = state.RestartToken.Trim(),
                         RestartLocalPort = state.RestartLocalPort,
                     };
+
+                    // The token lives in the OS credential store: an empty box means
+                    // "no token", a non-empty box replaces the stored secret.
+                    var token = state.RestartToken.Trim();
+                    if (token.Length > 0)
+                    {
+                        try
+                        {
+                            var reference = _restartTokenStore
+                                .SaveAsync(state.Id, token)
+                                .GetAwaiter()
+                                .GetResult();
+                            lock (_restartTokenCache)
+                            {
+                                _restartTokenCache[reference] = token;
+                            }
+
+                            updated = updated with { RestartToken = string.Empty, RestartTokenReference = reference };
+                        }
+                        catch (Exception exception) when (exception is
+                            InvalidOperationException or PlatformNotSupportedException or IOException or
+                                UnauthorizedAccessException or Win32Exception)
+                        {
+                            // Fall back to the config field so the action keeps working.
+                            updated = updated with { RestartToken = token, RestartTokenReference = string.Empty };
+                            tokenStoreWarning = exception.Message;
+                        }
+                    }
+                    else if (!string.IsNullOrWhiteSpace(existing.RestartTokenReference))
+                    {
+                        try
+                        {
+                            _restartTokenStore.DeleteAsync(existing.RestartTokenReference).GetAwaiter().GetResult();
+                        }
+                        catch (Exception exception) when (exception is
+                            InvalidOperationException or PlatformNotSupportedException or Win32Exception)
+                        {
+                            // The reference is dropped from config regardless.
+                        }
+
+                        lock (_restartTokenCache)
+                        {
+                            _restartTokenCache.Remove(existing.RestartTokenReference);
+                        }
+
+                        updated = updated with { RestartToken = string.Empty, RestartTokenReference = string.Empty };
+                    }
+
                     return current with
                     {
                         Services = current.Services
@@ -2662,6 +2811,12 @@ public sealed partial class AppController : IBridgeUiActions, IAsyncDisposable
                     };
                 },
                 $"{state.Name.Trim()} 已保存。");
+            if (!string.IsNullOrWhiteSpace(tokenStoreWarning))
+            {
+                RunOnUi(() => ViewModel.ShowNotice(
+                    "令牌已保存在配置文件中",
+                    "Windows 凭据管理器当前不可用，重启令牌退回了配置文件。请检查凭据管理器后重新保存一次。"));
+            }
         }
         catch (InvalidOperationException exception)
         {
@@ -2753,6 +2908,12 @@ public sealed partial class AppController : IBridgeUiActions, IAsyncDisposable
             return;
         }
 
+        if (settings.HealthCheckIntervalSeconds is < 5 or > 300)
+        {
+            RunOnUi(() => ViewModel.SettingsFeedback = "健康检查间隔必须是 5–300 秒。");
+            return;
+        }
+
         var theme = settings.ThemeIndex switch
         {
             1 => ThemePreference.Light,
@@ -2794,6 +2955,7 @@ public sealed partial class AppController : IBridgeUiActions, IAsyncDisposable
                     CloseToTray = settings.CloseToTray,
                     StartWithWindows = settings.StartWithWindows,
                     Theme = theme,
+                    HealthCheckIntervalSeconds = settings.HealthCheckIntervalSeconds,
                 },
                 UpdateNetwork = new UpdateNetworkSettings
                 {
@@ -2833,11 +2995,34 @@ public sealed partial class AppController : IBridgeUiActions, IAsyncDisposable
         if (await SaveConfigAsync(BuildSettingsConfig, "设置已保存，连接配置已经重新应用。"))
         {
             ConfigureReleaseUpdateNetwork(_config.UpdateNetwork);
+            ApplyHealthCheckInterval();
             RunOnUi(() =>
             {
                 ApplyTheme(theme);
                 ViewModel.SettingsFeedback = "设置已保存；新的更新网络方式将在下一次检查或下载时使用。";
             });
+        }
+    }
+
+    /// <summary>
+    /// Pushes the configured health-check interval into the running supervisor.
+    /// </summary>
+    private void ApplyHealthCheckInterval()
+    {
+        var seconds = _config.Behavior.HealthCheckIntervalSeconds;
+        if (seconds is < 5 or > 300)
+        {
+            return;
+        }
+
+        try
+        {
+            _runtime.SetHealthCheckInterval(TimeSpan.FromSeconds(seconds));
+        }
+        catch (Exception exception) when (exception is ArgumentOutOfRangeException or ObjectDisposedException)
+        {
+            // The runtime replaces its supervisor loop on reconnect; the next
+            // loop iteration picks the interval up.
         }
     }
 
@@ -3418,6 +3603,44 @@ public sealed partial class AppController : IBridgeUiActions, IAsyncDisposable
     private void RuntimeOnSnapshotChanged(object? sender, TunnelSnapshot snapshot) =>
         RunOnUi(() => ApplySnapshot(snapshot));
 
+    /// <summary>
+    /// Raised when an enabled service transitions into a broken phase so the
+    /// shell layer can surface a desktop notification.
+    /// </summary>
+    public event EventHandler<ServiceAlert>? ServiceAlert;
+
+    private readonly Dictionary<string, ServicePhase> _lastServicePhases = new(StringComparer.Ordinal);
+
+    private void DetectServiceAlerts(IReadOnlyList<ServiceSnapshot> services)
+    {
+        foreach (var service in services)
+        {
+            var definition = _config.Services.FirstOrDefault(item => item.Id == service.ServiceId);
+            if (definition is null || !definition.Enabled)
+            {
+                continue;
+            }
+
+            var seen = _lastServicePhases.TryGetValue(service.ServiceId, out var previous);
+            _lastServicePhases[service.ServiceId] = service.Phase;
+            if (!seen)
+            {
+                continue;
+            }
+
+            var broken = service.Phase is ServicePhase.RemoteUnavailable or ServicePhase.ForwardDenied;
+            var wasBroken = previous is ServicePhase.RemoteUnavailable or ServicePhase.ForwardDenied;
+            if (broken && !wasBroken)
+            {
+                ServiceAlert?.Invoke(this, new ServiceAlert(
+                    service.ServiceId,
+                    service.Name,
+                    service.Phase == ServicePhase.ForwardDenied ? "SSH 转发被拒绝" : "服务无响应",
+                    service.Detail ?? "请检查 Linux 上的服务状态。"));
+            }
+        }
+    }
+
     private void LoggerOnEventWritten(object? sender, DiagnosticEvent entry) =>
         RunOnUi(RefreshDiagnostics);
 
@@ -3465,6 +3688,8 @@ public sealed partial class AppController : IBridgeUiActions, IAsyncDisposable
                 service,
                 runtimeServices.FirstOrDefault(item => item.ServiceId == service.Id)
                 ?? new ServiceSnapshot(service.Id, service.Name, ServicePhase.WaitingForTunnel))));
+
+        DetectServiceAlerts(runtimeServices);
 
         ViewModel.TailscaleExecutable = ExecutableLocator.FindTailscale() ?? "未找到 tailscale.exe";
         ViewModel.HasTailscaleIssue = snapshot.Phase is TunnelPhase.NeedsTailscale or TunnelPhase.WrongTailnet;
@@ -3641,6 +3866,9 @@ public sealed partial class AppController : IBridgeUiActions, IAsyncDisposable
             _ => 0,
         };
         ViewModel.UpdateManualProxyUrl = _config.UpdateNetwork.ManualProxyUrl;
+        ViewModel.HealthCheckIntervalSeconds = _config.Behavior.HealthCheckIntervalSeconds is >= 5 and <= 300
+            ? _config.Behavior.HealthCheckIntervalSeconds
+            : 20;
         ViewModel.MarkThemeSaved(_config.Behavior.Theme);
         ViewModel.ApplySetupState(
             _config.SetupCompleted,
@@ -3699,7 +3927,7 @@ public sealed partial class AppController : IBridgeUiActions, IAsyncDisposable
             service.HealthKind,
             service.HealthPath,
             service.RestartPath,
-            service.RestartToken,
+            CachedRestartToken(service),
             service.RestartLocalPort,
             FormatLastRestart(service.Id));
     }

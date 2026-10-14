@@ -76,6 +76,8 @@ internal sealed record LegacyBehaviorSettingsV3
 
     public required ThemePreference Theme { get; init; }
 
+    public int HealthCheckIntervalSeconds { get; init; } = 20;
+
     public BehaviorSettings ToCurrent() => new()
     {
         AutoConnect = AutoConnect,
@@ -83,6 +85,7 @@ internal sealed record LegacyBehaviorSettingsV3
         CloseToTray = CloseToTray,
         StartWithWindows = StartWithWindows,
         Theme = Theme,
+        HealthCheckIntervalSeconds = HealthCheckIntervalSeconds,
     };
 }
 
@@ -135,6 +138,8 @@ internal sealed record LegacyServiceDefinitionV3
 
     public string RestartToken { get; init; } = string.Empty;
 
+    public string RestartTokenReference { get; init; } = string.Empty;
+
     public int RestartLocalPort { get; init; }
 
     public ServiceDefinition ToCurrent() => new()
@@ -153,6 +158,7 @@ internal sealed record LegacyServiceDefinitionV3
         HealthKind = HealthKind,
         RestartPath = RestartPath,
         RestartToken = RestartToken,
+        RestartTokenReference = RestartTokenReference,
         RestartLocalPort = RestartLocalPort,
     };
 }

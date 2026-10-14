@@ -216,6 +216,10 @@ public sealed class AppControllerWindowsLocalServiceTests
             return Task.CompletedTask;
         }
 
+        public void SetHealthCheckInterval(TimeSpan interval)
+        {
+        }
+
         public ValueTask DisposeAsync() => ValueTask.CompletedTask;
     }
 }

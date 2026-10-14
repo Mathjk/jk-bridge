@@ -110,6 +110,17 @@
                                     <TextBlock Text="切换连接方式后请先保存，再检查或下载更新。下载不动时可取消，并在浏览器中打开官方 Release。"
                                                Classes="body" TextWrapping="Wrap" />
                                 </Border>
+
+                                <TextBlock Text="服务健康检查间隔" Classes="body-strong" Margin="0,18,0,6" />
+                                <ComboBox SelectedIndex="{Binding HealthCheckIntervalIndex}" Classes="field">
+                                    <ComboBoxItem Content="10 秒" />
+                                    <ComboBoxItem Content="20 秒（默认）" />
+                                    <ComboBoxItem Content="30 秒" />
+                                    <ComboBoxItem Content="60 秒" />
+                                    <ComboBoxItem Content="120 秒" />
+                                </ComboBox>
+                                <TextBlock Text="只影响卡片状态刷新频率，不改变 SSH 隧道；保存后立即生效，无需重连。"
+                                           Classes="caption" TextWrapping="Wrap" Margin="0,7,0,0" />
                             </StackPanel>
 
                             <StackPanel Grid.Column="2">
