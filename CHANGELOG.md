@@ -2,6 +2,45 @@
 
 All notable changes are documented here. The project follows semantic versioning after the first public release.
 
+## 2.4.0 - 2026-10-14
+
+This release turns the restart action into a complete operational feature,
+adds an optional Linux control daemon, and removes the experimental Linux
+Agent stack. One-shot pairing remains the only device-enrollment path, and the
+restricted-SSH security model is unchanged.
+
+### Added
+
+- Added a reusable modal confirmation dialog. Restarting a service now
+  requires an explicit confirmation that names the service and warns about the
+  brief interruption.
+- Added a restarting button state and a session-scoped "last restarted" audit
+  line on each service card.
+- Added status-code-specific rejection messages (token, path, format, server
+  error) and an honest "delivery unconfirmed" notice when the connection drops
+  during an in-place restart.
+- Added `jkbridge-ctl`, an optional systemd user daemon that exposes
+  token-protected restart, log, and status actions over a fixed allow-list on
+  Linux loopback, with packaging and installation notes.
+- Added an optional restart port per service so one existing tunnel (the
+  control daemon's) can serve the restart buttons of every service card.
+  Validation requires the target port to match a configured service port.
+- Moved restart tokens into the Windows credential store. Existing plaintext
+  tokens migrate automatically on first launch; config keeps only a reference.
+- Added native balloon alerts when an enabled service transitions into a
+  broken phase.
+- Added a Linux service log viewer that reads bounded, read-only log tails
+  through the control tunnel.
+- Added a configurable service health-check interval (10/20/30/60/120 s)
+  applied to the running supervisor without reconnecting.
+
+### Removed
+
+- Removed the experimental Linux Agent stack: client, enrollment, management,
+  discovery, managed relays, packaging, and their documentation and tests.
+  The one-shot `jkbridge-linux.py` pairing helper is unchanged and remains the
+  supported setup and recovery path.
+
 ## 2.3.1 - 2026-10-13
 
 This release generalizes the restart action so one shared Linux control
