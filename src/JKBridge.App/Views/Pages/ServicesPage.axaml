@@ -119,9 +119,10 @@
                                             <TextBlock Text="{Binding BrowserUrlPreview}" Classes="caption"
                                                        VerticalAlignment="Center" TextTrimming="CharacterEllipsis" />
                                             <Button Grid.Column="1" Content="检查" Classes="ghost" Command="{Binding RetryCommand}" />
-                                            <Button Grid.Column="2" Content="重启" Classes="ghost"
+                                            <Button Grid.Column="2" Content="{Binding RestartButtonText}" Classes="ghost"
                                                     Command="{Binding RestartCommand}"
-                                                    IsVisible="{Binding HasRestartAction}" />
+                                                    IsVisible="{Binding HasRestartAction}"
+                                                    IsEnabled="{Binding !IsRestarting}" />
                                             <Button Grid.Column="3" Content="打开 ↗" Classes="ghost" Command="{Binding OpenCommand}"
                                                     IsEnabled="{Binding CanOpen}" />
                                         </Grid>

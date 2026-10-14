@@ -245,7 +245,7 @@ public sealed class ServiceRestartActionTests
     [Fact]
     public async Task RestartServiceAsync_SurfacesRejectionWithoutClaimingSuccess()
     {
-        var handler = new CapturingHandler(HttpStatusCode.InternalServerError);
+        var handler = new CapturingHandler(HttpStatusCode.Unauthorized);
         using var client = new HttpClient(handler);
         var directory = CreateControllerDirectory();
         var controller = CreateController(client, directory);
@@ -276,10 +276,34 @@ public sealed class ServiceRestartActionTests
 
             Assert.True(handler.Called, "The restart request was never sent.");
             Assert.Contains("重启被拒绝", controller.ViewModel.IssueTitle, StringComparison.Ordinal);
+            Assert.Contains("令牌", controller.ViewModel.IssueDetail, StringComparison.Ordinal);
         }
         finally
         {
             await controller.DisposeAsync();
+            if (Directory.Exists(directory))
+            {
+                Directory.Delete(directory, recursive: true);
+            }
+        }
+    }
+
+    [Fact]
+    public void ConfirmAsync_WithoutOwnerWindowFailsSafe()
+    {
+        var directory = CreateControllerDirectory();
+        var controller = CreateController(new HttpClient(new CapturingHandler()), directory);
+
+        try
+        {
+            // The test host has no main window, so a destructive action must not proceed.
+            var confirmed = controller.ConfirmAsync(new ConfirmRequest("t", "m")).GetAwaiter().GetResult();
+
+            Assert.False(confirmed);
+        }
+        finally
+        {
+            controller.DisposeAsync().GetAwaiter().GetResult();
             if (Directory.Exists(directory))
             {
                 Directory.Delete(directory, recursive: true);

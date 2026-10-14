@@ -1,4 +1,6 @@
 using System.Text;
+using JKBridge.App.ViewModels;
+using JKBridge.App.Views;
 using JKBridge.Core.Diagnostics;
 using JKBridge.Core.Models;
 using JKBridge.Core.Routing;
@@ -17,6 +19,30 @@ public sealed partial class AppController
     private static readonly TimeSpan RestartRequestTimeout = TimeSpan.FromSeconds(15);
 
     private static readonly TimeSpan RestartSettleDelay = TimeSpan.FromSeconds(3);
+
+    private readonly Dictionary<string, DateTimeOffset> _lastSuccessfulRestarts = new(StringComparer.Ordinal);
+
+    /// <summary>
+    /// Shows the reusable modal confirmation dialog. Returns false when no owner
+    /// window exists, so callers fail safe for destructive actions.
+    /// </summary>
+    public Task<bool> ConfirmAsync(ConfirmRequest request)
+    {
+        var owner = _getWindow();
+        if (owner is null)
+        {
+            return Task.FromResult(false);
+        }
+
+        var dialog = new ConfirmDialogWindow(new ConfirmDialogViewModel
+        {
+            Title = request.Title,
+            Message = request.Message,
+            ConfirmText = request.ConfirmText,
+            IsDangerous = request.IsDangerous,
+        });
+        return dialog.ShowDialog<bool>(owner);
+    }
 
     public async Task RestartServiceAsync(string serviceId)
     {
@@ -57,6 +83,7 @@ public sealed partial class AppController
         {
             using var timeout = new CancellationTokenSource(RestartRequestTimeout);
             var accepted = false;
+            var unconfirmed = false;
             string? rejection = null;
             using (var request = new HttpRequestMessage(HttpMethod.Post, restartUri)
             {
@@ -74,22 +101,36 @@ public sealed partial class AppController
                     using var response = await client
                         .SendAsync(request, HttpCompletionOption.ResponseHeadersRead, timeout.Token)
                         .ConfigureAwait(false);
-                    accepted = response.IsSuccessStatusCode;
-                    if (!accepted)
+                    if (response.IsSuccessStatusCode)
                     {
-                        rejection = $"HTTP {(int)response.StatusCode}";
+                        accepted = true;
+                    }
+                    else
+                    {
+                        var code = (int)response.StatusCode;
+                        rejection = code switch
+                        {
+                            401 or 403 => "令牌被拒绝，请检查重启令牌是否正确",
+                            404 => "Linux 端没有这个重启路径，请检查路径配置",
+                            400 or 405 or 415 => "Linux 端不接受这个请求格式",
+                            >= 500 => $"Linux 端执行重启时出错（HTTP {code}）",
+                            _ => $"HTTP {code}",
+                        };
                     }
                 }
                 catch (OperationCanceledException) when (timeout.IsCancellationRequested)
                 {
                     // The service accepted the restart and never finished the response.
                     accepted = true;
+                    unconfirmed = true;
                 }
                 catch (HttpRequestException)
                 {
                     // An in-place restart can drop the loopback connection before the
-                    // response body is written. Treat a transport failure as "sent".
+                    // response body is written. Treat a transport failure as "sent",
+                    // but flag it as unconfirmed so the notice stays honest.
                     accepted = true;
+                    unconfirmed = true;
                 }
             }
 
@@ -101,20 +142,29 @@ public sealed partial class AppController
                         $"Restart rejected for {service.Name}.",
                         rejection)
                     .ConfigureAwait(false);
-                ShowControllerError(
-                    "重启被拒绝",
-                    $"Linux 服务没有接受重启请求（{rejection ?? "未知原因"}）。请检查重启路径和令牌是否正确。");
+                ShowControllerError("重启被拒绝", rejection ?? "未知原因");
                 return;
+            }
+
+            if (!unconfirmed)
+            {
+                lock (_lastSuccessfulRestarts)
+                {
+                    _lastSuccessfulRestarts[service.Id] = DateTimeOffset.Now;
+                }
             }
 
             await SafeLogAsync(
                     DiagnosticSeverity.Information,
                     "Service",
-                    $"Restart requested for {service.Name}.")
+                    $"Restart requested for {service.Name}.",
+                    unconfirmed ? "Delivery could not be confirmed." : null)
                 .ConfigureAwait(false);
             RunOnUi(() => ViewModel.ShowNotice(
-                "重启指令已发送",
-                $"{service.Name} 正在重启；稍等片刻会自动刷新健康状态。"));
+                unconfirmed ? "重启指令已发送（未能确认送达）" : "重启指令已发送",
+                unconfirmed
+                    ? $"{service.Name} 的连接在重启过程中中断，指令可能已送达。请稍后核对服务状态；若未生效请重试一次。"
+                    : $"{service.Name} 正在重启；稍等片刻会自动刷新健康状态。"));
 
             await Task.Delay(RestartSettleDelay).ConfigureAwait(false);
             await ProbeServiceAsync(service).ConfigureAwait(false);

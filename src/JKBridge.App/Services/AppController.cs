@@ -3660,7 +3660,7 @@ public sealed partial class AppController : IBridgeUiActions, IAsyncDisposable
     private void RefreshDiagnostics() =>
         ViewModel.SetDiagnostics(_logger.Snapshot().Reverse().Take(100).Select(ToDiagnosticUiState));
 
-    private static ServiceUiState ToServiceUiState(ServiceDefinition service, ServiceSnapshot snapshot)
+    private ServiceUiState ToServiceUiState(ServiceDefinition service, ServiceSnapshot snapshot)
     {
         var available = snapshot.Phase == ServicePhase.Available;
         var warning = snapshot.Phase is ServicePhase.RemoteUnavailable or ServicePhase.ForwardDenied;
@@ -3700,7 +3700,30 @@ public sealed partial class AppController : IBridgeUiActions, IAsyncDisposable
             service.HealthPath,
             service.RestartPath,
             service.RestartToken,
-            service.RestartLocalPort);
+            service.RestartLocalPort,
+            FormatLastRestart(service.Id));
+    }
+
+    /// <summary>
+    /// Session-scoped audit text for the last confirmed restart of a service.
+    /// </summary>
+    private string FormatLastRestart(string serviceId)
+    {
+        lock (_lastSuccessfulRestarts)
+        {
+            if (!_lastSuccessfulRestarts.TryGetValue(serviceId, out var at))
+            {
+                return string.Empty;
+            }
+
+            var local = at.ToLocalTime();
+            var today = DateTime.Today;
+            return local.Date == today
+                ? $"最近重启 今天 {local:HH:mm}"
+                : local.Date == today.AddDays(-1)
+                    ? $"最近重启 昨天 {local:HH:mm}"
+                    : $"最近重启 {local:MM-dd HH:mm}";
+        }
     }
 
     /// <summary>

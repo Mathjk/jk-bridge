@@ -93,6 +93,38 @@ public sealed class ServiceProfileTests
     }
 
     [Fact]
+    public void DeserializeImportDocument_LegacyPathKeepsCurrentServiceFields()
+    {
+        // Guards the legacy import boundary: every new ServiceDefinition field must
+        // be tolerated by LegacyServiceDefinitionV3, otherwise a configuration that
+        // carries newer service fields fails the v2.1 import path.
+        var legacy = TestConfigs.CreateConfigured() with
+        {
+            SchemaVersion = 3,
+            Services =
+            [
+                .. TestConfigs.CreateConfigured().Services.Select(service =>
+                    service.Id == "gpu-dashboard"
+                        ? service with
+                        {
+                            RestartPath = "/api/restart/investment-news",
+                            RestartToken = "legacy-import-token",
+                            RestartLocalPort = 8765,
+                        }
+                        : service with { }),
+            ],
+        };
+        var json = SerializeLegacyV3(legacy);
+
+        var import = ServiceProfileSerializer.DeserializeImportDocument(json);
+
+        Assert.Equal(ServiceProfileImportSource.LegacyConfigV3, import.Source);
+        var dashboard = import.Profile.Services.Single(service => service.Id == "gpu-dashboard");
+        Assert.Equal("/api/restart/investment-news", dashboard.RestartPath);
+        Assert.Equal(8765, dashboard.RestartLocalPort);
+    }
+
+    [Fact]
     public void DeserializeImportDocument_ExplicitlyIdentifiesPortableProfile()
     {
         var profile = ServiceProfileSerializer.Create(AppConfig.CreateDefault());

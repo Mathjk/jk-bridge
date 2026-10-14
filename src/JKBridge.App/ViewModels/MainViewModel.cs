@@ -1136,7 +1136,7 @@ public partial class MainViewModel : ViewModelBase
                 state,
                 service => _actions.OpenServiceAsync(service.Id, service.LocalUrl),
                 service => _actions.RetryServiceAsync(service.Id),
-                service => _actions.RestartServiceAsync(service.Id),
+                RestartWithConfirmationAsync,
                 service => _actions.CopyAddressAsync(service.LocalUrl),
                 (service, enabled) => SaveServiceDraftAsync(service),
                 SaveServiceDraftAsync,
@@ -1160,6 +1160,33 @@ public partial class MainViewModel : ViewModelBase
             }
 
             existing.ApplyRuntimeState(state);
+        }
+    }
+
+    private async Task RestartWithConfirmationAsync(ServiceCardViewModel card)
+    {
+        if (card.IsRestarting)
+        {
+            return;
+        }
+
+        var confirmed = await _actions.ConfirmAsync(new ConfirmRequest(
+            $"重启 {card.Name}？",
+            $"{card.Name} 会短暂中断，正在使用的页面需要刷新。重启请求经现有 SSH 隧道发送到 Linux。",
+            "重启"));
+        if (!confirmed)
+        {
+            return;
+        }
+
+        card.IsRestarting = true;
+        try
+        {
+            await _actions.RestartServiceAsync(card.Id);
+        }
+        finally
+        {
+            card.IsRestarting = false;
         }
     }
 

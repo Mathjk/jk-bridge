@@ -35,7 +35,17 @@ public sealed record ServiceUiState(
     string HealthPath = "/",
     string RestartPath = "",
     string RestartToken = "",
-    int RestartLocalPort = 0);
+    int RestartLocalPort = 0,
+    string LastRestartText = "");
+
+/// <summary>
+/// Request for the reusable modal confirmation dialog.
+/// </summary>
+public sealed record ConfirmRequest(
+    string Title,
+    string Message,
+    string ConfirmText = "确认",
+    bool IsDangerous = true);
 
 public sealed record WindowsLocalServiceUiState(
     string Id,
@@ -180,6 +190,7 @@ public interface IBridgeUiActions
     Task OpenServiceAsync(string serviceId, string localUrl);
     Task RetryServiceAsync(string serviceId);
     Task RestartServiceAsync(string serviceId);
+    Task<bool> ConfirmAsync(ConfirmRequest request);
     Task CopyAddressAsync(string localUrl);
     Task SetServiceEnabledAsync(string serviceId, bool enabled);
     Task AddServiceAsync();
@@ -265,6 +276,7 @@ internal sealed class NullBridgeUiActions : IBridgeUiActions
     public Task OpenServiceAsync(string serviceId, string localUrl) => Task.CompletedTask;
     public Task RetryServiceAsync(string serviceId) => Task.CompletedTask;
     public Task RestartServiceAsync(string serviceId) => Task.CompletedTask;
+    public Task<bool> ConfirmAsync(ConfirmRequest request) => Task.FromResult(false);
     public Task CopyAddressAsync(string localUrl) => Task.CompletedTask;
     public Task SetServiceEnabledAsync(string serviceId, bool enabled) => Task.CompletedTask;
     public Task AddServiceAsync() => Task.CompletedTask;

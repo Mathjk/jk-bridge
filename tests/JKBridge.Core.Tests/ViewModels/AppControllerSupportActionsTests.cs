@@ -1,3 +1,4 @@
+using System.Reflection;
 using JKBridge.App.Platform;
 using JKBridge.App.Services;
 using JKBridge.Core.Configuration;
@@ -11,6 +12,11 @@ namespace JKBridge.Core.Tests.ViewModels;
 
 public sealed class AppControllerSupportActionsTests
 {
+    private static string CurrentApplicationVersion => typeof(AppController).Assembly
+        .GetCustomAttribute<AssemblyInformationalVersionAttribute>()!
+        .InformationalVersion
+        .Split('+', 2)[0];
+
     [Fact]
     public async Task SupportActions_AreManualAndDiagnosticExportUsesSafeService()
     {
@@ -57,12 +63,12 @@ public sealed class AppControllerSupportActionsTests
             await controller.CheckForUpdatesAsync();
 
             Assert.Equal(1, updateChecker.Calls);
-            Assert.Equal("2.3.1", updateChecker.CurrentVersion);
-            Assert.Equal("JK Bridge 2.3.1", controller.ViewModel.ApplicationVersionText);
-            Assert.Equal("v2.3.1 · Windows 11", controller.ViewModel.ApplicationFooterText);
+            Assert.Equal(CurrentApplicationVersion, updateChecker.CurrentVersion);
+            Assert.Equal($"JK Bridge {CurrentApplicationVersion}", controller.ViewModel.ApplicationVersionText);
+            Assert.Equal($"v{CurrentApplicationVersion} · Windows 11", controller.ViewModel.ApplicationFooterText);
             Assert.True(controller.ViewModel.HasUpdateReleaseInfo);
             Assert.Equal(
-                "https://github.com/Mathjk/jk-bridge/releases/tag/v2.3.0",
+                "https://github.com/Mathjk/jk-bridge/releases/tag/v9.9.9",
                 controller.ViewModel.UpdateReleaseUrl);
             Assert.Contains("没有成对的 Windows 安装器和 SHA-256", controller.ViewModel.UpdateCheckFeedback);
             Assert.False(controller.ViewModel.IsUpdateChecking);
@@ -407,7 +413,7 @@ public sealed class AppControllerSupportActionsTests
 
     private sealed class RecordingUpdateChecker(
         bool updateAvailable = true,
-        string latestVersion = "2.3.0",
+        string latestVersion = "9.9.9",
         ReleaseInstallerAsset? installer = null,
         string? downloadedInstallerPath = null,
         bool waitForCancellation = false) : IReleaseUpdateChecker, IReleaseUpdateNetworkConfigurator

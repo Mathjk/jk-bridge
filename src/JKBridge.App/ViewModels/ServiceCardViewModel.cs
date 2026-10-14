@@ -46,6 +46,8 @@ public partial class ServiceCardViewModel : ViewModelBase
     [ObservableProperty] private string _restartTokenText;
     [ObservableProperty] private string _restartLocalPortText;
     [ObservableProperty] private bool _useRestartAction;
+    [ObservableProperty] private bool _isRestarting;
+    [ObservableProperty] private string _lastRestartText;
     [ObservableProperty] private ServiceTemplateOptionViewModel? _selectedTemplate;
     [ObservableProperty] private bool _templateApplyConfirmed;
     [ObservableProperty] private string _templateApplyFeedback = "选择模板只会显示预览；确认并点击应用后才会改动当前草稿。";
@@ -113,6 +115,7 @@ public partial class ServiceCardViewModel : ViewModelBase
             ? string.Empty
             : state.RestartLocalPort.ToString(System.Globalization.CultureInfo.InvariantCulture);
         _useRestartAction = !string.IsNullOrWhiteSpace(state.RestartPath);
+        _lastRestartText = state.LastRestartText;
 
         _open = open;
         _retry = retry;
@@ -394,6 +397,15 @@ public partial class ServiceCardViewModel : ViewModelBase
     /// </summary>
     public bool HasRestartAction => UseRestartAction && IsSafeRestartPath(RestartPathText);
 
+    partial void OnIsRestartingChanged(bool value) => OnPropertyChanged(nameof(RestartButtonText));
+
+    partial void OnLastRestartTextChanged(string value) =>
+        OnPropertyChanged(nameof(HasLastRestartText));
+
+    public string RestartButtonText => IsRestarting ? "重启中…" : "重启";
+
+    public bool HasLastRestartText => !string.IsNullOrWhiteSpace(LastRestartText);
+
     public string RestartActionHint
     {
         get
@@ -568,6 +580,7 @@ public partial class ServiceCardViewModel : ViewModelBase
         IsAvailable = state.IsAvailable;
         HasWarning = state.HasWarning;
         CanOpen = state.CanOpen;
+        LastRestartText = state.LastRestartText;
     }
 
     private static int ToHealthModeIndex(HealthCheckKind kind) => kind switch
