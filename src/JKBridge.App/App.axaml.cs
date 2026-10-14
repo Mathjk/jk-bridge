@@ -1,4 +1,3 @@
-using System.ComponentModel;
 using Avalonia;
 using Avalonia.Controls;
 using Avalonia.Controls.ApplicationLifetimes;
@@ -138,10 +137,11 @@ public partial class App : Application
                 $"{alert.ServiceName}：{alert.Title}",
                 alert.Detail);
         }
-        catch (Exception exception) when (exception is
-            InvalidOperationException or Win32Exception or NotSupportedException)
+        catch (Exception)
         {
-            // Notification support is optional; the in-app banner still shows.
+            // Notification support is best-effort: a missing platform entry point
+            // or any interop failure must never take down the bridge. The in-app
+            // banner still shows the same information.
         }
     }
 
